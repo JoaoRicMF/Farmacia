@@ -8,32 +8,36 @@ from datetime import datetime, timedelta
 #CONFIGURAÇÕES E BANCO DE DADOS
 st.set_page_config(page_title="Financeiro Farmácia", layout="wide", page_icon="🏥")
 
-if not os.path.exists('database'):
-    os.makedirs('database')
-    print("Pasta 'database' criada.")
 
-db_path = 'database/financeiro.db'
-conn = sqlite3.connect(db_path)
+@st.cache_resource
+def get_database_connection():
+    # Cria a pasta se não existir
+    if not os.path.exists('database'):
+        os.makedirs('database')
+
+    # Conecta ao banco
+    connection = sqlite3.connect('database/financeiro.db', check_same_thread=False)
+
+    cursor = connection.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS financeiro (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data_processamento TEXT,
+            descricao TEXT,
+            valor REAL,
+            codigo_barras TEXT,
+            vencimento TEXT,
+            status TEXT
+        )
+    ''')
+    connection.commit()
+    return connection
+
+
+# Usa a função para pegar a conexão
+conn = get_database_connection()
+# O cursor pode ser criado localmente quando necessário, ou globalmente aqui
 cursor = conn.cursor()
-
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS financeiro (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        data_processamento TEXT,
-        descricao TEXT,
-        valor REAL,
-        codigo_barras TEXT,
-        vencimento TEXT,
-        status TEXT
-    )
-''')
-
-conn.commit()
-conn.close()
-
-print(f"Base de dados criada com sucesso em: {db_path}")
-print("Tabela 'financeiro' pronta a utilizar.")
-
 # FUNÇÕES
 def decifrar_boleto(linha):
     """Extrai vencimento e valor do padrão de boletos ."""
@@ -122,31 +126,47 @@ if menu == "📊 Dashboard":
 # LER BOLETO
 elif menu == "📑 Ler Novo Boleto":
     st.title("📑 Entrada de Boleto")
-    codigo_lido = st.text_input("Aponte o leitor de código de barras para o boleto",
-                                placeholder="Clique aqui antes de bipar...")
+    if "limpar_pendente" in st.session_state and st.session_state["limpar_pendente"]:
+        st.session_state["input_codigo_barras"] = ""  # Limpa o valor na memória
+        st.session_state["limpar_pendente"] = False  # Desliga o sinalizador
 
-    if codigo_lido:
-        venc, val = decifrar_boleto(codigo_lido)
+        # Agora desenhamos o campo (ele vai pegar o valor vazio se tiver sido limpo acima)
+    codigo = st.text_input("Passe o leitor ou digite a linha digitável",
+                           placeholder="Clique aqui antes de usar o leitor",
+                           key="input_codigo_barras")
 
-        if venc:
-            with st.form("confirmar_boleto"):
-                st.success(f"Boleto Identificado! Vencimento: {venc} | Valor: R$ {val:,.2f}")
-                desc_input = st.text_input("Fornecedor / Descrição (Ex: Lab. Medley)")
-                status_input = st.selectbox("Status Inicial", ["Pendente", "Pago"])
+    if codigo:
+        vencimento, valor = decifrar_boleto(codigo)
 
-                if st.form_submit_button("Confirmar e Salvar no Banco"):
-                    if desc_input:
-                        cursor.execute('''
-                            INSERT INTO financeiro (data_registro, descricao, valor, codigo_barras, vencimento, status)
+        if vencimento:
+            st.markdown("---")
+            col1, col2 = st.columns(2)
+            col1.info(f"**Vencimento:** {vencimento}")
+            col2.success(f"**Valor:** R$ {valor:,.2f}")
+
+            with st.form("form_boleto"):
+                desc = st.text_input("Descrição (Ex: Fornecedor Medley)")
+                status = st.selectbox("Status", ["Pendente", "Pago"])
+
+                if st.form_submit_button("Confirmar Lançamento"):
+                    # Inserir no banco
+                    cursor.execute('''
+                            INSERT INTO financeiro (data_processamento, descricao, valor, codigo_barras, vencimento, status)
                             VALUES (?, ?, ?, ?, ?, ?)
-                        ''', (datetime.now().strftime('%d/%m/%Y'), desc_input, val, codigo_lido, venc, status_input))
-                        conn.commit()
-                        st.balloons()
-                        st.success("Salvo com sucesso!")
-                    else:
-                        st.warning("Por favor, digite uma descrição.")
+                        ''', (datetime.now().strftime('%d/%m/%Y'), desc, valor, codigo, vencimento, status))
+                    conn.commit()
+
+                    # Mensagem de sucesso
+                    st.toast(f"Boleto de R$ {valor} salvo!", icon='✅')
+
+                    st.session_state["limpar_pendente"] = True  # Avisa para limpar na próxima volta
+                    st.rerun()  # Recarrega a página imediatamente
+
+                    # 2. Limpar o campo e recarregar
+                    st.session_state["input_codigo_barras"] = ""  # Limpa o valor na memória
+                    st.rerun()  # Recarrega a página para o campo aparecer vazio visualmente
         else:
-            st.error("Código de barras inválido ou formato não suportado.")
+            st.error("Linha digitável inválida ou incompleta.")
 
 # IMPORTAR EXCEL
 elif menu == "📥 Importar Excel":
