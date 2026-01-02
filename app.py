@@ -64,16 +64,16 @@ def excluir_registro(id_registro):
 
 # BARRA LATERAL
 st.sidebar.title("🏥 Gestão Farmácia")
-menu = st.sidebar.radio("Navegação:", ["📊 Dashboard", "📑 Ler Novo Boleto", "📥 Importar Excel", "📦 Exportar Dados"])
+menu = st.sidebar.radio("Navegação:", ["Dashboard", "Ler Novo Boleto", "Importar Excel", "Exportar Dados"])
 
 st.sidebar.divider()
-st.sidebar.info("Dica: Use o leitor de código de barras na tela de 'Ler Novo Boleto'.")
+st.sidebar.info("Use o leitor de código de barras na tela de 'Ler Novo Boleto'.")
 
 # TELAS DO SISTEMA
 
 # DASHBOARD
-if menu == "📊 Dashboard":
-    st.title("📈 Painel Financeiro")
+if menu == "Dashboard":
+    st.title("Painel Financeiro")
 
     # Busca e Filtros
     col_busca, col_filtro = st.columns([2, 1])
@@ -99,7 +99,7 @@ if menu == "📊 Dashboard":
         st.divider()
 
         # Tabela de Gerenciamento
-        st.subheader("📋 Lançamentos")
+        st.subheader("Lançamentos")
         for index, row in df.iterrows():
             with st.expander(f"{row['vencimento']} - {row['descricao']} | R$ {row['valor']:,.2f} ({row['status']})"):
                 c1, c2, c3 = st.columns([2, 1, 1])
@@ -118,14 +118,14 @@ if menu == "📊 Dashboard":
                     st.rerun()
 
         # Exportação
-        st.download_button("📥 Baixar tudo em Excel", data=df.to_csv(index=False).encode('utf-8'),
+        st.download_button("Baixar tudo em Excel", data=df.to_csv(index=False).encode('utf-8'),
                            file_name=f"financeiro_farmacia_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
     else:
         st.info("Nenhum registro encontrado.")
 
 # LER BOLETO
-elif menu == "📑 Ler Novo Boleto":
-    st.title("📑 Entrada de Boleto")
+elif menu == "Ler Novo Boleto":
+    st.title("Entrada de Boleto")
     if "limpar_pendente" in st.session_state and st.session_state["limpar_pendente"]:
         st.session_state["input_codigo_barras"] = ""  # Limpa o valor na memória
         st.session_state["limpar_pendente"] = False  # Desliga o sinalizador
@@ -174,8 +174,8 @@ elif menu == "📑 Ler Novo Boleto":
                         st.rerun()
 
 # IMPORTAR EXCEL
-elif menu == "📥 Importar Excel":
-    st.title("📥 Importar Planilha")
+elif menu == "Importar Excel":
+    st.title("Importar Planilha")
     st.write("A planilha deve conter as colunas: `descricao`, `valor`, `vencimento`, `status`")
     arquivo = st.file_uploader("Selecione o arquivo Excel", type=["xlsx"])
 
@@ -188,8 +188,8 @@ elif menu == "📥 Importar Excel":
             st.success("Dados importados com sucesso!")
 
 # EXPORTAR EXCEL
-elif menu == "📦 Exportar Dados":
-    st.title("📦 Exportar Relatórios")
+elif menu == "Exportar Dados":
+    st.title("Exportar Relatórios")
     st.write("Gere planilhas para o seu contador ou para controle de estoque/financeiro.")
 
     # Carregar dados atuais
