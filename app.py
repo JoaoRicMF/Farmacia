@@ -149,24 +149,29 @@ elif menu == "📑 Ler Novo Boleto":
                 status = st.selectbox("Status", ["Pendente", "Pago"])
 
                 if st.form_submit_button("Confirmar Lançamento"):
-                    # Inserir no banco
-                    cursor.execute('''
-                            INSERT INTO financeiro (data_processamento, descricao, valor, codigo_barras, vencimento, status)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        ''', (datetime.now().strftime('%d/%m/%Y'), desc, valor, codigo, vencimento, status))
-                    conn.commit()
+                    # 1. Verifica se já existe no banco
+                    cursor.execute("SELECT id FROM financeiro WHERE codigo_barras = ?", (codigo,))
+                    boleto_existente = cursor.fetchone()
 
-                    # Mensagem de sucesso
-                    st.toast(f"Boleto de R$ {valor} salvo!", icon='✅')
+                    if boleto_existente:
+                        # SE EXISTIR: Mostra erro e não faz mais nada
+                        st.error("⚠️ Este boleto já foi cadastrado anteriormente!")
 
-                    st.session_state["limpar_pendente"] = True  # Avisa para limpar na próxima volta
-                    st.rerun()  # Recarrega a página imediatamente
+                    else:
+                        # SE NÃO EXISTIR (Else alinhado com o if boleto_existente): Salva
+                        cursor.execute('''
+                                            INSERT INTO financeiro (data_processamento, descricao, valor, codigo_barras, vencimento, status)
+                                            VALUES (?, ?, ?, ?, ?, ?)
+                                        ''',
+                                       (datetime.now().strftime('%d/%m/%Y'), desc, valor, codigo, vencimento, status))
+                        conn.commit()
 
-                    # 2. Limpar o campo e recarregar
-                    st.session_state["input_codigo_barras"] = ""  # Limpa o valor na memória
-                    st.rerun()  # Recarrega a página para o campo aparecer vazio visualmente
-        else:
-            st.error("Linha digitável inválida ou incompleta.")
+                        # Mensagem de sucesso
+                        st.toast(f"Boleto de R$ {valor} salvo!", icon='✅')
+
+                        # Configura a limpeza e recarrega
+                        st.session_state["limpar_pendente"] = True
+                        st.rerun()
 
 # IMPORTAR EXCEL
 elif menu == "📥 Importar Excel":
