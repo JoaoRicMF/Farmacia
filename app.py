@@ -3,21 +3,23 @@ import pandas as pd
 import sqlite3
 import os
 from datetime import datetime, timedelta
-from streamlit_calendar import calendar
+
 
 #CONFIGURAÇÕES E BANCO DE DADOS
 st.set_page_config(page_title="Financeiro Farmácia", layout="wide", page_icon="🏥")
 
 if not os.path.exists('database'):
     os.makedirs('database')
+    print("Pasta 'database' criada.")
 
-conn = sqlite3.connect('database/financeiro.db', check_same_thread=False)
+db_path = 'database/financeiro.db'
+conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS financeiro (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        data_registro TEXT,
+        data_processamento TEXT,
         descricao TEXT,
         valor REAL,
         codigo_barras TEXT,
@@ -25,12 +27,16 @@ cursor.execute('''
         status TEXT
     )
 ''')
-conn.commit()
 
+conn.commit()
+conn.close()
+
+print(f"Base de dados criada com sucesso em: {db_path}")
+print("Tabela 'financeiro' pronta a utilizar.")
 
 # FUNÇÕES
 def decifrar_boleto(linha):
-    """Extrai vencimento e valor do padrão de boletos bancários brasileiros."""
+    """Extrai vencimento e valor do padrão de boletos ."""
     linha = ''.join(filter(str.isdigit, linha))
     if len(linha) < 47: return None, 0.0
     try:
