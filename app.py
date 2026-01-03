@@ -1,242 +1,271 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
-import os
 from datetime import datetime, timedelta
+import math
+from streamlit_calendar import calendar
+import database_manager as db
 
-
-#CONFIGURAÇÕES E BANCO DE DADOS
+# CONFIGURAÇÕES DA PÁGINA
 st.set_page_config(page_title="Financeiro Farmácia", layout="wide", page_icon="🏥")
+db.init_db()
+
+# --- ESTILOS CSS ---
+st.markdown("""
+<style>
+    .stLogin { max-width: 400px; margin: 0 auto; padding-top: 100px; }
+    .sucesso-login { padding: 1rem; background-color: #d4edda; color: #155724; border-radius: 5px; margin-bottom: 1rem; }
+</style>
+""", unsafe_allow_html=True)
+
+CATEGORIAS = ["Medicamentos (Estoque)", "Materiais de Consumo", "Impostos & Taxas",
+              "Folha de Pagamento", "Aluguel & Condomínio", "Água/Luz/Internet",
+              "Marketing", "Manutenção", "Outros"]
+
+# --- CONTROLE DE SESSÃO (LOGIN) ---
+if 'logado' not in st.session_state:
+    st.session_state['logado'] = False
+    st.session_state['usuario_nome'] = ""
 
 
-@st.cache_resource
-def get_database_connection():
-    # Cria a pasta se não existir
-    if not os.path.exists('database'):
-        os.makedirs('database')
+def realizar_login():
+    user = st.session_state.form_user
+    senha = st.session_state.form_senha
+    dados_usuario = db.verificar_login(user, senha)
 
-    # Conecta ao banco
-    connection = sqlite3.connect('database/financeiro.db', check_same_thread=False)
-
-    cursor = connection.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS financeiro (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            data_processamento TEXT,
-            descricao TEXT,
-            valor REAL,
-            codigo_barras TEXT,
-            vencimento TEXT,
-            status TEXT
-        )
-    ''')
-    connection.commit()
-    return connection
+    if dados_usuario:
+        st.session_state['logado'] = True
+        st.session_state['usuario_nome'] = dados_usuario[1]  # Nome real
+        st.rerun()
+    else:
+        st.error("Usuário ou senha incorretos.")
 
 
-# Usa a função para pegar a conexão
-conn = get_database_connection()
-# O cursor pode ser criado localmente quando necessário, ou globalmente aqui
-cursor = conn.cursor()
-# FUNÇÕES
+def realizar_logout():
+    st.session_state['logado'] = False
+    st.session_state['usuario_nome'] = ""
+    st.rerun()
+
+
+# --- TELA DE LOGIN ---
+if not st.session_state['logado']:
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.title("🔐 Acesso Restrito")
+        st.markdown("### Sistema Financeiro Farmácia")
+        with st.form("login_form"):
+            st.text_input("Usuário", key="form_user")
+            st.text_input("Senha", type="password", key="form_senha")
+            st.form_submit_button("Entrar", on_click=realizar_login)
+
+        st.info("Primeiro acesso? Use **admin** / **admin123**")
+
+    st.stop()  # PARA O CÓDIGO AQUI SE NÃO ESTIVER LOGADO
+
+# ==============================================================================
+# SISTEMA PRINCIPAL (APENAS LOGADOS)
+# ==============================================================================
+
+USUARIO_ATUAL = st.session_state['usuario_nome']
+
+
+# --- FUNÇÕES AUXILIARES ---
 def decifrar_boleto(linha):
-    """Extrai vencimento e valor do padrão de boletos ."""
+    if not linha: return None, 0.0, ""
     linha = ''.join(filter(str.isdigit, linha))
-    if len(linha) < 47: return None, 0.0
     try:
-        fator_vencimento = int(linha[33:37])
-        vencimento = datetime(1997, 10, 7) + timedelta(days=fator_vencimento)
-        valor = int(linha[37:]) / 100.0
-        return vencimento.strftime('%d/%m/%Y'), valor
+        if linha.startswith('8'):
+            val = 0.0
+            if len(linha) == 48:
+                barras = linha[0:11] + linha[12:23] + linha[24:35] + linha[36:47]
+                if len(barras) == 44: val = int(barras[4:15]) / 100.0
+            elif len(linha) == 44:
+                val = int(linha[4:15]) / 100.0
+            return None, val, "Concessionária"
+        else:
+            if len(linha) == 47:
+                fator, val_str = linha[33:37], linha[37:]
+            elif len(linha) == 44:
+                fator, val_str = linha[5:9], linha[9:19]
+            else:
+                return None, 0.0, "Inválido"
+            venc = datetime(1997, 10, 7) + timedelta(days=int(fator))
+            if venc < (datetime.now() - timedelta(days=3000)): venc += timedelta(days=9000)
+            return venc.strftime('%d/%m/%Y'), int(val_str) / 100.0, "Bancário"
     except:
-        return None, 0.0
+        return None, 0.0, "Erro"
 
 
-def atualizar_status(id_registro, novo_status):
-    cursor.execute("UPDATE financeiro SET status = ? WHERE id = ?", (novo_status, id_registro))
-    conn.commit()
-
-
-def excluir_registro(id_registro):
-    cursor.execute("DELETE FROM financeiro WHERE id = ?", (id_registro,))
-    conn.commit()
-
-
-# BARRA LATERAL
-st.sidebar.title("🏥 Gestão Farmácia")
-menu = st.sidebar.radio("Navegação:", ["Dashboard", "Ler Novo Boleto", "Importar Excel", "Exportar Dados"])
+# --- BARRA LATERAL ---
+st.sidebar.title(f"Olá, {USUARIO_ATUAL} 👋")
+if st.sidebar.button("Sair / Logout"):
+    realizar_logout()
 
 st.sidebar.divider()
-st.sidebar.info("Use o leitor de código de barras na tela de 'Ler Novo Boleto'.")
+menu = st.sidebar.radio("Navegação:", ["📊 Dashboard", "📑 Ler Novo Boleto", "📥 Importar Excel", "📦 Exportar/Auditoria"])
 
-# TELAS DO SISTEMA
+# --- DASHBOARD ---
+if menu == "📊 Dashboard":
+    st.title("📈 Painel Financeiro")
+    tab_lista, tab_cal, tab_graf = st.tabs(["📋 Lista", "📅 Calendário", "📊 Gráficos"])
 
-# DASHBOARD
-if menu == "Dashboard":
-    st.title("Painel Financeiro")
+    # ABA 1: LISTA
+    with tab_lista:
+        c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
+        busca = c1.text_input("🔍 Buscar", placeholder="Fornecedor")
+        status = c2.selectbox("Status", ["Todos", "Pendente", "Pago"])
+        cat = c3.selectbox("Categoria", ["Todas"] + CATEGORIAS)
+        per = c4.selectbox("Período", ["Tudo", "Este Mês", "Este Ano"])
 
-    # Busca e Filtros
-    col_busca, col_filtro = st.columns([2, 1])
-    busca = col_busca.text_input("🔍 Buscar por fornecedor ou descrição")
-    filtro_status = col_filtro.selectbox("Filtrar Status", ["Todos", "Pendente", "Pago"])
+        d_ini, d_fim = None, None
+        hj = datetime.now()
+        if per == "Este Mês":
+            d_ini = hj.replace(day=1).strftime('%Y-%m-%d')
+            d_fim = ((hj.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)).strftime('%Y-%m-%d')
+        elif per == "Este Ano":
+            d_ini, d_fim = hj.strftime('%Y-01-01'), hj.strftime('%Y-12-31')
 
-    # Carregar Dados
-    query = "SELECT * FROM financeiro"
-    df = pd.read_sql(query, conn)
+        total = db.contar_registros(busca, status, cat, d_ini, d_fim)
+        paginas = math.ceil(total / 10)
+        if 'pag' not in st.session_state: st.session_state.pag = 1
+        if st.session_state.pag > paginas and paginas > 0: st.session_state.pag = paginas
+        if paginas == 0: st.session_state.pag = 1
 
-    if not df.empty:
-        if busca:
-            df = df[df['descricao'].str.contains(busca, case=False, na=False)]
-        if filtro_status != "Todos":
-            df = df[df['status'] == filtro_status]
+        offset = (st.session_state.pag - 1) * 10
+        df = db.listar_registros(busca, status, cat, d_ini, d_fim, 10, offset)
 
-        # Métricas
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Total Pendente", f"R$ {df[df['status'] == 'Pendente']['valor'].sum():,.2f}", delta_color="inverse")
-        m2.metric("Total Pago", f"R$ {df[df['status'] == 'Pago']['valor'].sum():,.2f}")
-        m3.metric("Qtd Documentos", len(df))
-
-        st.divider()
-
-        # Tabela de Gerenciamento
-        st.subheader("Lançamentos")
-        for index, row in df.iterrows():
-            with st.expander(f"{row['vencimento']} - {row['descricao']} | R$ {row['valor']:,.2f} ({row['status']})"):
-                c1, c2, c3 = st.columns([2, 1, 1])
-                c1.write(f"**Código:** `{row['codigo_barras']}`")
+        if not df.empty:
+            st.write(f"**{total}** registros (Página {st.session_state.pag}/{paginas})")
+            for _, row in df.iterrows():
+                aviso = ""
                 if row['status'] == 'Pendente':
-                    if c2.button("✅ Marcar como Pago", key=f"pay_{row['id']}"):
-                        atualizar_status(row['id'], 'Pago')
-                        st.rerun()
-                else:
-                    if c2.button("↩️ Reverter para Pendente", key=f"unpay_{row['id']}"):
-                        atualizar_status(row['id'], 'Pendente')
-                        st.rerun()
+                    try:
+                        dias = (datetime.strptime(row['vencimento'], '%d/%m/%Y').date() - hj.date()).days
+                        if dias < 0:
+                            aviso = f"🚨 ATRASADO {abs(dias)} DIAS"
+                        elif dias == 0:
+                            aviso = "🔥 VENCE HOJE"
+                    except:
+                        pass
 
-                if c3.button("🗑️ Excluir", key=f"del_{row['id']}"):
-                    excluir_registro(row['id'])
-                    st.rerun()
+                titulo = f"{'✅' if row['status'] == 'Pago' else '📅'} {row['vencimento']} - {row['descricao']} | R$ {row['valor']:,.2f} {aviso}"
+                with st.expander(titulo):
+                    c_a, c_b, c_c = st.columns([2, 1, 1])
+                    c_a.code(row['codigo_barras'], language="text")
+                    c_a.caption(f"Categoria: {row['categoria']}")
+                    with c_b:
+                        if row['status'] == 'Pendente':
+                            if st.button("Baixar", key=f"p{row['id']}"):
+                                db.atualizar_status(USUARIO_ATUAL, row['id'], 'Pago');
+                                st.rerun()
+                        else:
+                            if st.button("Reabrir", key=f"u{row['id']}"):
+                                db.atualizar_status(USUARIO_ATUAL, row['id'], 'Pendente');
+                                st.rerun()
+                    with c_c:
+                        with st.popover("Excluir"):
+                            if st.button("Confirmar", key=f"d{row['id']}", type="primary"):
+                                db.excluir_registro(USUARIO_ATUAL, row['id']);
+                                st.rerun()
 
-        # Exportação
-        st.download_button("Baixar tudo em Excel", data=df.to_csv(index=False).encode('utf-8'),
-                           file_name=f"financeiro_farmacia_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
-    else:
-        st.info("Nenhum registro encontrado.")
+            cp, _, cn = st.columns([1, 2, 1])
+            if st.session_state.pag > 1:
+                if cp.button("⬅️ Ant"): st.session_state.pag -= 1; st.rerun()
+            if st.session_state.pag < paginas:
+                if cn.button("Prox ➡️"): st.session_state.pag += 1; st.rerun()
+        else:
+            st.info("Nada encontrado.")
 
-# LER BOLETO
-elif menu == "Ler Novo Boleto":
-    st.title("Entrada de Boleto")
-    if "limpar_pendente" in st.session_state and st.session_state["limpar_pendente"]:
-        st.session_state["input_codigo_barras"] = ""  # Limpa o valor na memória
-        st.session_state["limpar_pendente"] = False  # Desliga o sinalizador
-
-        # Agora desenhamos o campo (ele vai pegar o valor vazio se tiver sido limpo acima)
-    codigo = st.text_input("Passe o leitor ou digite a linha digitável",
-                           placeholder="Clique aqui antes de usar o leitor",
-                           key="input_codigo_barras")
-
-    if codigo:
-        vencimento, valor = decifrar_boleto(codigo)
-
-        if vencimento:
-            st.markdown("---")
-            col1, col2 = st.columns(2)
-            col1.info(f"**Vencimento:** {vencimento}")
-            col2.success(f"**Valor:** R$ {valor:,.2f}")
-
-            with st.form("form_boleto"):
-                desc = st.text_input("Descrição (Ex: Fornecedor Medley)")
-                status = st.selectbox("Status", ["Pendente", "Pago"])
-
-                if st.form_submit_button("Confirmar Lançamento"):
-                    # 1. Verifica se já existe no banco
-                    cursor.execute("SELECT id FROM financeiro WHERE codigo_barras = ?", (codigo,))
-                    boleto_existente = cursor.fetchone()
-
-                    if boleto_existente:
-                        # SE EXISTIR: Mostra erro e não faz mais nada
-                        st.error("⚠️ Este boleto já foi cadastrado anteriormente!")
-
-                    else:
-                        # SE NÃO EXISTIR (Else alinhado com o if boleto_existente): Salva
-                        cursor.execute('''
-                                            INSERT INTO financeiro (data_processamento, descricao, valor, codigo_barras, vencimento, status)
-                                            VALUES (?, ?, ?, ?, ?, ?)
-                                        ''',
-                                       (datetime.now().strftime('%d/%m/%Y'), desc, valor, codigo, vencimento, status))
-                        conn.commit()
-
-                        # Mensagem de sucesso
-                        st.toast(f"Boleto de R$ {valor} salvo!", icon='✅')
-
-                        # Configura a limpeza e recarrega
-                        st.session_state["limpar_pendente"] = True
-                        st.rerun()
-
-# IMPORTAR EXCEL
-elif menu == "Importar Excel":
-    st.title("Importar Planilha")
-    st.write("A planilha deve conter as colunas: `descricao`, `valor`, `vencimento`, `status`")
-    arquivo = st.file_uploader("Selecione o arquivo Excel", type=["xlsx"])
-
-    if arquivo:
-        df_excel = pd.read_excel(arquivo)
-        st.dataframe(df_excel)
-        if st.button("Confirmar Importação em Massa"):
-            df_excel['data_registro'] = datetime.now().strftime('%d/%m/%Y')
-            df_excel.to_sql('financeiro', conn, if_exists='append', index=False)
-            st.success("Dados importados com sucesso!")
-
-# EXPORTAR EXCEL
-elif menu == "Exportar Dados":
-    st.title("Exportar Relatórios")
-    st.write("Gere planilhas para o seu contador ou para controle de estoque/financeiro.")
-
-    # Carregar dados atuais
-    df_export = pd.read_sql("SELECT * FROM financeiro", conn)
-
-    if not df_export.empty:
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.subheader("Configurações da Planilha")
-            formato = st.selectbox("Escolha o formato do arquivo:", ["Excel (.xlsx)", "CSV (.csv)"])
-            filtro_exp = st.multiselect("Filtrar por Status:", ["Pendente", "Pago"], default=["Pendente", "Pago"])
-
-            # Aplicar filtro antes de exportar
-            df_final = df_export[df_export['status'].isin(filtro_exp)]
-
-        with col2:
-            st.subheader("Resumo da Exportação")
-            st.write(f"**Total de registros:** {len(df_final)}")
-            st.write(f"**Valor total:** R$ {df_final['valor'].sum():,.2f}")
-
-        st.divider()
-
-        # Botão de Download
-        if formato == "Excel (.xlsx)":
-            import io
-
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_final.to_excel(writer, index=False, sheet_name='Financeiro')
-
-            st.download_button(
-                label="📥 Baixar Planilha Excel",
-                data=output.getvalue(),
-                file_name=f"financeiro_farmacia_{datetime.now().strftime('%d_%m_%Y')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    # ABA 2: CALENDÁRIO
+    with tab_cal:
+        evs = db.obter_dados_calendario()
+        # CSS Correção Dark Mode e Tamanho
+        css_dark = """
+            .fc-col-header-cell-cushion, .fc-daygrid-day-number, .fc-toolbar-title { color: #FFFFFF !important; text-decoration: none !important; }
+            .fc-button { background-color: #FF4B4B !important; border: none !important; color: white !important; }
+            .fc-theme-standard td, .fc-theme-standard th { border-color: #444 !important; }
+        """
+        # A chave 'key' única é essencial para não travar
+        if evs:
+            calendar(
+                events=evs,
+                options={"initialView": "dayGridMonth", "locale": "pt-br", "height": 650},
+                custom_css=css_dark,
+                key="cal_principal_v2"
             )
         else:
-            # Exportação em CSV
-            csv = df_final.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Baixar Arquivo CSV",
-                data=csv,
-                file_name=f"financeiro_farmacia_{datetime.now().strftime('%d_%m_%Y')}.csv",
-                mime="text/csv"
-            )
+            st.info("Sem dados para o calendário.")
 
-        st.info("Nota: O arquivo gerado será salvo na sua pasta de 'Downloads' padrão.")
-    else:
-        st.warning("Não há dados no banco para exportar.")
+    # ABA 3: GRÁFICOS
+    with tab_graf:
+        cg1, cg2 = st.columns(2)
+        with cg1:
+            st.write("Por Mês")
+            dft = db.obter_dados_grafico_tempo()
+            if not dft.empty: st.bar_chart(dft.set_index('mes'))
+        with cg2:
+            st.write("Por Categoria")
+            dfc = db.obter_dados_grafico_categoria()
+            if not dfc.empty: st.bar_chart(dfc.set_index('categoria'), horizontal=True)
+
+# --- LER BOLETO ---
+elif menu == "📑 Ler Novo Boleto":
+    st.title("📑 Novo Lançamento")
+    if st.session_state.get('sucesso'):
+        st.session_state.input_codigo = "";
+        st.session_state.sucesso = False
+    if "input_codigo" not in st.session_state: st.session_state.input_codigo = ""
+
+    cod = st.text_input("Código de Barras", key="input_codigo")
+    if cod:
+        venc, val, tipo = decifrar_boleto(cod)
+        if tipo == "Concessionária": st.warning("Confira a data de vencimento.")
+        if not venc: venc = datetime.now().strftime('%d/%m/%Y')
+
+        if tipo in ["Bancário", "Concessionária"]:
+            with st.form("add"):
+                c1, c2 = st.columns(2)
+                desc = c1.text_input("Descrição")
+                valor = c2.number_input("Valor", value=val, min_value=0.01)
+                c3, c4 = st.columns(2)
+                dt = c3.text_input("Vencimento", value=venc)
+                cat = c4.selectbox("Categoria", CATEGORIAS)
+                stt = st.selectbox("Status", ["Pendente", "Pago"])
+
+                if st.form_submit_button("Salvar"):
+                    if not desc:
+                        st.error("Descrição vazia.")
+                    elif db.verificar_existencia_boleto(cod):
+                        st.error("Duplicado.")
+                    else:
+                        db.adicionar_registro(USUARIO_ATUAL, datetime.now().strftime('%d/%m/%Y'), desc, valor, cod, dt,
+                                              stt, cat)
+                        st.toast("Salvo!");
+                        st.session_state.sucesso = True;
+                        st.rerun()
+
+# --- IMPORTAR / EXPORTAR ---
+elif menu == "📥 Importar Excel":
+    st.title("Importar");
+    arq = st.file_uploader("Excel", ["xlsx"])
+    if arq and st.button("Processar"):
+        try:
+            db.importar_dataframe(USUARIO_ATUAL, pd.read_excel(arq)); st.success("Ok!")
+        except Exception as e:
+            st.error(e)
+
+elif menu == "📦 Exportar/Auditoria":
+    st.title("Dados & Auditoria")
+    tab_exp, tab_logs = st.tabs(["📥 Exportar Dados", "🛡️ Logs de Segurança"])
+
+    with tab_exp:
+        st.write("Baixar dados financeiros:")
+        df = db.listar_registros()
+        if not df.empty: st.download_button("CSV Financeiro", df.to_csv(index=False).encode('utf-8'), "dados.csv")
+
+    with tab_logs:
+        st.subheader("Quem fez o quê?")
+        df_logs = db.obter_logs()
+        if not df_logs.empty:
+            st.dataframe(df_logs, use_container_width=True)
+        else:
+            st.write("Nenhum log registrado.")
