@@ -151,20 +151,61 @@ def obter_logs():
 
 
 def obter_dados_calendario():
+    """
+    Retorna eventos válidos para o streamlit-calendar.
+    Corrige datas inválidas, ignora lixo histórico e evita quebra silenciosa.
+    """
     try:
-        df = pd.read_sql(text("SELECT * FROM financeiro"), engine)
-        evs = []
+        df = pd.read_sql("SELECT descricao, valor, vencimento, status FROM financeiro", engine)
+        eventos = []
+
+        hoje = datetime.now().date()
+
         for _, r in df.iterrows():
-            try:
-                dt = datetime.strptime(r['vencimento'], '%d/%m/%Y').strftime('%Y-%m-%d')
-            except:
+            venc_raw = str(r["vencimento"]).strip()
+
+            if not venc_raw:
                 continue
-            cor = "#28a745" if r['status'] == "Pago" else "#dc3545"
-            evs.append({"title": f"R$ {r['valor']:.2f} - {r['descricao']}", "start": dt, "backgroundColor": cor,
-                        "borderColor": cor})
-        return evs
-    except:
+
+            dt = None
+
+            # Tenta DD/MM/AAAA
+            try:
+                dt = datetime.strptime(venc_raw, "%d/%m/%Y").date()
+            except:
+                pass
+
+            # Tenta YYYY-MM-DD
+            if not dt:
+                try:
+                    dt = datetime.strptime(venc_raw, "%Y-%m-%d").date()
+                except:
+                    continue  # ignora definitivamente
+
+            # DESCARTA DATAS ABSURDAS (FEBRABAN 1997, lixo etc.)
+            if dt.year < 2010 or dt.year > hoje.year + 5:
+                continue
+
+            cor = "#28a745" if r["status"] == "Pago" else "#dc3545"
+
+            titulo = f"R$ {r['valor']:.2f}"
+            if r["descricao"]:
+                titulo += f" - {r['descricao']}"
+
+            eventos.append({
+                "title": titulo,
+                "start": dt.strftime("%Y-%m-%d"),
+                "allDay": True,
+                "backgroundColor": cor,
+                "borderColor": cor
+            })
+
+        return eventos
+
+    except Exception as e:
+        print("Erro calendário:", e)
         return []
+
 
 
 def contar_registros(busca=None, status_filtro="Todos", cat_filtro="Todas", d_ini=None, d_fim=None):

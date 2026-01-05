@@ -106,36 +106,37 @@ menu = st.sidebar.radio("Navegação:", ["📊 Dashboard", "📑 Ler Novo Boleto
 # --- DASHBOARD ---
 if menu == "📊 Dashboard":
     st.title("📈 Painel Financeiro")
-    tab_lista, tab_cal, tab_graf = st.tabs(["📋 Lista", "📅 Calendário", "📊 Gráficos"])
 
-    # ABA 1: LISTA
+    # Agora criamos apenas duas abas: uma para a Lista e outra para o Painel Visual (Calendário + Gráficos)
+    tab_lista, tab_visual = st.tabs(["📋 Lista de Registros", "🖼️ Painel Visual (Calendário e Gráficos)"])
+
+    # --- ABA 1: LISTA ---
     with tab_lista:
         c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
         busca = c1.text_input("🔍 Buscar", placeholder="Fornecedor")
-        status = c2.selectbox("Status", ["Todos", "Pendente", "Pago"])
-        cat = c3.selectbox("Categoria", ["Todas"] + CATEGORIAS)
-        per = c4.selectbox("Período", ["Tudo", "Este Mês", "Este Ano"])
+        status_sel = c2.selectbox("Status", ["Todos", "Pendente", "Pago"])
+        cat_sel = c3.selectbox("Categoria", ["Todas"] + CATEGORIAS)
+        per_sel = c4.selectbox("Período", ["Tudo", "Este Mês", "Este Ano"])
 
         d_ini, d_fim = None, None
         hj = datetime.now()
-        if per == "Este Mês":
+        if per_sel == "Este Mês":
             d_ini = hj.replace(day=1).strftime('%Y-%m-%d')
             d_fim = ((hj.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)).strftime('%Y-%m-%d')
-        elif per == "Este Ano":
+        elif per_sel == "Este Ano":
             d_ini, d_fim = hj.strftime('%Y-01-01'), hj.strftime('%Y-12-31')
 
-        total = db.contar_registros(busca, status, cat, d_ini, d_fim)
-        paginas = math.ceil(total / 10)
+        total = db.contar_registros(busca, status_sel, cat_sel, d_ini, d_fim)
+        paginas = math.ceil(total / 10) if total > 0 else 1
+
         if 'pag' not in st.session_state: st.session_state.pag = 1
-        if st.session_state.pag > paginas and paginas > 0: st.session_state.pag = paginas
-        if paginas == 0: st.session_state.pag = 1
+        if st.session_state.pag > paginas: st.session_state.pag = paginas
 
         offset = (st.session_state.pag - 1) * 10
-        df = db.listar_registros(busca, status, cat, d_ini, d_fim, 10, offset)
+        df_list = db.listar_registros(busca, status_sel, cat_sel, d_ini, d_fim, 10, offset)
 
-        if not df.empty:
-            st.write(f"**{total}** registros (Página {st.session_state.pag}/{paginas})")
-            for _, row in df.iterrows():
+        if not df_list.empty:
+            for _, row in df_list.iterrows():
                 aviso = ""
                 if row['status'] == 'Pendente':
                     try:
@@ -147,24 +148,24 @@ if menu == "📊 Dashboard":
                     except:
                         pass
 
-                titulo = f"{'✅' if row['status'] == 'Pago' else '📅'} {row['vencimento']} - {row['descricao']} | R$ {row['valor']:,.2f} {aviso}"
-                with st.expander(titulo):
+                titulo_exp = f"{'✅' if row['status'] == 'Pago' else '📅'} {row['vencimento']} - {row['descricao']} | R$ {row['valor']:,.2f} {aviso}"
+                with st.expander(titulo_exp):
                     c_a, c_b, c_c = st.columns([2, 1, 1])
                     c_a.code(row['codigo_barras'], language="text")
                     c_a.caption(f"Categoria: {row['categoria']}")
                     with c_b:
                         if row['status'] == 'Pendente':
-                            if st.button("Pagar", key=f"p{row['id']}"):
-                                db.atualizar_status(USUARIO_ATUAL, row['id'], 'Pago');
+                            if st.button("Pagar", key=f"p_{row['id']}"):
+                                db.atualizar_status(USUARIO_ATUAL, row['id'], 'Pago')
                                 st.rerun()
                         else:
-                            if st.button("Reabrir", key=f"u{row['id']}"):
-                                db.atualizar_status(USUARIO_ATUAL, row['id'], 'Pendente');
+                            if st.button("Reabrir", key=f"u_{row['id']}"):
+                                db.atualizar_status(USUARIO_ATUAL, row['id'], 'Pendente')
                                 st.rerun()
                     with c_c:
                         with st.popover("Excluir"):
-                            if st.button("Confirmar", key=f"d{row['id']}", type="primary"):
-                                db.excluir_registro(USUARIO_ATUAL, row['id']);
+                            if st.button("Confirmar", key=f"d_{row['id']}", type="primary"):
+                                db.excluir_registro(USUARIO_ATUAL, row['id'])
                                 st.rerun()
 
             cp, _, cn = st.columns([1, 2, 1])
@@ -175,53 +176,68 @@ if menu == "📊 Dashboard":
         else:
             st.info("Nada encontrado.")
 
-        # ABA 2: CALENDÁRIO
-        with tab_cal:
-            st.subheader("Visão Mensal")
-            eventos = db.obter_dados_calendario()
+    # --- ABA 2: PAINEL VISUAL (CALENDÁRIO + GRÁFICOS JUNTOS) ---
+    with tab_visual:
+        st.subheader("📅 Vencimentos no Calendário")
 
-            # 1. CSS para Forçar Texto Branco (Correção Dark Mode)
-            mode_escuro_css = """
-                .fc-theme-standard td, .fc-theme-standard th { border-color: #444 !important; }
-                .fc-col-header-cell-cushion { color: #FFFFFF !important; text-decoration: none !important; } /* Dias da semana */
-                .fc-daygrid-day-number { color: #FFFFFF !important; text-decoration: none !important; } /* Números */
-                .fc-toolbar-title { color: #FFFFFF !important; } /* Título do Mês */
-                .fc-button { background-color: #FF4B4B !important; border: none !important; color: white !important; } /* Botões */
-                .fc-button:hover { background-color: #FF3333 !important; }
+        eventos_cal = db.obter_dados_calendario()
+
+        if not eventos_cal:
+            st.warning("Nenhum vencimento válido encontrado para exibição no calendário.")
+        else:
+            custom_css_cal = """
+            .fc-theme-standard td, .fc-theme-standard th {
+                border-color: #444 !important;
+            }
+            .fc-daygrid-day-number,
+            .fc-col-header-cell-cushion,
+            .fc-toolbar-title {
+                color: #FFFFFF !important;
+                text-decoration: none !important;
+            }
+            .fc-button {
+                background-color: #FF4B4B !important;
+                border: none !important;
+                color: white !important;
+            }
             """
 
-            calendar_options = {
+            opts_cal = {
                 "headerToolbar": {
                     "left": "prev,next today",
                     "center": "title",
                     "right": "dayGridMonth,listMonth"
                 },
                 "initialView": "dayGridMonth",
-                "locale": "pt-br",
-                "height": 650,  # Força uma altura para garantir que aparece
+                "initialDate": datetime.now().strftime("%Y-%m-%d"),
+                "height": 600,
+                "timeZone": "local"
             }
 
-            if eventos:
-                calendar(
-                    events=eventos,
-                    options=calendar_options,
-                    custom_css=mode_escuro_css,  # Aplica a correção de cor
-                    key="calendario_principal"  # Chave única para evitar bugs em abas
-                )
-            else:
-                st.info("Cadastre boletos para vê-los no calendário.")
+            calendar(
+                events=eventos_cal,
+                options=opts_cal,
+                custom_css=custom_css_cal,
+                key="cal_unificado"
+            )
 
-    # ABA 3: GRÁFICOS
-    with tab_graf:
-        cg1, cg2 = st.columns(2)
-        with cg1:
-            st.write("Por Mês")
-            dft = db.obter_dados_grafico_tempo()
-            if not dft.empty: st.bar_chart(dft.set_index('mes'))
-        with cg2:
-            st.write("Por Categoria")
-            dfc = db.obter_dados_grafico_categoria()
-            if not dfc.empty: st.bar_chart(dfc.set_index('categoria'), horizontal=True)
+        st.divider()
+
+        st.subheader("📊 Análise de Despesas")
+        g1, g2 = st.columns(2)
+
+        with g1:
+            st.write("**Total por Mês**")
+            df_t = db.obter_dados_grafico_tempo()
+            if not df_t.empty:
+                st.bar_chart(df_t.set_index("mes"))
+
+        with g2:
+            st.write("**Total por Categoria**")
+            df_c = db.obter_dados_grafico_categoria()
+            if not df_c.empty:
+                st.bar_chart(df_c.set_index("categoria"), horizontal=True)
+
 
 # --- LER BOLETO ---
 elif menu == "📑 Ler Novo Boleto":
