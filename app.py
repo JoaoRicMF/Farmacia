@@ -35,7 +35,6 @@ def realizar_login():
     if dados_usuario:
         st.session_state['logado'] = True
         st.session_state['usuario_nome'] = dados_usuario[1]  # Nome real
-        st.rerun()
     else:
         st.error("Usuário ou senha incorretos.")
 
@@ -157,16 +156,13 @@ if menu == "📊 Dashboard":
                         if row['status'] == 'Pendente':
                             if st.button("Pagar", key=f"p_{row['id']}"):
                                 db.atualizar_status(USUARIO_ATUAL, row['id'], 'Pago')
-                                st.rerun()
                         else:
                             if st.button("Reabrir", key=f"u_{row['id']}"):
                                 db.atualizar_status(USUARIO_ATUAL, row['id'], 'Pendente')
-                                st.rerun()
                     with c_c:
                         with st.popover("Excluir"):
                             if st.button("Confirmar", key=f"d_{row['id']}", type="primary"):
                                 db.excluir_registro(USUARIO_ATUAL, row['id'])
-                                st.rerun()
 
             cp, _, cn = st.columns([1, 2, 1])
             if st.session_state.pag > 1:
