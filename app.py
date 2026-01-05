@@ -154,7 +154,7 @@ if menu == "📊 Dashboard":
                     c_a.caption(f"Categoria: {row['categoria']}")
                     with c_b:
                         if row['status'] == 'Pendente':
-                            if st.button("Baixar", key=f"p{row['id']}"):
+                            if st.button("Pagar", key=f"p{row['id']}"):
                                 db.atualizar_status(USUARIO_ATUAL, row['id'], 'Pago');
                                 st.rerun()
                         else:
@@ -175,25 +175,41 @@ if menu == "📊 Dashboard":
         else:
             st.info("Nada encontrado.")
 
-    # ABA 2: CALENDÁRIO
-    with tab_cal:
-        evs = db.obter_dados_calendario()
-        # CSS Correção Dark Mode e Tamanho
-        css_dark = """
-            .fc-col-header-cell-cushion, .fc-daygrid-day-number, .fc-toolbar-title { color: #FFFFFF !important; text-decoration: none !important; }
-            .fc-button { background-color: #FF4B4B !important; border: none !important; color: white !important; }
-            .fc-theme-standard td, .fc-theme-standard th { border-color: #444 !important; }
-        """
-        # A chave 'key' única é essencial para não travar
-        if evs:
-            calendar(
-                events=evs,
-                options={"initialView": "dayGridMonth", "locale": "pt-br", "height": 650},
-                custom_css=css_dark,
-                key="cal_principal_v2"
-            )
-        else:
-            st.info("Sem dados para o calendário.")
+        # ABA 2: CALENDÁRIO
+        with tab_cal:
+            st.subheader("Visão Mensal")
+            eventos = db.obter_dados_calendario()
+
+            # 1. CSS para Forçar Texto Branco (Correção Dark Mode)
+            mode_escuro_css = """
+                .fc-theme-standard td, .fc-theme-standard th { border-color: #444 !important; }
+                .fc-col-header-cell-cushion { color: #FFFFFF !important; text-decoration: none !important; } /* Dias da semana */
+                .fc-daygrid-day-number { color: #FFFFFF !important; text-decoration: none !important; } /* Números */
+                .fc-toolbar-title { color: #FFFFFF !important; } /* Título do Mês */
+                .fc-button { background-color: #FF4B4B !important; border: none !important; color: white !important; } /* Botões */
+                .fc-button:hover { background-color: #FF3333 !important; }
+            """
+
+            calendar_options = {
+                "headerToolbar": {
+                    "left": "prev,next today",
+                    "center": "title",
+                    "right": "dayGridMonth,listMonth"
+                },
+                "initialView": "dayGridMonth",
+                "locale": "pt-br",
+                "height": 650,  # Força uma altura para garantir que aparece
+            }
+
+            if eventos:
+                calendar(
+                    events=eventos,
+                    options=calendar_options,
+                    custom_css=mode_escuro_css,  # Aplica a correção de cor
+                    key="calendario_principal"  # Chave única para evitar bugs em abas
+                )
+            else:
+                st.info("Cadastre boletos para vê-los no calendário.")
 
     # ABA 3: GRÁFICOS
     with tab_graf:
@@ -249,7 +265,8 @@ elif menu == "📥 Importar Excel":
     arq = st.file_uploader("Excel", ["xlsx"])
     if arq and st.button("Processar"):
         try:
-            db.importar_dataframe(USUARIO_ATUAL, pd.read_excel(arq)); st.success("Ok!")
+            db.importar_dataframe(USUARIO_ATUAL, pd.read_excel(arq));
+            st.success("Ok!")
         except Exception as e:
             st.error(e)
 
@@ -266,6 +283,6 @@ elif menu == "📦 Exportar/Auditoria":
         st.subheader("Quem fez o quê?")
         df_logs = db.obter_logs()
         if not df_logs.empty:
-            st.dataframe(df_logs, use_container_width=True)
+            st.dataframe(df_logs, width=True)
         else:
             st.write("Nenhum log registrado.")
