@@ -178,50 +178,6 @@ if menu == "📊 Dashboard":
 
     # --- ABA 2: PAINEL VISUAL (CALENDÁRIO + GRÁFICOS JUNTOS) ---
     with tab_visual:
-        st.subheader("📅 Vencimentos no Calendário")
-
-        eventos_cal = db.obter_dados_calendario()
-
-        if not eventos_cal:
-            st.warning("Nenhum vencimento válido encontrado para exibição no calendário.")
-        else:
-            custom_css_cal = """
-            .fc-theme-standard td, .fc-theme-standard th {
-                border-color: #444 !important;
-            }
-            .fc-daygrid-day-number,
-            .fc-col-header-cell-cushion,
-            .fc-toolbar-title {
-                color: #FFFFFF !important;
-                text-decoration: none !important;
-            }
-            .fc-button {
-                background-color: #FF4B4B !important;
-                border: none !important;
-                color: white !important;
-            }
-            """
-
-            opts_cal = {
-                "headerToolbar": {
-                    "left": "prev,next today",
-                    "center": "title",
-                    "right": "dayGridMonth,listMonth"
-                },
-                "initialView": "dayGridMonth",
-                "initialDate": datetime.now().strftime("%Y-%m-%d"),
-                "height": 600,
-                "timeZone": "local"
-            }
-
-            calendar(
-                events=eventos_cal,
-                options=opts_cal,
-                custom_css=custom_css_cal,
-                key="cal_unificado"
-            )
-
-        st.divider()
 
         st.subheader("📊 Análise de Despesas")
         g1, g2 = st.columns(2)
