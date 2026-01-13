@@ -14,140 +14,79 @@ DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(DATABASE_URL)
 
-
 # --- SEGURANÇA E HASH ---
 def gerar_hash_senha(senha):
-    """Gera um hash SHA-256 seguro para a senha."""
     return hashlib.sha256(senha.encode()).hexdigest()
 
-
 def verificar_login(usuario, senha):
-    """Verifica se usuário e senha batem no banco."""
+    """Verifica login e retorna (id, nome, funcao)."""
     senha_hash = gerar_hash_senha(senha)
     with engine.connect() as conn:
-        res = conn.execute(text("SELECT id, nome FROM usuarios WHERE usuario = :u AND senha = :s"),
+        # ATENÇÃO: Agora retorna também a FUNCAO
+        res = conn.execute(text("SELECT id, nome, funcao FROM usuarios WHERE usuario = :u AND senha = :s"),
                            {'u': usuario, 's': senha_hash}).fetchone()
-        return res  # Retorna None se falhar, ou (id, nome) se sucesso
-
+        return res
 
 def criar_usuario_inicial():
-    """Cria o admin padrão se não houver usuários."""
     with engine.connect() as conn:
         count = conn.execute(text("SELECT COUNT(*) FROM usuarios")).scalar()
         if count == 0:
             senha_padrao = gerar_hash_senha("admin123")
             conn.execute(text("INSERT INTO usuarios (usuario, senha, nome, funcao) VALUES (:u, :s, :n, :f)"),
-                         {'u': 'admin', 's': senha_padrao, 'n': 'Administrador', 'f': 'Gerente'})
+                         {'u': 'admin', 's': senha_padrao, 'n': 'Administrador', 'f': 'Admin'}) # Admin ou Operador
             conn.commit()
-            print("⚠️ Usuário 'admin' criado com senha 'admin123'. Altere assim que possível!")
-
-def alterar_senha_usuario(usuario_nome, nova_senha):
-    """Atualiza a senha do usuário logado no banco de dados."""
-    novo_hash = gerar_hash_senha(nova_senha)
-    with engine.connect() as conn:
-        # Usamos o nome real (ex: 'Administrador') ou o login ('admin')
-        # para identificar o registro conforme sua estrutura
-        conn.execute(text("UPDATE usuarios SET senha = :s WHERE nome = :n"),
-                     {'s': novo_hash, 'n': usuario_nome})
-        conn.commit()
-    registrar_log(usuario_nome, "Alteração de Senha", "O usuário alterou sua própria senha")
-def atualizar_perfil_usuario(nome_atual, novo_login, novo_nome_exibicao):
-    """Atualiza o login e o nome de exibição do usuário."""
-    with engine.connect() as conn:
-        conn.execute(text("UPDATE usuarios SET usuario = :u, nome = :n WHERE nome = :nome_ref"),
-                     {'u': novo_login, 'n': novo_nome_exibicao, 'nome_ref': nome_atual})
-        conn.commit()
-    registrar_log(novo_nome_exibicao, "Atualização de Perfil", f"Alterou login para {novo_login} e nome para {novo_nome_exibicao}")
-
-def obter_dados_usuario(nome_exibicao):
-    """Busca os dados atuais do usuário logado."""
-    with engine.connect() as conn:
-        return conn.execute(text("SELECT usuario, nome FROM usuarios WHERE nome = :n"),
-                           {'n': nome_exibicao}).fetchone()
 
 # --- AUDITORIA (LOGS) ---
 def registrar_log(usuario_nome, acao, detalhes=""):
-    """Grava quem fez o quê."""
     data_hora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     with engine.connect() as conn:
         conn.execute(text("INSERT INTO logs (data_hora, usuario, acao, detalhes) VALUES (:d, :u, :a, :det)"),
                      {'d': data_hora, 'u': usuario_nome, 'a': acao, 'det': detalhes})
         conn.commit()
 
+def obter_logs():
+    """Retorna os últimos 100 logs."""
+    with engine.connect() as conn:
+        return pd.read_sql(text("SELECT * FROM logs ORDER BY id DESC LIMIT 100"), conn)
 
-# --- BACKUP E INIT ---
-def realizar_backup_automatico():
-    if not os.path.exists(BACKUP_FOLDER): os.makedirs(BACKUP_FOLDER)
-    if not os.path.exists(DB_PATH): return
-    hoje = datetime.now().strftime('%Y-%m-%d')
-    bkp = os.path.join(BACKUP_FOLDER, f"financeiro_backup_{hoje}.db")
-    if not os.path.exists(bkp):
-        try:
-            shutil.copy2(DB_PATH, bkp)
-        except:
-            pass
-    # Limpeza backups antigos
-    try:
-        bkps = sorted([os.path.join(BACKUP_FOLDER, f) for f in os.listdir(BACKUP_FOLDER) if f.endswith('.db')])
-        while len(bkps) > 30: os.remove(bkps[0]); bkps.pop(0)
-    except:
-        pass
-
-
+# --- DB INIT ---
 def init_db():
     if not os.path.exists(DB_FOLDER): os.makedirs(DB_FOLDER)
-    realizar_backup_automatico()
-
     with engine.connect() as conn:
-        # Tabela Financeiro
         conn.execute(text('''
-            CREATE TABLE IF NOT EXISTS financeiro (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                data_processamento TEXT,
-                descricao TEXT,
-                valor REAL,
-                codigo_barras TEXT,
-                vencimento TEXT,
-                status TEXT,
-                categoria TEXT DEFAULT 'Outros'
-            )
-        '''))
-
-        # Tabela Usuários
+                          CREATE TABLE IF NOT EXISTS financeiro (
+                                                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                                    data_processamento TEXT,
+                                                                    descricao TEXT,
+                                                                    valor REAL,
+                                                                    codigo_barras TEXT,
+                                                                    vencimento TEXT,
+                                                                    status TEXT,
+                                                                    categoria TEXT DEFAULT 'Outros'
+                          )
+                          '''))
         conn.execute(text('''
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                usuario TEXT UNIQUE,
-                senha TEXT,
-                nome TEXT,
-                funcao TEXT
-            )
-        '''))
-
-        # Tabela Logs de Auditoria
+                          CREATE TABLE IF NOT EXISTS usuarios (
+                                                                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                                  usuario TEXT UNIQUE,
+                                                                  senha TEXT,
+                                                                  nome TEXT,
+                                                                  funcao TEXT
+                          )
+                          '''))
         conn.execute(text('''
-            CREATE TABLE IF NOT EXISTS logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                data_hora TEXT,
-                usuario TEXT,
-                acao TEXT,
-                detalhes TEXT
-            )
-        '''))
-
-        # Migrações (se necessário)
-        try:
-            cols = pd.read_sql(text("PRAGMA table_info(financeiro)"), conn)['name'].tolist()
-            if 'categoria' not in cols:
-                conn.execute(text("ALTER TABLE financeiro ADD COLUMN categoria TEXT DEFAULT 'Outros'"))
-        except:
-            pass
-
+                          CREATE TABLE IF NOT EXISTS logs (
+                                                              id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                              data_hora TEXT,
+                                                              usuario TEXT,
+                                                              acao TEXT,
+                                                              detalhes TEXT
+                          )
+                          '''))
     criar_usuario_inicial()
 
-
-# --- FUNÇÕES DE LEITURA (PÚBLICAS) ---
-def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas", limit=None, offset=0):
+# --- FUNÇÕES FINANCEIRAS ---
+def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas", d_ini=None, d_fim=None, limit=None, offset=0):
     try:
         q = "SELECT * FROM financeiro WHERE 1=1"
         p = {}
@@ -164,8 +103,8 @@ def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas"
             q += " AND categoria = :c"
             p['c'] = categoria_filtro
 
-        # Ordenação: Vencimento (Gambiarra para ordenar data DD/MM/YYYY no SQLite)
-        q += " ORDER BY substr(vencimento, 7, 4) || '-' || substr(vencimento, 4, 2) || '-' || substr(vencimento, 1, 2) DESC"
+        # Ordenação simples por ID decrescente (mais recentes primeiro) para evitar erro de data
+        q += " ORDER BY id DESC"
 
         if limit:
             q += " LIMIT :lim OFFSET :off"
@@ -175,121 +114,67 @@ def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas"
         with engine.connect() as conn:
             return pd.read_sql(text(q), conn, params=p)
     except Exception as e:
-        print(e)
+        print(f"Erro no banco: {e}")
         return pd.DataFrame()
 
 def contar_registros_filtro(busca=None, status_filtro="Todos", categoria_filtro="Todas"):
-    """Conta total para a paginação"""
     q = "SELECT COUNT(*) FROM financeiro WHERE 1=1"
     p = {}
     if busca: q += " AND descricao LIKE :b"; p['b'] = f"%{busca}%"
     if status_filtro != "Todos": q += " AND status = :s"; p['s'] = status_filtro
     if categoria_filtro != "Todas": q += " AND categoria = :c"; p['c'] = categoria_filtro
+    with engine.connect() as conn: return conn.execute(text(q), p).scalar()
 
+def adicionar_registro(usuario_log, data_proc, descricao, valor, codigo_barras, vencimento, status, categoria):
     with engine.connect() as conn:
-        return conn.execute(text(q), p).scalar()
+        conn.execute(text("INSERT INTO financeiro (data_processamento, descricao, valor, codigo_barras, vencimento, status, categoria) VALUES (:d, :desc, :val, :c, :v, :s, :cat)"),
+                     {'d': data_proc, 'desc': descricao, 'val': valor, 'c': codigo_barras, 'v': vencimento, 's': status, 'cat': categoria})
+        conn.commit()
+    registrar_log(usuario_log, "Novo Lançamento", f"R$ {valor} - {descricao}")
 
-# ... (MANTENHA OBTER_GRAFICOS, ADICIONAR, ETC) ...
-
-# --- NOVA FUNÇÃO: EDITAR ---
 def editar_registro(usuario_log, id_reg, descricao, valor, vencimento, categoria, status):
     with engine.connect() as conn:
-        # Pega dados antigos para log
         antigo = conn.execute(text("SELECT descricao, valor FROM financeiro WHERE id=:id"), {'id': id_reg}).fetchone()
-
-        conn.execute(text("""
-                          UPDATE financeiro
-                          SET descricao=:d, valor=:v, vencimento=:dt, categoria=:c, status=:s
-                          WHERE id=:id
-                          """), {
-                         'd': descricao, 'v': valor, 'dt': vencimento, 'c': categoria, 's': status, 'id': id_reg
-                     })
+        conn.execute(text("UPDATE financeiro SET descricao=:d, valor=:v, vencimento=:dt, categoria=:c, status=:s WHERE id=:id"),
+                     {'d': descricao, 'v': valor, 'dt': vencimento, 'c': categoria, 's': status, 'id': id_reg})
         conn.commit()
-
-    # Log simplificado
     detalhe = f"De: {antigo[0]} ({antigo[1]}) Para: {descricao} ({valor})" if antigo else ""
     registrar_log(usuario_log, "Edição", detalhe)
 
-def obter_datas_vencimento():
-    """Retorna uma lista de objetos date com todos os vencimentos cadastrados."""
-    with engine.connect() as conn:
-        # Busca todas as datas de vencimento
-        query = text("SELECT vencimento FROM financeiro")
-        df = pd.read_sql(query, conn)
-
-        # Converte as strings DD/MM/AAAA para objetos datetime do Python
-        datas = pd.to_datetime(df['vencimento'], format='%d/%m/%Y').dt.date.tolist()
-        return datas
-
-def obter_logs():
-    """Retorna os últimos 100 logs para auditoria."""
-    return pd.read_sql(text("SELECT * FROM logs ORDER BY id DESC LIMIT 100"), engine)
-
-def contar_registros(busca=None, status_filtro="Todos", cat_filtro="Todas", d_ini=None, d_fim=None):
-    with engine.connect() as conn:
-        q = "SELECT COUNT(*) FROM financeiro WHERE 1=1"
-        p = {}
-        if busca: q += " AND descricao LIKE :b"; p['b'] = f"%{busca}%"
-        if status_filtro != "Todos": q += " AND status = :s"; p['s'] = status_filtro
-        if cat_filtro != "Todas": q += " AND categoria = :c"; p['c'] = cat_filtro
-        if d_ini: q += " AND (substr(vencimento, 7, 4) || '-' || substr(vencimento, 4, 2) || '-' || substr(vencimento, 1, 2)) >= :di";
-        p['di'] = d_ini
-        if d_fim: q += " AND (substr(vencimento, 7, 4) || '-' || substr(vencimento, 4, 2) || '-' || substr(vencimento, 1, 2)) <= :df";
-        p['df'] = d_fim
-        return conn.execute(text(q), p).scalar()
-
-
-def obter_dados_grafico_tempo():
-    with engine.connect() as c: return pd.read_sql(text(
-        "SELECT substr(vencimento, 7, 4) || '-' || substr(vencimento, 4, 2) as mes, SUM(valor) as total FROM financeiro GROUP BY mes ORDER BY mes ASC"),
-                                                   c)
-
-
-def obter_dados_grafico_categoria():
-    with engine.connect() as c: return pd.read_sql(
-        text("SELECT categoria, SUM(valor) as total FROM financeiro GROUP BY categoria ORDER BY total DESC"), c)
-
-
-# --- CRUD COM AUDITORIA (MUDANÇA PRINCIPAL) ---
-def adicionar_registro(usuario_log, data_proc, descricao, valor, codigo_barras, vencimento, status, categoria):
-    with engine.connect() as conn:
-        conn.execute(text(
-            "INSERT INTO financeiro (data_processamento, descricao, valor, codigo_barras, vencimento, status, categoria) VALUES (:d, :desc, :val, :c, :v, :s, :cat)"),
-                     {'d': data_proc, 'desc': descricao, 'val': valor, 'c': codigo_barras, 'v': vencimento, 's': status,
-                      'cat': categoria})
-        conn.commit()
-    # Registra no log
-    registrar_log(usuario_log, "Novo Lançamento", f"Valor: {valor} | Fornecedor: {descricao}")
-
-
-def verificar_existencia_boleto(codigo):
-    with engine.connect() as c: return c.execute(text("SELECT id FROM financeiro WHERE codigo_barras = :c"),
-                                                 {'c': codigo}).fetchone() is not None
-
-
 def atualizar_status(usuario_log, id_reg, novo_status):
-    # Primeiro pega dados antigos para log
     with engine.connect() as conn:
-        antigo = conn.execute(text("SELECT descricao, status FROM financeiro WHERE id=:id"), {'id': id_reg}).fetchone()
         conn.execute(text("UPDATE financeiro SET status = :s WHERE id = :i"), {'s': novo_status, 'i': id_reg})
         conn.commit()
-
-    desc = antigo[0] if antigo else "Desconhecido"
-    status_ant = antigo[1] if antigo else "?"
-    registrar_log(usuario_log, "Alteração Status", f"ID {id_reg} ({desc}): {status_ant} -> {novo_status}")
-
+    registrar_log(usuario_log, "Alteração Status", f"ID {id_reg} -> {novo_status}")
 
 def excluir_registro(usuario_log, id_reg):
     with engine.connect() as conn:
-        antigo = conn.execute(text("SELECT descricao, valor FROM financeiro WHERE id=:id"), {'id': id_reg}).fetchone()
+        antigo = conn.execute(text("SELECT descricao FROM financeiro WHERE id=:id"), {'id': id_reg}).fetchone()
         conn.execute(text("DELETE FROM financeiro WHERE id = :i"), {'i': id_reg})
         conn.commit()
+    registrar_log(usuario_log, "Exclusão", f"Apagou: {antigo[0] if antigo else 'ID '+str(id_reg)}")
 
-    detalhe = f"{antigo[0]} (R$ {antigo[1]})" if antigo else f"ID {id_reg}"
-    registrar_log(usuario_log, "Exclusão", f"Apagou registro: {detalhe}")
+def verificar_existencia_boleto(codigo):
+    with engine.connect() as c: return c.execute(text("SELECT id FROM financeiro WHERE codigo_barras = :c"), {'c': codigo}).fetchone() is not None
 
+def obter_dados_grafico_tempo():
+    with engine.connect() as c: return pd.read_sql(text("SELECT substr(vencimento, 7, 4) || '-' || substr(vencimento, 4, 2) as mes, SUM(valor) as total FROM financeiro GROUP BY mes ORDER BY mes ASC"), c)
 
-def importar_dataframe(usuario_log, df):
-    if 'categoria' not in df.columns: df['categoria'] = 'Outros'
-    df.to_sql('financeiro', engine, if_exists='append', index=False)
-    registrar_log(usuario_log, "Importação em Massa", f"Importou {len(df)} registros via Excel")
+def obter_dados_grafico_categoria():
+    with engine.connect() as c: return pd.read_sql(text("SELECT categoria, SUM(valor) as total FROM financeiro GROUP BY categoria ORDER BY total DESC"), c)
+
+def obter_dados_usuario(nome_exibicao):
+    with engine.connect() as conn: return conn.execute(text("SELECT usuario, nome FROM usuarios WHERE nome = :n"), {'n': nome_exibicao}).fetchone()
+
+def atualizar_perfil_usuario(nome_atual, novo_login, novo_nome):
+    with engine.connect() as conn:
+        conn.execute(text("UPDATE usuarios SET usuario = :u, nome = :n WHERE nome = :nome_ref"), {'u': novo_login, 'n': novo_nome, 'nome_ref': nome_atual})
+        conn.commit()
+    registrar_log(novo_nome, "Perfil", "Atualizou dados de perfil")
+
+def alterar_senha_usuario(usuario_nome, nova_senha):
+    hash_s = gerar_hash_senha(nova_senha)
+    with engine.connect() as conn:
+        conn.execute(text("UPDATE usuarios SET senha = :s WHERE nome = :n"), {'s': hash_s, 'n': usuario_nome})
+        conn.commit()
+    registrar_log(usuario_nome, "Segurança", "Alterou a senha")

@@ -1,44 +1,75 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, Response
 import database_manager as db
 from datetime import datetime, timedelta
 import pandas as pd
-import os
+import io
 
 app = Flask(__name__, template_folder='templates')
-app.secret_key = 'chave_secreta_super_segura_farmacia'
+app.secret_key = 'chave_secreta_farmacia_pro'
 
 db.init_db()
 
-# --- AUXILIAR: Decifrar Boleto ---
+# --- HELPER: DATAS ---
+def converter_datas(df):
+    if df.empty: return df
+    df['dt_venc'] = pd.to_datetime(df['vencimento'], dayfirst=True, errors='coerce')
+    return df
+
+# --- HELPER: LER BOLETO (CORRIGIDO) ---
 def decifrar_boleto(linha):
     if not linha: return None, 0.0, ""
     linha = ''.join(filter(str.isdigit, linha))
+
     try:
+        # TIPO 1: CONCESSIONÁRIA (Começa com 8)
+        # Ex: Contas de Luz, Água, Telefone
         if linha.startswith('8'):
             val = 0.0
-            if len(linha) == 48:
-                barras = linha[0:11] + linha[12:23] + linha[24:35] + linha[36:47]
-                if len(barras) == 44: val = int(barras[4:15]) / 100.0
-            elif len(linha) == 44:
-                val = int(linha[4:15]) / 100.0
+            # Extrai valor (geralmente posições 4 a 15 ou similar)
+            if len(linha) >= 11:
+                val_str = linha[4:15]
+                val = int(val_str) / 100.0
+
+            # Concessionárias não têm data padrão no código.
+            # Retornamos Hoje ou None para o usuário preencher.
             return None, val, "Concessionária"
+
+        # TIPO 2: BOLETO BANCÁRIO (Começa com outros números)
         else:
-            if len(linha) == 47:
-                fator, val_str = linha[33:37], linha[37:]
-            elif len(linha) == 44:
-                fator, val_str = linha[5:9], linha[9:19]
+            if len(linha) == 47: # Linha digitável
+                fator = linha[33:37]
+                val_str = linha[37:]
+            elif len(linha) == 44: # Código de barras
+                fator = linha[5:9]
+                val_str = linha[9:19]
             else:
                 return None, 0.0, "Inválido"
-            venc = datetime(1997, 10, 7) + timedelta(days=int(fator))
-            if venc < (datetime.now() - timedelta(days=3000)): venc += timedelta(days=9000)
-            return venc.strftime('%d/%m/%Y'), int(val_str) / 100.0, "Bancário"
-    except:
+
+            # CÁLCULO DA DATA (Fator de Vencimento)
+            # Base do BACEN: 07/10/1997
+            base = datetime(1997, 10, 7)
+            dias = int(fator)
+            venc = base + timedelta(days=dias)
+
+            # Ajuste para a "virada" do fator (aconteceu em 2025)
+            # Se a data calculada for muito antiga (ex: ano 2000), adiciona 9000 dias ou ajusta base
+            # O fator reseta a cada ~25 anos (9000 dias)
+            while venc < (datetime.now() - timedelta(days=1000)):
+                venc += timedelta(days=9000) # Aproximação do ciclo
+
+            # CORREÇÃO PRINCIPAL: Retorna YYYY-MM-DD para o HTML entender
+            data_formatada = venc.strftime('%Y-%m-%d')
+            valor_final = int(val_str) / 100.0
+
+            return data_formatada, valor_final, "Bancário"
+
+    except Exception as e:
+        print(f"Erro ao ler boleto: {e}")
         return None, 0.0, "Erro"
 
-# --- ROTAS ---
+# --- ROTAS DE LOGIN/LOGOUT ---
 @app.route('/')
-def index():
-    return render_template('index.html')
+def index(): return render_template('index.html')
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -46,198 +77,183 @@ def login():
     user = db.verificar_login(data.get('usuario'), data.get('senha'))
     if user:
         session['usuario'] = user[1]
-        return jsonify({'success': True, 'nome': user[1]})
+        session['funcao'] = user[2]
+        return jsonify({'success': True, 'nome': user[1], 'funcao': user[2]})
     return jsonify({'success': False, 'message': 'Credenciais inválidas'}), 401
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
-    session.pop('usuario', None)
+    session.clear()
     return jsonify({'success': True})
 
-@app.route('/api/registros', methods=['GET'])
-def listar():
-    if 'usuario' not in session: return jsonify([]), 403
-
-    # Parâmetros da URL
-    busca = request.args.get('busca', '')
-    status = request.args.get('status', 'Todos')
-    cat = request.args.get('categoria', 'Todas')
-    pagina = int(request.args.get('pagina', 1))
-    itens_por_pag = 10
-
-    offset = (pagina - 1) * itens_por_pag
-
-    # Busca dados
-    df = db.listar_registros(busca, status, cat, limit=itens_por_pag, offset=offset)
-    total_itens = db.contar_registros_filtro(busca, status, cat)
-
-    total_paginas = (total_itens // itens_por_pag) + (1 if total_itens % itens_por_pag > 0 else 0)
-
-    return jsonify({
-        'registros': df.to_dict(orient='records'),
-        'total_paginas': total_paginas,
-        'pagina_atual': pagina
-    })
-
-@app.route('/api/editar', methods=['POST'])
-def editar():
-    if 'usuario' not in session: return jsonify({'success': False}), 403
-    d = request.json
-    try:
-        # Tenta formatar data se vier ISO
-        try:
-            data_fmt = datetime.strptime(d['vencimento'], '%Y-%m-%d').strftime('%d/%m/%Y')
-        except:
-            data_fmt = d['vencimento']
-
-        db.editar_registro(
-            session['usuario'], d['id'], d['descricao'],
-            float(d['valor']), data_fmt, d['categoria'], d['status']
-        )
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
+# --- DASHBOARD ---
 @app.route('/api/dashboard', methods=['GET'])
 def dashboard_data():
     if 'usuario' not in session: return jsonify({}), 403
-
-    df_tempo = db.obter_dados_grafico_tempo()
-    df_cat = db.obter_dados_grafico_categoria()
-
     df = db.listar_registros()
 
-    hoje = datetime.now()
-    mes_atual = hoje.month
-    ano_atual = hoje.year
+    vals = {'pagar_mes':0, 'pago_mes':0, 'vencidos_val':0, 'vencidos_qtd':0, 'proximos_val':0, 'proximos_qtd':0}
 
     if not df.empty:
-        df['dt_venc'] = pd.to_datetime(df['vencimento'], format='%d/%m/%Y', errors='coerce')
+        df = converter_datas(df)
+        hoje = pd.Timestamp(datetime.now().date())
 
-        mask_mes = (df['dt_venc'].dt.month == mes_atual) & (df['dt_venc'].dt.year == ano_atual)
-        mask_vencidos = (df['dt_venc'] < hoje) & (df['status'] == 'Pendente')
-        # Ajuste para pegar apenas a data (sem hora) para comparação correta de "hoje"
-        mask_proximos = (df['dt_venc'] >= pd.Timestamp(hoje.date())) & (df['dt_venc'] <= pd.Timestamp(hoje.date()) + timedelta(days=7)) & (df['status'] == 'Pendente')
+        m_pendente = (df['status'] == 'Pendente')
+        # Pago no mês atual
+        m_pago_mes = (df['status'] == 'Pago') & (df['dt_venc'].dt.month == hoje.month) & (df['dt_venc'].dt.year == hoje.year)
+        # Vencidos
+        m_vencido = (df['status'] == 'Pendente') & (df['dt_venc'] < hoje)
+        # Próximos 7 dias
+        m_prox = (df['status'] == 'Pendente') & (df['dt_venc'] >= hoje) & (df['dt_venc'] <= hoje + timedelta(days=7))
 
-        total_pagar_mes = df[mask_mes & (df['status'] == 'Pendente')]['valor'].sum()
-        total_pago_mes = df[mask_mes & (df['status'] == 'Pago')]['valor'].sum()
-
-        vencidos_valor = df[mask_vencidos]['valor'].sum()
-        vencidos_qtd = int(df[mask_vencidos].shape[0])
-
-        proximos_qtd = int(df[mask_proximos].shape[0])
-        proximos_valor = df[mask_proximos]['valor'].sum()
-    else:
-        total_pagar_mes = 0.0
-        total_pago_mes = 0.0
-        vencidos_valor = 0.0
-        vencidos_qtd = 0
-        proximos_qtd = 0
-        proximos_valor = 0.0
+        vals['pagar_mes'] = df[m_pendente]['valor'].sum()
+        vals['pago_mes'] = df[m_pago_mes]['valor'].sum()
+        vals['vencidos_val'] = df[m_vencido]['valor'].sum()
+        vals['vencidos_qtd'] = int(df[m_vencido].shape[0])
+        vals['proximos_val'] = df[m_prox]['valor'].sum()
+        vals['proximos_qtd'] = int(df[m_prox].shape[0])
 
     return jsonify({
         'graficos': {
-            'por_mes': df_tempo.to_dict(orient='records'),
-            'por_categoria': df_cat.to_dict(orient='records')
+            'por_mes': db.obter_dados_grafico_tempo().to_dict(orient='records'),
+            'por_categoria': db.obter_dados_grafico_categoria().to_dict(orient='records')
         },
-        'cards': {
-            'pagar_mes': total_pagar_mes,
-            'pago_mes': total_pago_mes,
-            'vencidos_val': vencidos_valor,
-            'vencidos_qtd': vencidos_qtd,
-            'proximos_qtd': proximos_qtd,
-            'proximos_val': proximos_valor
-        }
+        'cards': vals
     })
 
-# --- NOVA ROTA: DETALHES DO CARD ---
 @app.route('/api/detalhes_card', methods=['POST'])
-def detalhes_card():
+def detalhes():
     if 'usuario' not in session: return jsonify([]), 403
     tipo = request.json.get('tipo')
-
     df = db.listar_registros()
     if df.empty: return jsonify([])
 
-    hoje = datetime.now()
-    mes_atual = hoje.month
-    ano_atual = hoje.year
-    df['dt_venc'] = pd.to_datetime(df['vencimento'], format='%d/%m/%Y', errors='coerce')
-
+    df = converter_datas(df)
+    hoje = pd.Timestamp(datetime.now().date())
     filtrado = pd.DataFrame()
 
-    if tipo == 'pagar_mes':
-        mask = (df['dt_venc'].dt.month == mes_atual) & (df['dt_venc'].dt.year == ano_atual) & (df['status'] == 'Pendente')
-        filtrado = df[mask]
-    elif tipo == 'vencidos':
-        mask = (df['dt_venc'] < hoje) & (df['status'] == 'Pendente')
-        filtrado = df[mask]
-    elif tipo == 'proximos':
-        # Compara apenas datas para incluir o dia de hoje corretamente
-        mask = (df['dt_venc'] >= pd.Timestamp(hoje.date())) & (df['dt_venc'] <= pd.Timestamp(hoje.date()) + timedelta(days=7)) & (df['status'] == 'Pendente')
-        filtrado = df[mask]
-    elif tipo == 'pago_mes':
-        mask = (df['dt_venc'].dt.month == mes_atual) & (df['dt_venc'].dt.year == ano_atual) & (df['status'] == 'Pago')
-        filtrado = df[mask]
+    if tipo == 'pagar_mes': filtrado = df[df['status'] == 'Pendente']
+    elif tipo == 'vencidos': filtrado = df[(df['status'] == 'Pendente') & (df['dt_venc'] < hoje)]
+    elif tipo == 'proximos': filtrado = df[(df['status'] == 'Pendente') & (df['dt_venc'] >= hoje) & (df['dt_venc'] <= hoje + timedelta(days=7))]
+    elif tipo == 'pago_mes': filtrado = df[(df['status'] == 'Pago') & (df['dt_venc'].dt.month == hoje.month) & (df['dt_venc'].dt.year == hoje.year)]
 
-    # Remove a coluna auxiliar de data antes de enviar
-    if 'dt_venc' in filtrado.columns:
-        del filtrado['dt_venc']
-
+    if 'dt_venc' in filtrado.columns: del filtrado['dt_venc']
     return jsonify(filtrado.fillna('').to_dict(orient='records'))
 
+@app.route('/api/calendario', methods=['GET'])
+def calendario():
+    if 'usuario' not in session: return jsonify([]), 403
+    df = db.listar_registros()
+    eventos = []
+    if not df.empty:
+        df = converter_datas(df)
+        hoje = pd.Timestamp(datetime.now().date())
+        for _, row in df.iterrows():
+            if pd.isna(row['dt_venc']): continue
+            cor = '#10b981' if row['status'] == 'Pago' else ('#ef4444' if row['dt_venc'] < hoje else '#f59e0b')
+            eventos.append({
+                'id': row['id'],
+                'title': f"R$ {row['valor']:.2f} - {row['descricao']}",
+                'start': row['dt_venc'].strftime('%Y-%m-%d'),
+                'backgroundColor': cor, 'borderColor': cor, 'allDay': True,
+                'extendedProps': {'status': row['status'], 'valor': row['valor']}
+            })
+    return jsonify(eventos)
+
+# --- CRUD / REGISTROS ---
+@app.route('/api/registros', methods=['GET'])
+def listar():
+    if 'usuario' not in session: return jsonify([]), 403
+    p = int(request.args.get('pagina', 1))
+    # Chama o banco com os filtros
+    df = db.listar_registros(
+        busca=request.args.get('busca', ''),
+        status_filtro=request.args.get('status', 'Todos'),
+        categoria_filtro=request.args.get('categoria', 'Todas'),
+        limit=10,
+        offset=(p-1)*10
+    )
+    total = db.contar_registros_filtro(
+        busca=request.args.get('busca', ''),
+        status_filtro=request.args.get('status', 'Todos'),
+        categoria_filtro=request.args.get('categoria', 'Todas')
+    )
+    return jsonify({
+        'registros': df.to_dict(orient='records'),
+        'total_paginas': (total // 10) + (1 if total % 10 > 0 else 0),
+        'pagina_atual': p,
+        'perm_excluir': session.get('funcao') == 'Admin'
+    })
+
+@app.route('/api/ler_codigo', methods=['POST'])
+def ler():
+    # Usa a função corrigida que retorna YYYY-MM-DD
+    v, val, t = decifrar_boleto(request.json.get('codigo'))
+    return jsonify({'vencimento': v, 'valor': val, 'tipo': t})
+
 @app.route('/api/novo_boleto', methods=['POST'])
-def adicionar():
-    if 'usuario' not in session: return jsonify({'success': False}), 403
+def add():
+    if 'usuario' not in session: return jsonify({}), 403
     d = request.json
-    try:
-        data_fmt = datetime.strptime(d['vencimento'], '%Y-%m-%d').strftime('%d/%m/%Y')
-    except: data_fmt = d['vencimento']
+    # Se vier YYYY-MM-DD do input date, converte para DD/MM/YYYY para salvar no banco (padrão BR)
+    try: data_fmt = datetime.strptime(d['vencimento'], '%Y-%m-%d').strftime('%d/%m/%Y')
+    except: data_fmt = d['vencimento'] # Se já vier BR ou vazio, mantém
 
-    if db.verificar_existencia_boleto(d['codigo']):
-        return jsonify({'success': False, 'message': 'Boleto duplicado'})
+    if db.verificar_existencia_boleto(d['codigo']): return jsonify({'success': False, 'message': 'Duplicado'})
 
-    db.adicionar_registro(session['usuario'], datetime.now().strftime('%d/%m/%Y'),
-                          d['descricao'], float(d['valor']), d['codigo'], data_fmt, d['status'], d['categoria'])
+    db.adicionar_registro(session['usuario'], datetime.now().strftime('%d/%m/%Y'), d['descricao'], float(d['valor']), d['codigo'], data_fmt, d['status'], d['categoria'])
     return jsonify({'success': True})
-@app.route('/api/atualizar_status', methods=['POST'])
-def atualizar_status():
-    if 'usuario' not in session: return jsonify({'success': False}), 403
+
+@app.route('/api/editar', methods=['POST'])
+def edit():
+    if 'usuario' not in session: return jsonify({}), 403
     d = request.json
-    db.atualizar_status(session['usuario'], d['id'], d['status'])
+    try: data_fmt = datetime.strptime(d['vencimento'], '%Y-%m-%d').strftime('%d/%m/%Y')
+    except: data_fmt = d['vencimento']
+    db.editar_registro(session['usuario'], d['id'], d['descricao'], float(d['valor']), data_fmt, d['categoria'], d['status'])
+    return jsonify({'success': True})
+
+@app.route('/api/atualizar_status', methods=['POST'])
+def status_up():
+    if 'usuario' not in session: return jsonify({}), 403
+    db.atualizar_status(session['usuario'], request.json['id'], request.json['status'])
     return jsonify({'success': True})
 
 @app.route('/api/excluir', methods=['POST'])
-def excluir():
-    if 'usuario' not in session: return jsonify({'success': False}), 403
-    d = request.json
-    db.excluir_registro(session['usuario'], d['id'])
+def delete():
+    if 'usuario' not in session: return jsonify({}), 403
+    if session.get('funcao') != 'Admin': return jsonify({'success': False, 'message': 'Apenas Admins podem excluir.'}), 403
+    db.excluir_registro(session['usuario'], request.json['id'])
     return jsonify({'success': True})
 
-@app.route('/api/ler_codigo', methods=['POST'])
-def ler_codigo():
-    codigo = request.json.get('codigo')
-    venc, val, tipo = decifrar_boleto(codigo)
-    return jsonify({'vencimento': venc, 'valor': val, 'tipo': tipo})
+@app.route('/api/logs', methods=['GET'])
+def logs():
+    if 'usuario' not in session: return jsonify([]), 403
+    return jsonify(db.obter_logs().to_dict(orient='records'))
+
+@app.route('/api/exportar', methods=['GET'])
+def exportar():
+    if 'usuario' not in session: return "", 403
+    df = db.listar_registros()
+    out = io.StringIO()
+    df.to_csv(out, index=False, sep=';', encoding='utf-8-sig')
+    return Response(out.getvalue(), mimetype="text/csv", headers={"Content-disposition": "attachment; filename=dados.csv"})
 
 @app.route('/api/dados_usuario', methods=['GET'])
-def dados_usuario():
-    if 'usuario' not in session: return jsonify({}), 403
-    dados = db.obter_dados_usuario(session['usuario'])
-    return jsonify({'login': dados[0], 'nome': dados[1]})
+def dados_u():
+    if 'usuario' not in session: return jsonify({})
+    d = db.obter_dados_usuario(session['usuario'])
+    return jsonify({'login': d[0], 'nome': d[1]})
 
 @app.route('/api/alterar_perfil', methods=['POST'])
-def alterar_perfil():
+def alt_perf():
     if 'usuario' not in session: return jsonify({'success': False}), 403
     d = request.json
-    try:
-        if d.get('novo_login') and d.get('novo_nome'):
-            db.atualizar_perfil_usuario(session['usuario'], d['novo_login'], d['novo_nome'])
-            session['usuario'] = d['novo_nome']
-        if d.get('nova_senha'):
-            db.alterar_senha_usuario(session['usuario'], d['nova_senha'])
-        return jsonify({'success': True})
-    except Exception as e: return jsonify({'success': False, 'message': str(e)})
+    if d.get('nova_senha'): db.alterar_senha_usuario(session['usuario'], d['nova_senha'])
+    if d.get('novo_nome'):
+        db.atualizar_perfil_usuario(session['usuario'], d['novo_login'], d['novo_nome'])
+        session['usuario'] = d['novo_nome']
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
