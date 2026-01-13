@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financeiro Farmácia</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #e74c3c;
+            --bg: #f4f6f9;
+            --white: #ffffff;
+            --success: #27ae60;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); margin: 0; padding: 0; color: #333; overflow-x: hidden; }
+
+        /* CLASSE CRÍTICA PARA OCULTAR TELAS */
+        .hidden { display: none !important; }
+
+        /* Login Styles */
+        #login-screen { display: flex; height: 100vh; width: 100vw; justify-content: center; align-items: center; background: linear-gradient(135deg, #2c3e50, #4ca1af); position: fixed; top: 0; left: 0; z-index: 9999; }
+        .login-box { background: var(--white); padding: 2rem; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 100%; max-width: 350px; text-align: center; }
+        .login-box input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+        .login-box button { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; }
+
+        /* App Styles */
+        #app-screen { display: flex; min-height: 100vh; }
+        .sidebar { width: 250px; background: var(--primary); color: white; padding: 20px; display: flex; flex-direction: column; position: fixed; height: 100%; }
+        .sidebar h2 { font-size: 1.2rem; margin-bottom: 30px; }
+        .menu-item { padding: 12px; cursor: pointer; border-radius: 5px; margin-bottom: 5px; transition: 0.2s; }
+        .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.1); }
+        .content { flex: 1; padding: 30px; margin-left: 290px; overflow-y: auto; }
+
+        /* Cards & Components */
+        .card { background: var(--white); padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; margin-right: 5px;}
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--accent); color: white; }
+
+        /* Forms */
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; }
+        .status-Pago { background: #d4edda; color: #155724; }
+        .status-Pendente { background: #f8d7da; color: #721c24; }
+
+        .chart-container { position: relative; height: 300px; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="login-box">
+            <h2>🏥 Farmácia</h2>
+            <p>Acesso Restrito</p>
+            <input type="text" id="login-user" placeholder="Usuário">
+            <input type="password" id="login-pass" placeholder="Senha">
+            <button onclick="fazerLogin()">Entrar</button>
+            <p id="login-msg" style="color: red; margin-top: 10px; font-size: 0.9rem;"></p>
+        </div>
+    </div>
+
+    <div id="app-screen" class="hidden">
+        <div class="sidebar">
+            <h2>Olá, <span id="user-display">Usuario</span></h2>
+            <div class="menu-item active" onclick="nav('dashboard', this)">📊 Dashboard</div>
+            <div class="menu-item" onclick="nav('novo', this)">📑 Novo Boleto</div>
+            <div class="menu-item" onclick="nav('lista', this)">📋 Registros</div>
+            <div class="menu-item" onclick="nav('config', this)">⚙️ Configurações</div>
+            <div style="flex-grow: 1;"></div>
+            <div class="menu-item" onclick="fazerLogout()">🚪 Sair</div>
+        </div>
+
+        <div class="content">
+            <div id="view-dashboard">
+                <h1>Painel Financeiro</h1>
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1; min-width: 300px;">
+                        <h3>Despesas por Mês</h3>
+                        <div class="chart-container"><canvas id="chartMes"></canvas></div>
+                    </div>
+                    <div class="card" style="flex: 1; min-width: 300px;">
+                        <h3>Por Categoria</h3>
+                        <div class="chart-container"><canvas id="chartCat"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-novo" class="hidden">
+                <h1>Novo Lançamento</h1>
+                <div class="card" style="max-width: 700px;">
+                    <div class="form-group">
+                        <label>Código de Barras</label>
+                        <input type="text" id="boleto-cod" onblur="lerCodigoBarras()" placeholder="Cole aqui...">
+                    </div>
+                    <div class="form-group">
+                        <label>Descrição</label>
+                        <input type="text" id="boleto-desc">
+                    </div>
+                    <div style="display: flex; gap: 15px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Valor (R$)</label>
+                            <input type="number" step="0.01" id="boleto-valor">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Vencimento</label>
+                            <input type="date" id="boleto-venc">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 15px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Categoria</label>
+                            <select id="boleto-cat">
+                                <option>Medicamentos (Estoque)</option>
+                                <option>Materiais de Consumo</option>
+                                <option>Impostos & Taxas</option>
+                                <option>Folha de Pagamento</option>
+                                <option>Aluguel & Condomínio</option>
+                                <option>Água/Luz/Internet</option>
+                                <option>Marketing</option>
+                                <option>Manutenção</option>
+                                <option>Outros</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Status</label>
+                            <select id="boleto-status">
+                                <option value="Pendente">Pendente</option>
+                                <option value="Pago">Pago</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="salvarBoleto()">Salvar Lançamento</button>
+                </div>
+            </div>
+
+            <div id="view-lista" class="hidden">
+                <h1>Registros</h1>
+                <div class="card">
+                    <button class="btn btn-primary" onclick="carregarLista()">🔄 Atualizar Lista</button>
+                    <div style="overflow-x: auto;">
+                        <table id="tabela-registros">
+                            <thead>
+                                <tr>
+                                    <th>Vencimento</th>
+                                    <th>Descrição</th>
+                                    <th>Categoria</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-config" class="hidden">
+                <h1>Configurações do Usuário</h1>
+                <div class="card" style="max-width: 500px;">
+                    <h3>👤 Editar Perfil</h3>
+                    <div class="form-group">
+                        <label>Login de Acesso (Usuário)</label>
+                        <input type="text" id="conf-login">
+                    </div>
+                    <div class="form-group">
+                        <label>Nome de Exibição</label>
+                        <input type="text" id="conf-nome">
+                    </div>
+
+                    <h3>🔒 Segurança</h3>
+                    <div class="form-group">
+                        <label>Nova Senha (deixe em branco para não alterar)</label>
+                        <input type="password" id="conf-senha" placeholder="********">
+                    </div>
+
+                    <button class="btn btn-primary" onclick="salvarConfiguracoes()">💾 Salvar Alterações</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- NAVEGAÇÃO ---
+        function nav(viewId, elementoMenu) {
+            // Esconde todas as views
+            document.querySelectorAll('.content > div').forEach(el => el.classList.add('hidden'));
+            // Mostra a view desejada
+            document.getElementById('view-' + viewId).classList.remove('hidden');
+
+            // Atualiza menu ativo
+            if(elementoMenu) {
+                document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+                elementoMenu.classList.add('active');
+            }
+
+            // Carrega dados específicos
+            if(viewId === 'dashboard') carregarDashboard();
+            if(viewId === 'lista') carregarLista();
+            if(viewId === 'config') carregarConfiguracoes();
+        }
+
+        // --- LOGIN ---
+        async function fazerLogin() {
+            const user = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({usuario: user, senha: pass})
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('user-display').innerText = data.nome;
+                // AQUI ESTÁ A CORREÇÃO:
+                document.getElementById('login-screen').classList.add('hidden'); // Oculta login
+                document.getElementById('app-screen').classList.remove('hidden'); // Mostra app
+                carregarDashboard();
+            } else {
+                document.getElementById('login-msg').innerText = "Erro: " + data.message;
+            }
+        }
+
+        async function fazerLogout() {
+            await fetch('/api/logout', {method: 'POST'});
+            location.reload(); // Recarrega para voltar ao login limpo
+        }
+
+        // --- CONFIGURAÇÕES (NOVA FUNÇÃO) ---
+        async function carregarConfiguracoes() {
+            const res = await fetch('/api/dados_usuario');
+            const data = await res.json();
+            if(data.login) {
+                document.getElementById('conf-login').value = data.login;
+                document.getElementById('conf-nome').value = data.nome;
+            }
+        }
+
+        async function salvarConfiguracoes() {
+            const dados = {
+                novo_login: document.getElementById('conf-login').value,
+                novo_nome: document.getElementById('conf-nome').value,
+                nova_senha: document.getElementById('conf-senha').value
+            };
+
+            const res = await fetch('/api/alterar_perfil', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(dados)
+            });
+            const resp = await res.json();
+
+            if(resp.success) {
+                alert("Dados atualizados com sucesso!");
+                document.getElementById('user-display').innerText = dados.novo_nome;
+                document.getElementById('conf-senha').value = ""; // Limpa campo senha
+            } else {
+                alert("Erro ao atualizar: " + resp.message);
+            }
+        }
+
+        // --- BOLETOS ---
+        async function lerCodigoBarras() {
+            const cod = document.getElementById('boleto-cod').value;
+            if(!cod) return;
+
+            const res = await fetch('/api/ler_codigo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({codigo: cod})
+            });
+            const data = await res.json();
+
+            if(data.valor) document.getElementById('boleto-valor').value = data.valor;
+            if(data.vencimento) document.getElementById('boleto-venc').value = data.vencimento;
+        }
+
+        async function salvarBoleto() {
+            const dados = {
+                codigo: document.getElementById('boleto-cod').value,
+                descricao: document.getElementById('boleto-desc').value,
+                valor: document.getElementById('boleto-valor').value,
+                vencimento: document.getElementById('boleto-venc').value,
+                categoria: document.getElementById('boleto-cat').value,
+                status: document.getElementById('boleto-status').value
+            };
+
+            const res = await fetch('/api/novo_boleto', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(dados)
+            });
+            const resp = await res.json();
+            if(resp.success) {
+                alert("Salvo com sucesso!");
+                document.getElementById('boleto-cod').value = "";
+                document.getElementById('boleto-desc').value = "";
+            } else {
+                alert("Erro: " + resp.message);
+            }
+        }
+
+        // --- LISTAGEM ---
+        async function carregarLista() {
+            const res = await fetch('/api/registros');
+            const lista = await res.json();
+            const tbody = document.querySelector('#tabela-registros tbody');
+            tbody.innerHTML = '';
+
+            lista.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.vencimento}</td>
+                    <td>${item.descricao}</td>
+                    <td><small>${item.categoria}</small></td>
+                    <td>R$ ${parseFloat(item.valor).toFixed(2)}</td>
+                    <td><span class="status-badge status-${item.status}">${item.status}</span></td>
+                    <td>
+                        ${item.status === 'Pendente' ?
+                          `<button class="btn btn-success" onclick="mudarStatus(${item.id}, 'Pago')">✓</button>` :
+                          `<button class="btn" style="background:#ccc" onclick="mudarStatus(${item.id}, 'Pendente')">↺</button>`}
+                        <button class="btn btn-danger" onclick="excluir(${item.id})">X</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function mudarStatus(id, novoStatus) {
+            await fetch('/api/atualizar_status', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id: id, status: novoStatus})
+            });
+            carregarLista();
+        }
+
+        async function excluir(id) {
+            if(!confirm("Tem certeza que deseja excluir?")) return;
+            await fetch('/api/excluir', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id: id})
+            });
+            carregarLista();
+        }
+
+        // --- DASHBOARD ---
+        let chartM = null;
+        let chartC = null;
+
+        async function carregarDashboard() {
+            const res = await fetch('/api/dashboard');
+            const data = await res.json();
+
+            const ctxM = document.getElementById('chartMes').getContext('2d');
+            if(chartM) chartM.destroy();
+            chartM = new Chart(ctxM, {
+                type: 'bar',
+                data: {
+                    labels: data.por_mes.map(d => d.mes),
+                    datasets: [{ label: 'Total R$', data: data.por_mes.map(d => d.total), backgroundColor: '#3498db' }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            const ctxC = document.getElementById('chartCat').getContext('2d');
+            if(chartC) chartC.destroy();
+            chartC = new Chart(ctxC, {
+                type: 'doughnut',
+                data: {
+                    labels: data.por_categoria.map(d => d.categoria),
+                    datasets: [{
+                        data: data.por_categoria.map(d => d.total),
+                        backgroundColor: ['#e74c3c', '#9b59b6', '#f1c40f', '#2ecc71', '#34495e', '#1abc9c']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+    </script>
+</body>
+</html>
