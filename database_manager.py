@@ -41,6 +41,29 @@ def criar_usuario_inicial():
             conn.commit()
             print("⚠️ Usuário 'admin' criado com senha 'admin123'. Altere assim que possível!")
 
+def alterar_senha_usuario(usuario_nome, nova_senha):
+    """Atualiza a senha do usuário logado no banco de dados."""
+    novo_hash = gerar_hash_senha(nova_senha)
+    with engine.connect() as conn:
+        # Usamos o nome real (ex: 'Administrador') ou o login ('admin')
+        # para identificar o registro conforme sua estrutura
+        conn.execute(text("UPDATE usuarios SET senha = :s WHERE nome = :n"),
+                     {'s': novo_hash, 'n': usuario_nome})
+        conn.commit()
+    registrar_log(usuario_nome, "Alteração de Senha", "O usuário alterou sua própria senha")
+def atualizar_perfil_usuario(nome_atual, novo_login, novo_nome_exibicao):
+    """Atualiza o login e o nome de exibição do usuário."""
+    with engine.connect() as conn:
+        conn.execute(text("UPDATE usuarios SET usuario = :u, nome = :n WHERE nome = :nome_ref"),
+                     {'u': novo_login, 'n': novo_nome_exibicao, 'nome_ref': nome_atual})
+        conn.commit()
+    registrar_log(novo_nome_exibicao, "Atualização de Perfil", f"Alterou login para {novo_login} e nome para {novo_nome_exibicao}")
+
+def obter_dados_usuario(nome_exibicao):
+    """Busca os dados atuais do usuário logado."""
+    with engine.connect() as conn:
+        return conn.execute(text("SELECT usuario, nome FROM usuarios WHERE nome = :n"),
+                           {'n': nome_exibicao}).fetchone()
 
 # --- AUDITORIA (LOGS) ---
 def registrar_log(usuario_nome, acao, detalhes=""):

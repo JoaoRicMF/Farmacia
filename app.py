@@ -55,7 +55,6 @@ if not st.session_state['logado']:
             st.text_input("Senha", type="password", key="form_senha")
             st.form_submit_button("Entrar", on_click=realizar_login)
 
-        st.info("Primeiro acesso? Use **admin** / **admin123**")
 
     st.stop()  # PARA O CÓDIGO AQUI SE NÃO ESTIVER LOGADO
 
@@ -99,7 +98,7 @@ if st.sidebar.button("Sair / Logout"):
     realizar_logout()
 
 st.sidebar.divider()
-menu = st.sidebar.radio("Navegação:", ["📊 Dashboard", "📑 Ler Novo Boleto", "📥 Importar Excel", "📦 Exportar/Auditoria"])
+menu = st.sidebar.radio("Navegação:", ["📊 Dashboard", "📑 Ler Novo Boleto", "📥 Importar Excel", "📦 Exportar/Auditoria", "⚙️ Configurações"])
 
 # --- DASHBOARD ---
 if menu == "📊 Dashboard":
@@ -292,3 +291,50 @@ elif menu == "📦 Exportar/Auditoria":
             st.dataframe(df_logs, width=True)
         else:
             st.write("Nenhum log registrado.")
+
+elif menu == "⚙️ Configurações":
+    st.title("⚙️ Painel de Configurações")
+
+    # Busca dados atuais para preencher o formulário
+    dados_user = db.obter_dados_usuario(USUARIO_ATUAL)
+    login_atual = dados_user[0] if dados_user else ""
+
+    tab_perfil, tab_seguranca, tab_sistema = st.tabs(["👤 Meu Perfil", "🔒 Segurança", "💻 Sistema"])
+
+    with tab_perfil:
+        st.subheader("Informações do Perfil")
+        with st.form("form_perfil"):
+            novo_login = st.text_input("Nome de Usuário (Login)", value=login_atual)
+            novo_nome_exibicao = st.text_input("Nome de Exibição (Como aparece no sistema)", value=USUARIO_ATUAL)
+
+            if st.form_submit_button("Atualizar Perfil"):
+                if not novo_login or not novo_nome_exibicao:
+                    st.error("Os campos não podem estar vazios.")
+                else:
+                    db.atualizar_perfil_usuario(USUARIO_ATUAL, novo_login, novo_nome_exibicao)
+                    st.session_state['usuario_nome'] = novo_nome_exibicao
+                    st.success("Perfil atualizado! As mudanças refletirão após atualizar a página.")
+                    st.rerun()
+
+    with tab_seguranca:
+        st.subheader("Alteração de Senha")
+        with st.form("form_senha_config"):
+            nova_senha = st.text_input("Nova Senha", type="password")
+            confirmar = st.text_input("Confirmar Nova Senha", type="password")
+
+            if st.form_submit_button("Trocar Senha"):
+                if nova_senha == confirmar and len(nova_senha) >= 4:
+                    db.alterar_senha_usuario(USUARIO_ATUAL, nova_senha)
+                    st.success("Senha alterada com sucesso!")
+                else:
+                    st.error("As senhas não coincidem ou são muito curtas.")
+
+    with tab_sistema:
+        st.subheader("Preferências do Sistema")
+        # Exemplo de configurações adicionais (estéticas)
+        st.toggle("Modo de Auditoria Compacto", value=True)
+        st.write(f"**Banco de Dados:** {db.DB_PATH}")
+
+        if st.button("Realizar Backup Manual Agora"):
+            db.realizar_backup_automatico()
+            st.toast("Backup concluído!")
