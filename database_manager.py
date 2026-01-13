@@ -145,6 +145,17 @@ def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas"
         return pd.DataFrame()
 
 
+def obter_datas_vencimento():
+    """Retorna uma lista de objetos date com todos os vencimentos cadastrados."""
+    with engine.connect() as conn:
+        # Busca todas as datas de vencimento
+        query = text("SELECT vencimento FROM financeiro")
+        df = pd.read_sql(query, conn)
+
+        # Converte as strings DD/MM/AAAA para objetos datetime do Python
+        datas = pd.to_datetime(df['vencimento'], format='%d/%m/%Y').dt.date.tolist()
+        return datas
+
 def obter_logs():
     """Retorna os últimos 100 logs para auditoria."""
     return pd.read_sql(text("SELECT * FROM logs ORDER BY id DESC LIMIT 100"), engine)

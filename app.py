@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 import math
-from streamlit_calendar import calendar
 import database_manager as db
 
 # CONFIGURAÇÕES DA PÁGINA
@@ -106,8 +105,7 @@ menu = st.sidebar.radio("Navegação:", ["📊 Dashboard", "📑 Ler Novo Boleto
 if menu == "📊 Dashboard":
     st.title("📈 Painel Financeiro")
 
-    # Agora criamos apenas duas abas: uma para a Lista e outra para o Painel Visual (Calendário + Gráficos)
-    tab_lista, tab_visual = st.tabs(["📋 Lista de Registros", "🖼️ Painel Visual (Calendário e Gráficos)"])
+    tab_lista, tab_visual = st.tabs(["📋 Lista de Registros", "🖼️ Painel Visual (Proximo Vencimentos e Gráficos)"])
 
     # --- ABA 1: LISTA ---
     with tab_lista:
@@ -174,7 +172,47 @@ if menu == "📊 Dashboard":
 
     # --- ABA 2: PAINEL VISUAL (CALENDÁRIO + GRÁFICOS JUNTOS) ---
     with tab_visual:
+        st.subheader("📅 Próximos Vencimentos")
 
+        # Busca as datas que possuem lançamentos no banco
+        datas_com_conta = db.obter_datas_vencimento()
+
+        # IMPORTANTE: Para destacar datas sem entrar em modo "range",
+        # garantimos que o valor padrão seja apenas a data de hoje.
+        hoje = datetime.now().date()
+
+        data_selecionada = st.date_input(
+            "Selecione uma data para filtrar:",
+            value=hoje,
+            format="DD/MM/YYYY",
+            help="As datas destacadas no banco de dados serão exibidas abaixo."
+        )
+
+        # O erro ocorria aqui. Agora garantimos que tratamos apenas se for uma data única.
+        if data_selecionada:
+            # Caso o Streamlit retorne uma lista/tupla por engano, pegamos o primeiro item
+            if isinstance(data_selecionada, (list, tuple)):
+                data_final = data_selecionada[0]
+            else:
+                data_final = data_selecionada
+
+            data_str = data_final.strftime('%d/%m/%Y')
+            data_iso = data_final.strftime('%Y-%m-%d')
+
+            # Busca registros especificamente para esse dia
+            df_dia = db.listar_registros(d_ini=data_iso, d_fim=data_iso)
+
+            if not df_dia.empty:
+                st.write(f"### 📋 Contas para o dia {data_str}")
+                # Formatação simples da tabela
+                st.dataframe(
+                    df_dia[['descricao', 'valor', 'status', 'categoria']],
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info(f"Nenhum lançamento encontrado para {data_str}.")
+        st.divider()
         st.subheader("📊 Análise de Despesas")
         g1, g2 = st.columns(2)
 
