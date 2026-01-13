@@ -147,26 +147,68 @@ def init_db():
 
 
 # --- FUNÇÕES DE LEITURA (PÚBLICAS) ---
-def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas", d_ini=None, d_fim=None, limit=None,
-                     offset=0):
+def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas", limit=None, offset=0):
     try:
         q = "SELECT * FROM financeiro WHERE 1=1"
         p = {}
-        if busca: q += " AND descricao LIKE :b"; p['b'] = f"%{busca}%"
-        if status_filtro != "Todos": q += " AND status = :s"; p['s'] = status_filtro
-        if categoria_filtro != "Todas": q += " AND categoria = :c"; p['c'] = categoria_filtro
-        if d_ini: q += " AND (substr(vencimento, 7, 4) || '-' || substr(vencimento, 4, 2) || '-' || substr(vencimento, 1, 2)) >= :di";
-        p['di'] = d_ini
-        if d_fim: q += " AND (substr(vencimento, 7, 4) || '-' || substr(vencimento, 4, 2) || '-' || substr(vencimento, 1, 2)) <= :df";
-        p['df'] = d_fim
 
-        q += " ORDER BY substr(vencimento, 7, 4) || '-' || substr(vencimento, 4, 2) || '-' || substr(vencimento, 1, 2) ASC"
-        if limit: q += " LIMIT :lim OFFSET :off"; p['lim'] = limit; p['off'] = offset
+        if busca:
+            q += " AND descricao LIKE :b"
+            p['b'] = f"%{busca}%"
 
-        return pd.read_sql(text(q), engine, params=p)
-    except:
+        if status_filtro and status_filtro != "Todos":
+            q += " AND status = :s"
+            p['s'] = status_filtro
+
+        if categoria_filtro and categoria_filtro != "Todas":
+            q += " AND categoria = :c"
+            p['c'] = categoria_filtro
+
+        # Ordenação: Vencimento (Gambiarra para ordenar data DD/MM/YYYY no SQLite)
+        q += " ORDER BY substr(vencimento, 7, 4) || '-' || substr(vencimento, 4, 2) || '-' || substr(vencimento, 1, 2) DESC"
+
+        if limit:
+            q += " LIMIT :lim OFFSET :off"
+            p['lim'] = limit
+            p['off'] = offset
+
+        with engine.connect() as conn:
+            return pd.read_sql(text(q), conn, params=p)
+    except Exception as e:
+        print(e)
         return pd.DataFrame()
 
+def contar_registros_filtro(busca=None, status_filtro="Todos", categoria_filtro="Todas"):
+    """Conta total para a paginação"""
+    q = "SELECT COUNT(*) FROM financeiro WHERE 1=1"
+    p = {}
+    if busca: q += " AND descricao LIKE :b"; p['b'] = f"%{busca}%"
+    if status_filtro != "Todos": q += " AND status = :s"; p['s'] = status_filtro
+    if categoria_filtro != "Todas": q += " AND categoria = :c"; p['c'] = categoria_filtro
+
+    with engine.connect() as conn:
+        return conn.execute(text(q), p).scalar()
+
+# ... (MANTENHA OBTER_GRAFICOS, ADICIONAR, ETC) ...
+
+# --- NOVA FUNÇÃO: EDITAR ---
+def editar_registro(usuario_log, id_reg, descricao, valor, vencimento, categoria, status):
+    with engine.connect() as conn:
+        # Pega dados antigos para log
+        antigo = conn.execute(text("SELECT descricao, valor FROM financeiro WHERE id=:id"), {'id': id_reg}).fetchone()
+
+        conn.execute(text("""
+                          UPDATE financeiro
+                          SET descricao=:d, valor=:v, vencimento=:dt, categoria=:c, status=:s
+                          WHERE id=:id
+                          """), {
+                         'd': descricao, 'v': valor, 'dt': vencimento, 'c': categoria, 's': status, 'id': id_reg
+                     })
+        conn.commit()
+
+    # Log simplificado
+    detalhe = f"De: {antigo[0]} ({antigo[1]}) Para: {descricao} ({valor})" if antigo else ""
+    registrar_log(usuario_log, "Edição", detalhe)
 
 def obter_datas_vencimento():
     """Retorna uma lista de objetos date com todos os vencimentos cadastrados."""
