@@ -4,65 +4,68 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Financeiro Farmácia</title>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+
 <div id="toast-container"></div>
 
 <div id="login-screen">
     <div class="login-box">
         <h2>🏥 Farmácia</h2>
-        <p>Financeiro & Gestão</p>
+        <p>Acesso ao Sistema Financeiro</p>
+
         <div class="input-wrapper">
             <input type="text" id="login-user" placeholder="Usuário">
         </div>
+
         <div class="input-wrapper">
             <input type="password" id="login-pass" placeholder="Senha">
             <span class="toggle-pass" onclick="toggleSenha()">👁️</span>
         </div>
-        <button class="btn-login" id="btn-entrar" onclick="fazerLogin()">Entrar</button>
-        <div id="login-error" class="error-alert">🔒 Usuário ou senha inválidos</div>
+
+        <button class="btn-login" id="btn-entrar" onclick="fazerLogin()">Acessar Sistema</button>
     </div>
 </div>
-<div id="mobile-overlay" onclick="toggleSidebar()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:900;"></div>
-
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-        <h2 id="logo-text">🏥 Farmácia</h2>
-    </div>
 
 <div id="app-screen" class="hidden">
+
+    <div id="mobile-overlay" onclick="toggleSidebar()"></div>
 
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h2 id="logo-text">🏥 Farmácia</h2>
-            <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
         </div>
+
         <div class="user-info">
             <div class="avatar-circle">👤</div>
             <div class="user-text">
                 <small>Bem-vindo,</small>
-                <span id="user-display" class="user-name">Financeiro</span>
+                <div id="user-display" class="user-name">Financeiro</div>
             </div>
         </div>
+
         <nav class="sidebar-menu">
             <div class="menu-item active" onclick="nav('dashboard', this)">
-                <span class="icon">📊</span> <span class="text">Dashboard</span>
+                <span class="icon">📊</span> Dashboard
             </div>
             <div class="menu-item" onclick="nav('novo', this)">
-                <span class="icon">📑</span> <span class="text">Novo Boleto</span>
+                <span class="icon">📑</span> Novo Boleto
             </div>
             <div class="menu-item" onclick="nav('lista', this)">
-                <span class="icon">📋</span> <span class="text">Registros</span>
+                <span class="icon">📋</span> Registros
             </div>
             <div class="menu-item" onclick="nav('config', this)">
-                <span class="icon">⚙️</span> <span class="text">Configurações</span>
+                <span class="icon">⚙️</span> Configurações
             </div>
         </nav>
+
         <div class="menu-footer">
             <div class="menu-item logout" onclick="fazerLogout()">
-                <span class="icon">🚪</span> <span class="text">Sair</span>
+                <span class="icon">🚪</span> Sair
             </div>
         </div>
     </div>
@@ -71,7 +74,11 @@
 
         <div id="view-dashboard">
             <div class="header-flex">
-                <h1>Painel Financeiro</h1>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
+                    <h1>Painel Financeiro</h1>
+                </div>
+
                 <select class="periodo-select">
                     <option>Este Mês</option>
                     <option>Este Ano</option>
@@ -79,51 +86,49 @@
             </div>
 
             <div class="dashboard-cards">
-
-                <div class="summary-card card-blue" onclick="verDetalhes('pagar_mes', 'A Pagar (Este Mês)')" style="cursor: pointer;">
+                <div class="summary-card card-blue" onclick="verDetalhes('pagar_mes', 'A Pagar (Este Mês)')">
                     <div class="card-icon">💸</div>
                     <div class="card-info">
                         <h3>A Pagar (Mês)</h3>
                         <p id="card-pagar-mes">R$ 0,00</p>
-                        <small>Clique para detalhes</small>
+                        <small>Boletos pendentes</small>
                     </div>
                 </div>
 
-                <div class="summary-card card-red" onclick="verDetalhes('vencidos', 'Boletos Vencidos')" style="cursor: pointer;">
+                <div class="summary-card card-red" onclick="verDetalhes('vencidos', 'Boletos Vencidos')">
                     <div class="card-icon">🚨</div>
                     <div class="card-info">
                         <h3>Vencidos</h3>
                         <p id="card-vencidos-val">R$ 0,00</p>
-                        <small style="color: #e53e3e;"><span id="card-vencidos-qtd">0</span> atrasados</small>
+                        <small style="color: var(--danger);"><span id="card-vencidos-qtd">0</span> atrasados</small>
                     </div>
                 </div>
 
-                <div class="summary-card card-yellow" onclick="verDetalhes('proximos', 'Vencendo em 7 Dias')" style="cursor: pointer;">
+                <div class="summary-card card-yellow" onclick="verDetalhes('proximos', 'Vencendo em 7 Dias')">
                     <div class="card-icon">⏳</div>
                     <div class="card-info">
                         <h3>Próximos 7 Dias</h3>
                         <p id="card-proximos-val">R$ 0,00</p>
-                        <small><span id="card-proximos-qtd">0</span> vencendo</small>
+                        <small><span id="card-proximos-qtd">0</span> a vencer</small>
                     </div>
                 </div>
 
-                <div class="summary-card card-green" onclick="verDetalhes('pago_mes', 'Contas Pagas (Este Mês)')" style="cursor: pointer;">
+                <div class="summary-card card-green" onclick="verDetalhes('pago_mes', 'Contas Pagas (Este Mês)')">
                     <div class="card-icon">✅</div>
                     <div class="card-info">
                         <h3>Pago (Mês)</h3>
                         <p id="card-pago-mes">R$ 0,00</p>
-                        <small>Ver liquidados</small>
+                        <small>Total liquidado</small>
                     </div>
                 </div>
-
             </div>
 
             <div class="charts-row">
-                <div class="chart-box">
+                <div class="card chart-box">
                     <h3>📈 Evolução Mensal</h3>
                     <div class="chart-container"><canvas id="chartMes"></canvas></div>
                 </div>
-                <div class="chart-box">
+                <div class="card chart-box">
                     <h3>🥧 Gastos por Categoria</h3>
                     <div class="chart-container"><canvas id="chartCat"></canvas></div>
                 </div>
@@ -131,7 +136,13 @@
         </div>
 
         <div id="view-novo" class="hidden">
-            <h1>Novo Lançamento</h1>
+            <div class="header-flex">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
+                    <h1>Novo Lançamento</h1>
+                </div>
+            </div>
+
             <div class="card" style="max-width: 800px;">
                 <div class="form-row">
                     <div class="form-group full-width">
@@ -140,6 +151,7 @@
                         <small class="hint">💡 Preenche Valor e Vencimento automaticamente.</small>
                     </div>
                 </div>
+
                 <div class="form-row">
                     <div class="form-group full-width">
                         <label>Descrição <span class="required">*</span></label>
@@ -147,6 +159,7 @@
                         <span class="error-msg" id="err-desc">Campo obrigatório</span>
                     </div>
                 </div>
+
                 <div class="form-row three-col">
                     <div class="form-group">
                         <label>Valor <span class="required">*</span></label>
@@ -175,6 +188,7 @@
                         <span class="error-msg" id="err-cat">Selecione uma categoria</span>
                     </div>
                 </div>
+
                 <div class="form-row">
                     <div class="form-group half-width">
                         <label>Status <span class="required">*</span></label>
@@ -184,16 +198,21 @@
                         </select>
                     </div>
                 </div>
+
                 <div class="form-actions">
                     <button class="btn btn-secondary" onclick="limparFormulario()">Limpar</button>
-                    <button class="btn btn-secondary" onclick="nav('dashboard')">Cancelar</button>
                     <button class="btn btn-primary" onclick="salvarBoleto()">Salvar Lançamento</button>
                 </div>
             </div>
         </div>
 
         <div id="view-lista" class="hidden">
-            <h1>Registros</h1>
+            <div class="header-flex">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
+                    <h1>Registros</h1>
+                </div>
+            </div>
 
             <div class="card">
                 <div class="toolbar">
@@ -246,70 +265,37 @@
             </div>
         </div>
 
-        <div id="modal-editar" class="modal-overlay hidden">
-            <div class="modal-content" style="max-width: 500px;">
-                <div class="modal-header">
-                    <h2>✏️ Editar Registro</h2>
-                    <button class="close-btn" onclick="fecharModalEdicao()">×</button>
+        <div id="view-config" class="hidden">
+            <div class="header-flex">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
+                    <h1>Configurações</h1>
                 </div>
-                <div class="modal-body">
-                    <input type="hidden" id="edit-id">
-                    <div class="form-group">
-                        <label>Descrição</label>
-                        <input type="text" id="edit-desc">
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group half-width">
-                            <label>Valor</label>
-                            <input type="text" id="edit-valor" oninput="mascaraMoeda(this)">
-                        </div>
-                        <div class="form-group half-width">
-                            <label>Vencimento</label>
-                            <input type="date" id="edit-venc">
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group half-width">
-                            <label>Categoria</label>
-                            <select id="edit-cat">
-                                <option>Medicamentos (Estoque)</option>
-                                <option>Materiais de Consumo</option>
-                                <option>Impostos & Taxas</option>
-                                <option>Folha de Pagamento</option>
-                                <option>Aluguel & Condomínio</option>
-                                <option>Água/Luz/Internet</option>
-                                <option>Marketing</option>
-                                <option>Manutenção</option>
-                                <option>Outros</option>
-                            </select>
-                        </div>
-                        <div class="form-group half-width">
-                            <label>Status</label>
-                            <select id="edit-status">
-                                <option value="Pendente">Pendente</option>
-                                <option value="Pago">Pago</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button class="btn btn-danger" onclick="fecharModalEdicao()">Cancelar</button>
-                        <button class="btn btn-success" onclick="salvarEdicao()">Salvar Alterações</button>
-                    </div>
+            </div>
+
+            <div class="card" style="max-width: 600px;">
+                <h3>👤 Editar Perfil</h3>
+                <div class="form-group">
+                    <label>Login de Acesso</label>
+                    <input type="text" id="conf-login">
+                </div>
+                <div class="form-group">
+                    <label>Nome de Exibição</label>
+                    <input type="text" id="conf-nome">
+                </div>
+
+                <h3 style="margin-top: 30px;">🔒 Segurança</h3>
+                <div class="form-group">
+                    <label>Nova Senha</label>
+                    <input type="password" id="conf-senha" placeholder="********">
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="salvarConfiguracoes()">💾 Salvar Alterações</button>
                 </div>
             </div>
         </div>
 
-        <div id="view-config" class="hidden">
-            <h1>Configurações</h1>
-            <div class="card" style="max-width: 500px;">
-                <h3>👤 Editar Perfil</h3>
-                <div class="form-group"><label>Login de Acesso</label><input type="text" id="conf-login"></div>
-                <div class="form-group"><label>Nome de Exibição</label><input type="text" id="conf-nome"></div>
-                <h3>🔒 Segurança</h3>
-                <div class="form-group"><label>Nova Senha</label><input type="password" id="conf-senha" placeholder="********"></div>
-                <button class="btn btn-primary" onclick="salvarConfiguracoes()">💾 Salvar Alterações</button>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -327,6 +313,59 @@
                     </thead>
                     <tbody></tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-editar" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2>✏️ Editar Registro</h2>
+            <button class="close-btn" onclick="fecharModalEdicao()">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="edit-id">
+            <div class="form-group">
+                <label>Descrição</label>
+                <input type="text" id="edit-desc">
+            </div>
+            <div class="form-row">
+                <div class="form-group half-width">
+                    <label>Valor</label>
+                    <input type="text" id="edit-valor" oninput="mascaraMoeda(this)">
+                </div>
+                <div class="form-group half-width">
+                    <label>Vencimento</label>
+                    <input type="date" id="edit-venc">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group half-width">
+                    <label>Categoria</label>
+                    <select id="edit-cat">
+                        <option>Medicamentos (Estoque)</option>
+                        <option>Materiais de Consumo</option>
+                        <option>Impostos & Taxas</option>
+                        <option>Folha de Pagamento</option>
+                        <option>Aluguel & Condomínio</option>
+                        <option>Água/Luz/Internet</option>
+                        <option>Marketing</option>
+                        <option>Manutenção</option>
+                        <option>Outros</option>
+                    </select>
+                </div>
+                <div class="form-group half-width">
+                    <label>Status</label>
+                    <select id="edit-status">
+                        <option value="Pendente">Pendente</option>
+                        <option value="Pago">Pago</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="fecharModalEdicao()">Cancelar</button>
+                <button class="btn btn-success" onclick="salvarEdicao()">Salvar Alterações</button>
             </div>
         </div>
     </div>
