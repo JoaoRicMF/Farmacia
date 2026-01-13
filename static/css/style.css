@@ -450,3 +450,52 @@ tr:hover td { background-color: var(--bg-body); }
 [data-theme="dark"] .fc-theme-standard td,
 [data-theme="dark"] .fc-theme-standard th { border-color: var(--border); }
 [data-theme="dark"] .fc-day-today { background-color: rgba(255,255,255,0.05) !important; }
+
+/* --- TOGGLE CALENDÁRIO --- */
+.toggle-header {
+    padding: 20px 25px;
+    background: var(--bg-card);
+    border-bottom: 1px solid transparent;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+}
+
+.toggle-header:hover {
+    background: var(--bg-body);
+}
+
+/* Quando aberto, adiciona borda embaixo */
+.toggle-header.open {
+    border-bottom-color: var(--border);
+    background: rgba(37, 99, 235, 0.05); /* Leve azul */
+}
+
+/* Ícone da seta */
+.arrow-icon {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    transition: transform 0.3s ease;
+}
+
+/* Gira a seta quando aberto */
+.toggle-header.open .arrow-icon {
+    transform: rotate(180deg);
+    color: var(--primary);
+}
+
+/* Conteúdo Oculto/Visível */
+.hidden-content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+.hidden-content.show {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
