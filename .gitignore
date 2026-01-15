@@ -16,6 +16,9 @@ database/*.db
 *.sqlite
 *.sqlite3
 
+# --- Backups ---
+backups/
+
 # --- Variáveis de Ambiente (Segurança) ---
 .env
 
