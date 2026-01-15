@@ -255,5 +255,87 @@ def alt_perf():
         session['usuario'] = d['novo_nome']
     return jsonify({'success': True})
 
+# --- fluxo de caixa ---
+@app.route('/api/fluxo_resumo', methods=['GET'])
+def api_fluxo():
+    if 'usuario' not in session: return jsonify({}), 403
+
+    # Pega mês/ano da query ou usa atual
+    mes = request.args.get('mes')
+    ano = request.args.get('ano')
+
+    dados = db.obter_resumo_fluxo(mes, ano)
+    return jsonify(dados)
+
+@app.route('/api/nova_entrada', methods=['POST'])
+def nova_entrada():
+    if 'usuario' not in session: return jsonify({}), 403
+    d = request.json
+
+    try:
+        # Garante valor float
+        valor = float(d['valor'])
+        # Data vem YYYY-MM-DD do input type="date"
+        db.adicionar_entrada(session['usuario'], valor, d['forma'], d['data'])
+        return jsonify({'success': True})
+    except Exception as e:
+        print(e)
+        return jsonify({'success': False, 'message': 'Erro ao salvar entrada'}), 500
+
+@app.route('/api/excluir_entrada', methods=['POST'])
+def excluir_entrada_route():
+    if 'usuario' not in session: return jsonify({}), 403
+    if session.get('funcao') != 'Admin':
+        return jsonify({'success': False, 'message': 'Permissão negada'}), 403
+
+    db.excluir_entrada(session['usuario'], request.json['id'])
+    return jsonify({'success': True})
+@app.route('/api/exportar_fluxo_excel', methods=['GET'])
+def exportar_fluxo_excel():
+    if 'usuario' not in session: return "", 403
+
+    mes = request.args.get('mes')
+    ano = request.args.get('ano')
+
+    # Busca os dados processados
+    dados = db.obter_resumo_fluxo(mes, ano)
+    extrato = dados['extrato']
+
+    if not extrato:
+        return "Não há dados para exportar neste período.", 404
+
+    # Cria DataFrame
+    df = pd.DataFrame(extrato)
+
+    # Seleciona e renomeia colunas para ficar bonito no Excel
+    # Colunas vindas do DB: data, descricao, valor, tipo, categoria, id
+    df_export = df[['data', 'descricao', 'categoria', 'tipo', 'valor']].copy()
+
+    # Traduz e formata
+    df_export.columns = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor']
+
+    # Buffer de memória para o arquivo
+    out = io.BytesIO()
+
+    # Salva como Excel usando engine openpyxl (já presente no requirements.txt)
+    with pd.ExcelWriter(out, engine='openpyxl') as writer:
+        df_export.to_excel(writer, index=False, sheet_name=f'Fluxo {mes}-{ano}')
+
+        # Opcional: Adicionar uma aba de Resumo com os totais
+        resumo_df = pd.DataFrame([
+            {'Item': 'Entradas Totais', 'Valor': dados['entradas_total']},
+            {'Item': 'Saídas (Pagas)', 'Valor': dados['saidas_total']},
+            {'Item': 'Saldo Líquido', 'Valor': dados['saldo']}
+        ])
+        resumo_df.to_excel(writer, index=False, sheet_name='Resumo')
+
+    out.seek(0)
+
+    return Response(
+        out.getvalue(),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={"Content-Disposition": f"attachment;filename=fluxo_caixa_{mes}_{ano}.xlsx"}
+    )
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

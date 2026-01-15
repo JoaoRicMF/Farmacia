@@ -63,6 +63,9 @@
             <div class="menu-item admin-only hidden" onclick="nav('logs', this)">
                 <span class="icon">🛡️</span> Auditoria
             </div>
+            <div class="menu-item" onclick="nav('fluxo', this)">
+                <span class="icon">💰</span> Fluxo de Caixa
+            </div>
             <div class="menu-item" onclick="nav('config', this)">
                 <span class="icon">⚙️</span> Configurações
             </div>
@@ -91,6 +94,7 @@
                     <option>Visão Geral</option>
                 </select>
             </div>
+
 
             <div class="dashboard-cards">
                 <div class="summary-card card-blue" onclick="verDetalhes('pagar_mes', 'Total a Pagar (Pendente)')">
@@ -154,6 +158,108 @@
                 </div>
             </div>
 
+        </div>
+
+        <div id="view-fluxo" class="hidden">
+            <div class="header-flex">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
+                    <h1>Fluxo de Caixa</h1>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="month" id="filtro-mes-fluxo" class="periodo-select" onchange="carregarFluxo()">
+
+                    <button class="btn btn-secondary" onclick="window.print()" title="Salvar como PDF (Imprimir)">
+                        🖨️ PDF
+                    </button>
+                    <button class="btn btn-success" onclick="baixarExcelFluxo()" title="Baixar Planilha (.xlsx)">
+                        📊 Excel
+                    </button>
+                </div>
+            </div>
+
+            <div class="dashboard-cards">
+                <div class="summary-card card-green">
+                    <div class="card-icon">📥</div>
+                    <div class="card-info">
+                        <h3>Entradas (Total)</h3>
+                        <p id="fluxo-entradas">R$ 0,00</p>
+                        <small id="detalhe-entradas" style="font-size:0.75rem; color:var(--text-light)">
+                            Din: 0 | Pix: 0 | Cart: 0
+                        </small>
+                    </div>
+                </div>
+
+                <div class="summary-card card-red">
+                    <div class="card-icon">📤</div>
+                    <div class="card-info">
+                        <h3>Saídas (Pagas)</h3>
+                        <p id="fluxo-saidas">R$ 0,00</p>
+                        <small>Boletos quitados no mês</small>
+                    </div>
+                </div>
+
+                <div class="summary-card card-blue">
+                    <div class="card-icon">⚖️</div>
+                    <div class="card-info">
+                        <h3>Saldo Líquido</h3>
+                        <p id="fluxo-saldo">R$ 0,00</p>
+                        <small id="fluxo-status-texto">Balanço do mês</small>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+
+                <div class="card no-print" style="flex: 1; min-width: 300px; height: fit-content;">
+                    <h3 style="margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                        ➕ Registrar Entrada
+                    </h3>
+
+                    <div class="form-group">
+                        <label>Data</label>
+                        <input type="date" id="ent-data">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="half-width">
+                            <label>Valor</label>
+                            <input type="text" id="ent-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
+                        </div>
+                        <div class="half-width">
+                            <label>Forma Pagto</label>
+                            <select id="ent-forma">
+                                <option value="Dinheiro">💵 Dinheiro</option>
+                                <option value="PIX">💠 PIX</option>
+                                <option value="Cartão">💳 Cartão</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success" style="width: 100%; margin-top: 15px;" onclick="salvarEntradaCaixa()">
+                        Registrar Entrada
+                    </button>
+                </div>
+
+                <div class="card" style="flex: 2; min-width: 400px;">
+                    <h3 style="margin-bottom: 15px;">📝 Extrato do Mês</h3>
+                    <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
+                        <table id="tabela-fluxo">
+                            <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Tipo/Forma</th>
+                                <th>Valor</th>
+                                <th class="no-print"></th> </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="view-novo" class="hidden">

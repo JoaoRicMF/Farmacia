@@ -423,9 +423,11 @@ tr:hover td { background-color: var(--bg-body); }
 @media print {
     .sidebar, .btn, .toolbar, .pagination, .header-flex button, #toast-container, .menu-footer { display: none !important; }
     .content { margin: 0; padding: 0; }
-    .card, .summary-card, .chart-box { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+    .card { border: none !important; padding: 0 !important; }
+    #tabela-fluxo th, #tabela-fluxo td { border: 1px solid #000 !important; }
     body { background: white; color: black; }
     .header-flex { margin-bottom: 20px; border-bottom: none; }
+    .no-print { display: none !important; }
 }
 #calendar {
     max-width: 100%;

@@ -138,6 +138,17 @@ function nav(viewId, elementoMenu) {
     if(viewId === 'lista') carregarLista(1);
     if(viewId === 'logs') carregarLogs();
     if(viewId === 'config') carregarConfiguracoes();
+    if(viewId === 'fluxo') {
+        // Define mês atual no input se estiver vazio
+        const inputMes = document.getElementById('filtro-mes-fluxo');
+        if(!inputMes.value) {
+            const hoje = new Date();
+            const ano = hoje.getFullYear();
+            const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+            inputMes.value = `${ano}-${mes}`;
+        }
+        carregarFluxo();
+    }
 }
 
 function verificarPermissoesUI() {
@@ -637,6 +648,143 @@ async function carregarLogs() {
             });
         }
     } catch(e) { console.error("Erro logs", e); }
+}
+
+// ---fluxo de caixa---
+async function carregarFluxo() {
+    const inputMes = document.getElementById('filtro-mes-fluxo').value; // YYYY-MM
+    if(!inputMes) return;
+
+    const [ano, mes] = inputMes.split('-');
+
+    try {
+        const res = await fetch(`/api/fluxo_resumo?mes=${mes}&ano=${ano}`);
+        const data = await res.json();
+
+        // 1. Atualizar Cards
+        const fmt = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        document.getElementById('fluxo-entradas').innerText = fmt(data.entradas_total);
+        document.getElementById('detalhe-entradas').innerText =
+            `Din: ${fmt(data.entradas_dinheiro)} | Pix: ${fmt(data.entradas_pix)} | Cart: ${fmt(data.entradas_cartao)}`;
+
+        document.getElementById('fluxo-saidas').innerText = fmt(data.saidas_total);
+
+        const elSaldo = document.getElementById('fluxo-saldo');
+        elSaldo.innerText = fmt(data.saldo);
+        elSaldo.style.color = data.saldo >= 0 ? 'var(--success)' : 'var(--danger)';
+
+        // 2. Preencher Tabela Extrato
+        const tbody = document.querySelector('#tabela-fluxo tbody');
+        tbody.innerHTML = '';
+
+        if(data.extrato.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Nenhuma movimentação neste mês.</td></tr>';
+        } else {
+            data.extrato.forEach(item => {
+                const tr = document.createElement('tr');
+
+                // Formatação Visual
+                const corValor = item.tipo === 'entrada' ? 'var(--success)' : 'var(--danger)';
+                const sinal = item.tipo === 'entrada' ? '+' : '-';
+                const icone = item.tipo === 'entrada' ? '⬇️' : '⬆️';
+
+                // Botão de excluir apenas para Entradas Manuais (Saídas são gerenciadas na outra tela)
+                let btnExcluir = '';
+                if(item.tipo === 'entrada' && sessionStorage.getItem('user_role') === 'Admin') {
+                    btnExcluir = `<button class="action-btn" style="color:var(--danger)" onclick="excluirEntrada(${item.id})">×</button>`;
+                }
+
+                // Formatar Data (YYYY-MM-DD -> DD/MM)
+                let dataFmt = item.data;
+                try {
+                    const partes = item.data.split('-');
+                    dataFmt = `${partes[2]}/${partes[1]}`;
+                } catch(e) {}
+
+                tr.innerHTML = `
+                    <td><small>${dataFmt}</small></td>
+                    <td>${item.descricao}</td>
+                    <td><span style="font-size:0.8rem; background:var(--bg-body); padding:2px 6px; border-radius:4px;">${item.categoria}</span></td>
+                    <td style="color:${corValor}; font-weight:bold;">${sinal} ${fmt(item.valor)}</td>
+                    <td style="text-align:right;">${btnExcluir}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    } catch(e) {
+        console.error("Erro fluxo", e);
+        showToast("Erro ao carregar fluxo.", "error");
+    }
+}
+
+async function salvarEntradaCaixa() {
+    const valorStr = document.getElementById('ent-valor').value;
+    const forma = document.getElementById('ent-forma').value;
+    let dataEnt = document.getElementById('ent-data').value;
+
+    const valor = formatarValorParaBanco(valorStr); // Usa função existente
+
+    try {
+        const res = await fetch('/api/nova_entrada', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                valor: valor,
+                forma: forma,
+                data: dataEnt
+            })
+        });
+
+        const json = await res.json();
+        if(json.success) {
+            showToast("Entrada registrada!", "success");
+            // Limpa campos
+            document.getElementById('ent-valor').value = '';
+            carregarFluxo(); // Recarrega a tela
+        } else {
+            showToast("Erro ao salvar.", "error");
+        }
+    } catch(e) {
+        showToast("Erro de conexão.", "error");
+    }
+}
+
+async function excluirEntrada(id) {
+    if(!confirm("Tem certeza que deseja apagar esta entrada?")) return;
+    try {
+        const res = await fetch('/api/excluir_entrada', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id: id})
+        });
+        if((await res.json()).success) {
+            showToast("Entrada removida.", "success");
+            carregarFluxo();
+        } else {
+            showToast("Permissão negada ou erro.", "error");
+        }
+    } catch(e) { showToast("Erro.", "error"); }
+}
+
+// Inicializa a data do input de entrada com HOJE
+document.addEventListener("DOMContentLoaded", () => {
+    const inputDt = document.getElementById('ent-data');
+    if(inputDt) {
+        const h = new Date().toISOString().split('T')[0];
+        inputDt.value = h;
+    }
+});
+function baixarExcelFluxo() {
+    const inputMes = document.getElementById('filtro-mes-fluxo').value;
+    if(!inputMes) {
+        showToast("Selecione um mês/ano.", "warning");
+        return;
+    }
+
+    const [ano, mes] = inputMes.split('-');
+
+    // Redireciona para a rota que força o download
+    window.location.href = `/api/exportar_fluxo_excel?mes=${mes}&ano=${ano}`;
 }
 
 // --- CONFIG ---
