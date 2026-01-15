@@ -1,23 +1,29 @@
-# 🏥 Sistema Financeiro Farmácia
+# 🏥 Farmácia Pro - Sistema Financeiro
 
-Sistema de gestão financeira desenvolvido em Python com Streamlit, focado no controle de contas a pagar (boletos), fluxo de caixa e organização de despesas de uma farmácia.
+Sistema de gestão financeira completo desenvolvido em Python com Flask, focado no controle de contas a pagar, fluxo de caixa e auditoria para farmácias.
+
+O sistema foi projetado para ser **híbrido**: roda leve localmente com **SQLite** e escala automaticamente para **PostgreSQL** em produção.
 
 ## 🚀 Funcionalidades
 
-- **Dashboard Interativo**: Visualização gráfica de despesas por mês e métricas de contas pagas/pendentes.
-- **Leitura de Boletos**: Decodificação automática de linha digitável e código de barras com correção para o ciclo de vencimento (pós-2025).
-- **Gestão de Pagamentos**: Controle de status (Pendente/Pago) e exclusão segura de registros.
-- **Importação/Exportação**: Suporte a arquivos Excel (.xlsx) e exportação de relatórios em CSV.
-- **Banco de Dados**: Armazenamento local seguro utilizando SQLite + SQLAlchemy.
+- **Dashboard Interativo**: Gráficos de despesas mensais (Chart.js), divisão por categorias e indicadores de vencimento.
+- **Fluxo de Caixa Otimizado**: Entradas e saídas com cálculo de saldo em tempo real (Agregações via SQL).
+- **Leitura de Boletos**: Decodificação inteligente de linha digitável e código de barras (Bancário e Concessionárias).
+- **Calendário Visual**: Visualização de vencimentos integrada (FullCalendar).
+- **Auditoria (Logs)**: Rastreamento completo de ações dos usuários (quem fez o quê e quando).
+- **Relatórios**: Exportação de dados para Excel (.xlsx) e CSV.
+- **Segurança**: Login criptografado (SHA-256) e controle de permissões (Admin vs Operador).
 
 ## 🛠️ Tecnologias Utilizadas
 
-- **Interface**: [Streamlit](https://streamlit.io/)
-- **Linguagem**: Python 3.14
-- **Manipulação de Dados**: Pandas
-- **Banco de Dados**: SQLite & SQLAlchemy
+- **Backend**: Python 3.14, Flask, SQLAlchemy.
+- **Banco de Dados**:
+   - *Desenvolvimento*: SQLite (Automático).
+   - *Produção*: PostgreSQL (Via variável de ambiente).
+- **Frontend**: HTML5, CSS3 (Responsivo + Dark Mode), JavaScript Puro.
+- **Servidor**: Gunicorn (Para deploy em produção).
 
-## 📦 Como Rodar o Projeto
+## 📦 Como Rodar Localmente
 
 1. **Clone o repositório**
    ```bash
