@@ -114,6 +114,22 @@ def init_db():
                                                                         usuario TEXT
                           )
                           '''))
+        conn.execute(text('''
+                          CREATE TABLE IF NOT EXISTS saidas_caixa (
+                                                                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                                      data_registro TEXT,
+                                                                      descricao TEXT, 
+                                                                      valor REAL,
+                                                                      forma_pagamento TEXT,
+                                                                      usuario TEXT
+                          )
+                          '''))
+
+        try:
+            cols = pd.read_sql(text("PRAGMA table_info(saidas_caixa)"), conn)['name'].tolist()
+            if 'descricao' not in cols:
+                conn.execute(text("ALTER TABLE saidas_caixa ADD COLUMN descricao TEXT"))
+        except: pass
 
         # Migração simples para garantir colunas novas
         try:
@@ -218,13 +234,13 @@ def excluir_registro(usuario_log, id_reg):
     registrar_log(usuario_log, "Exclusão", f"Apagou: {detalhe}")
 
     # --- FLUXO DE CAIXA ---
-def adicionar_entrada(usuario, descricao, valor, forma_pagamento, data_iso):
+def adicionar_entrada(usuario, valor, forma_pagamento, data_iso):
     # data_iso deve vir YYYY-MM-DD
     with engine.connect() as conn:
-        conn.execute(text("INSERT INTO entradas_caixa (data_registro, valor, forma_pagamento, usuario) VALUES (:d, :desc, :v, :fp, :u)"),
-                     {'d': data_iso, 'desc': descricao, 'v': valor, 'fp': forma_pagamento, 'u': usuario})
+        conn.execute(text("INSERT INTO entradas_caixa (data_registro, valor, forma_pagamento, usuario) VALUES (:d, :v, :fp, :u)"),
+                     {'d': data_iso, 'v': valor, 'fp': forma_pagamento, 'u': usuario})
         conn.commit()
-    registrar_log(usuario, "Entrada Caixa", f"R$ {valor} ({forma_pagamento}) - {descricao}")
+    registrar_log(usuario, "Entrada Caixa", f"R$ {valor} ({forma_pagamento})")
 
 def excluir_entrada(usuario, id_entrada):
     with engine.connect() as conn:
@@ -232,31 +248,47 @@ def excluir_entrada(usuario, id_entrada):
         conn.commit()
     registrar_log(usuario, "Exclusão Caixa", f"Removeu entrada ID {id_entrada}")
 
+def adicionar_saida_caixa(usuario, descricao, valor, forma_pagamento, data_iso):
+    with engine.connect() as conn:
+        # Agora incluímos :desc no INSERT
+        conn.execute(text("INSERT INTO saidas_caixa (data_registro, descricao, valor, forma_pagamento, usuario) VALUES (:d, :desc, :v, :fp, :u)"),
+                     {'d': data_iso, 'desc': descricao, 'v': valor, 'fp': forma_pagamento, 'u': usuario})
+        conn.commit()
+    registrar_log(usuario, "Saída Caixa", f"R$ {valor} - {descricao}")
+
+def excluir_saida_caixa(usuario, id_saida):
+    with engine.connect() as conn:
+        conn.execute(text("DELETE FROM saidas_caixa WHERE id = :id"), {'id': id_saida})
+        conn.commit()
+    registrar_log(usuario, "Exclusão Caixa", f"Removeu saída ID {id_saida}")
+
 def obter_resumo_fluxo(mes=None, ano=None):
+    # ... (INÍCIO DA FUNÇÃO MANTÉM IGUAL) ...
     if not mes or not ano:
         hoje = datetime.now()
         mes, ano = f"{hoje.month:02d}", str(hoje.year)
-
     filtro_data = f"{ano}-{mes}%"
 
     with engine.connect() as conn:
-        # Selecionamos colunas específicas para não depender da 'descricao' existir na tabela
-        # Se o banco for antigo, ele ignora a coluna descricao. Se for novo, ela nem existe.
+        # Entradas
         entradas_df = pd.read_sql(text("SELECT id, data_registro, valor, forma_pagamento FROM entradas_caixa WHERE data_registro LIKE :d ORDER BY data_registro DESC"),
                                   conn, params={'d': filtro_data})
 
-        saidas_raw = pd.read_sql(text("SELECT vencimento, descricao, valor, status FROM financeiro WHERE status = 'Pago'"), conn)
+        # Saídas (AGORA PEGANDO A DESCRIÇÃO)
+        saidas_caixa_df = pd.read_sql(text("SELECT id, data_registro, descricao, valor, forma_pagamento FROM saidas_caixa WHERE data_registro LIKE :d ORDER BY data_registro DESC"),
+                                      conn, params={'d': filtro_data})
+
+        # Saídas Boletos
+        saidas_boletos = pd.read_sql(text("SELECT vencimento, descricao, valor, status FROM financeiro WHERE status = 'Pago'"), conn)
 
     resumo = {
-        'entradas_total': 0.0,
-        'entradas_dinheiro': 0.0,
-        'entradas_pix': 0.0,
-        'entradas_cartao': 0.0,
+        'entradas_total': 0.0, 'entradas_dinheiro': 0.0, 'entradas_pix': 0.0, 'entradas_cartao': 0.0,
         'saidas_total': 0.0,
         'saldo': 0.0,
         'extrato': []
     }
 
+    # ... (PROCESSAMENTO DAS ENTRADAS MANTÉM IGUAL) ...
     if not entradas_df.empty:
         resumo['entradas_total'] = entradas_df['valor'].sum()
         resumo['entradas_dinheiro'] = entradas_df[entradas_df['forma_pagamento'] == 'Dinheiro']['valor'].sum()
@@ -266,33 +298,47 @@ def obter_resumo_fluxo(mes=None, ano=None):
         for _, row in entradas_df.iterrows():
             resumo['extrato'].append({
                 'data': row['data_registro'],
-                'descricao': 'Entrada de Caixa', # Texto padrão
+                'descricao': 'Entrada Avulsa',
                 'valor': row['valor'],
                 'tipo': 'entrada',
                 'categoria': row['forma_pagamento'],
                 'id': row['id']
             })
 
-    # ... (O RESTO DA FUNÇÃO CONTINUA IGUAL PARA AS SAÍDAS) ...
-    if not saidas_raw.empty:
-        # ... (código existente das saídas) ...
-        saidas_raw['dt_obj'] = pd.to_datetime(saidas_raw['vencimento'], dayfirst=True, errors='coerce')
-        mask = (saidas_raw['dt_obj'].dt.month == int(mes)) & (saidas_raw['dt_obj'].dt.year == int(ano))
-        saidas_mes = saidas_raw[mask]
+    # ... (ATUALIZE O PROCESSAMENTO DAS SAÍDAS RÁPIDAS) ...
+    if not saidas_caixa_df.empty:
+        resumo['saidas_total'] += saidas_caixa_df['valor'].sum()
+        for _, row in saidas_caixa_df.iterrows():
+            # Tenta pegar a descrição, se estiver vazia (banco antigo), usa "Saída Avulsa"
+            desc_texto = row['descricao'] if row['descricao'] else 'Saída Avulsa'
 
-        resumo['saidas_total'] = saidas_mes['valor'].sum()
+            resumo['extrato'].append({
+                'data': row['data_registro'],
+                'descricao': desc_texto, # Usa a descrição do banco
+                'valor': row['valor'],
+                'tipo': 'saida_caixa',
+                'categoria': row['forma_pagamento'],
+                'id': row['id']
+            })
+
+    # ... (PROCESSAMENTO DOS BOLETOS MANTÉM IGUAL E RETORNO) ...
+    if not saidas_boletos.empty:
+        saidas_boletos['dt_obj'] = pd.to_datetime(saidas_boletos['vencimento'], dayfirst=True, errors='coerce')
+        mask = (saidas_boletos['dt_obj'].dt.month == int(mes)) & (saidas_boletos['dt_obj'].dt.year == int(ano))
+        saidas_mes = saidas_boletos[mask]
+
+        resumo['saidas_total'] += saidas_mes['valor'].sum()
 
         for _, row in saidas_mes.iterrows():
             resumo['extrato'].append({
                 'data': row['dt_obj'].strftime('%Y-%m-%d') if pd.notnull(row['dt_obj']) else row['vencimento'],
-                'descricao': row['descricao'], # Saídas mantêm a descrição do boleto
+                'descricao': row['descricao'],
                 'valor': row['valor'],
-                'tipo': 'saida',
+                'tipo': 'saida_boleto',
                 'categoria': 'Conta Paga',
                 'id': 0
             })
 
     resumo['extrato'].sort(key=lambda x: x['data'], reverse=True)
     resumo['saldo'] = resumo['entradas_total'] - resumo['saidas_total']
-
     return resumo

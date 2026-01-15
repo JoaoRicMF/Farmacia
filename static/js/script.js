@@ -652,71 +652,156 @@ async function carregarLogs() {
 
 // ---fluxo de caixa---
 async function carregarFluxo() {
-    const inputMes = document.getElementById('filtro-mes-fluxo').value; // YYYY-MM
+    const inputMes = document.getElementById('filtro-mes-fluxo').value;
     if(!inputMes) return;
-
     const [ano, mes] = inputMes.split('-');
 
     try {
         const res = await fetch(`/api/fluxo_resumo?mes=${mes}&ano=${ano}`);
         const data = await res.json();
-
-        // 1. Atualizar Cards
         const fmt = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+        // 1. Atualiza Cards
         document.getElementById('fluxo-entradas').innerText = fmt(data.entradas_total);
-        document.getElementById('detalhe-entradas').innerText =
-            `Din: ${fmt(data.entradas_dinheiro)} | Pix: ${fmt(data.entradas_pix)} | Cart: ${fmt(data.entradas_cartao)}`;
-
+        document.getElementById('detalhe-entradas').innerText = `Din: ${fmt(data.entradas_dinheiro)} | Pix: ${fmt(data.entradas_pix)} | Cart: ${fmt(data.entradas_cartao)}`;
         document.getElementById('fluxo-saidas').innerText = fmt(data.saidas_total);
 
         const elSaldo = document.getElementById('fluxo-saldo');
         elSaldo.innerText = fmt(data.saldo);
         elSaldo.style.color = data.saldo >= 0 ? 'var(--success)' : 'var(--danger)';
+        document.getElementById('fluxo-status-texto').innerText = data.saldo >= 0 ? "Saldo Positivo" : "Saldo Negativo";
 
         // 2. Preencher Tabela Extrato
         const tbody = document.querySelector('#tabela-fluxo tbody');
         tbody.innerHTML = '';
 
         if(data.extrato.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Nenhuma movimentação neste mês.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Sem movimentações.</td></tr>';
         } else {
             data.extrato.forEach(item => {
                 const tr = document.createElement('tr');
 
-                // Formatação Visual
-                const corValor = item.tipo === 'entrada' ? 'var(--success)' : 'var(--danger)';
-                const sinal = item.tipo === 'entrada' ? '+' : '-';
-                const icone = item.tipo === 'entrada' ? '⬇️' : '⬆️';
+                const isEntrada = item.tipo === 'entrada';
+                const cor = isEntrada ? 'var(--success)' : 'var(--danger)';
+                const sinal = isEntrada ? '+' : '-';
 
-                // Botão de excluir apenas para Entradas Manuais (Saídas são gerenciadas na outra tela)
+                // --- NOVO: Adiciona atributo para filtragem ---
+                // Se for entrada, marca 'entrada'. Se for qualquer saida, marca 'saida'.
+                tr.setAttribute('data-fluxo-tipo', isEntrada ? 'entrada' : 'saida');
+                // ----------------------------------------------
+
                 let btnExcluir = '';
-                if(item.tipo === 'entrada' && sessionStorage.getItem('user_role') === 'Admin') {
-                    btnExcluir = `<button class="action-btn" style="color:var(--danger)" onclick="excluirEntrada(${item.id})">×</button>`;
+                if(sessionStorage.getItem('user_role') === 'Admin') {
+                    if(item.tipo === 'entrada' || item.tipo === 'saida_caixa') {
+                        btnExcluir = `<button class="action-btn" style="color:var(--danger)" onclick="excluirItemFluxo(${item.id}, '${item.tipo}')">×</button>`;
+                    }
                 }
 
-                // Formatar Data (YYYY-MM-DD -> DD/MM)
                 let dataFmt = item.data;
-                try {
-                    const partes = item.data.split('-');
-                    dataFmt = `${partes[2]}/${partes[1]}`;
-                } catch(e) {}
+                try { const p = item.data.split('-'); dataFmt = `${p[2]}/${p[1]}`; } catch(e){}
 
                 tr.innerHTML = `
                     <td><small>${dataFmt}</small></td>
                     <td>${item.descricao}</td>
-                    <td><span style="font-size:0.8rem; background:var(--bg-body); padding:2px 6px; border-radius:4px;">${item.categoria}</span></td>
-                    <td style="color:${corValor}; font-weight:bold;">${sinal} ${fmt(item.valor)}</td>
+                    <td><span style="font-size:0.75rem; background:var(--bg-body); padding:2px 6px; border-radius:4px;">${item.categoria}</span></td>
+                    <td style="color:${cor}; font-weight:bold;">${sinal} ${fmt(item.valor)}</td>
                     <td style="text-align:right;">${btnExcluir}</td>
                 `;
                 tbody.appendChild(tr);
             });
         }
-    } catch(e) {
-        console.error("Erro fluxo", e);
-        showToast("Erro ao carregar fluxo.", "error");
-    }
+    } catch(e) { console.error(e); }
 }
+
+// --- ADICIONE ESTA NOVA FUNÇÃO ---
+function filtrarFluxo(tipo) {
+    const linhas = document.querySelectorAll('#tabela-fluxo tbody tr');
+    let cont = 0;
+
+    linhas.forEach(tr => {
+        const tipoLinha = tr.getAttribute('data-fluxo-tipo');
+
+        // Se tipo for 'todos', mostra tudo.
+        // Se tipo for 'entrada', mostra só entradas.
+        // Se tipo for 'saida', mostra só saídas.
+        if (tipo === 'todos' || tipoLinha === tipo) {
+            tr.style.display = '';
+            cont++;
+        } else {
+            tr.style.display = 'none';
+        }
+    });
+
+    // Feedback visual para o usuário
+    let msg = "Exibindo todos os registros.";
+    if(tipo === 'entrada') msg = "Exibindo apenas Entradas.";
+    if(tipo === 'saida') msg = "Exibindo apenas Saídas.";
+
+    showToast(msg, "success");
+}
+
+// NOVA FUNÇÃO: SALVAR SAÍDA
+async function salvarSaidaCaixa() {
+    const desc = document.getElementById('sai-desc').value; // Novo campo
+    const valorStr = document.getElementById('sai-valor').value;
+    const forma = document.getElementById('sai-forma').value;
+    const dataSai = document.getElementById('sai-data').value;
+
+    if(!valorStr || !dataSai || !desc) {
+        showToast("Preencha descrição, valor e data.", "warning");
+        return;
+    }
+    const valor = formatarValorParaBanco(valorStr);
+
+    try {
+        const res = await fetch('/api/nova_saida_caixa', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                descricao: desc, // Enviando a descrição
+                valor: valor,
+                forma: forma,
+                data: dataSai
+            })
+        });
+        if((await res.json()).success) {
+            showToast("Saída registrada!", "success");
+            document.getElementById('sai-valor').value = '';
+            document.getElementById('sai-desc').value = ''; // Limpa a descrição
+            carregarFluxo();
+        } else { showToast("Erro ao salvar.", "error"); }
+    } catch(e) { showToast("Erro conexão.", "error"); }
+}
+
+// NOVA FUNÇÃO UNIFICADA DE EXCLUSÃO
+async function excluirItemFluxo(id, tipo) {
+    if(!confirm("Excluir este lançamento?")) return;
+
+    let url = '';
+    if(tipo === 'entrada') url = '/api/excluir_entrada';
+    if(tipo === 'saida_caixa') url = '/api/excluir_saida_caixa';
+
+    if(!url) return;
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id: id})
+        });
+        if((await res.json()).success) {
+            showToast("Removido com sucesso.", "success");
+            carregarFluxo();
+        } else { showToast("Erro ao excluir.", "error"); }
+    } catch(e) { showToast("Erro.", "error"); }
+}
+
+// Inicializar Datas com Hoje
+document.addEventListener("DOMContentLoaded", () => {
+    const hoje = new Date().toISOString().split('T')[0];
+    const i1 = document.getElementById('ent-data');
+    const i2 = document.getElementById('sai-data');
+    if(i1) i1.value = hoje;
+    if(i2) i2.value = hoje;
+});
 
 async function salvarEntradaCaixa() {
     const valorStr = document.getElementById('ent-valor').value;

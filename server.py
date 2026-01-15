@@ -290,6 +290,29 @@ def excluir_entrada_route():
 
     db.excluir_entrada(session['usuario'], request.json['id'])
     return jsonify({'success': True})
+
+@app.route('/api/nova_saida_caixa', methods=['POST'])
+def nova_saida_caixa():
+    if 'usuario' not in session: return jsonify({}), 403
+    d = request.json
+    try:
+        valor = float(d['valor'])
+        # Passamos a descrição (d['descricao']) para o banco
+        db.adicionar_saida_caixa(session['usuario'], d['descricao'], valor, d['forma'], d['data'])
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Erro ao salvar saída: {e}") # Bom para debug no console
+        return jsonify({'success': False, 'message': 'Erro ao salvar saída'}), 500
+
+@app.route('/api/excluir_saida_caixa', methods=['POST'])
+def excluir_saida_caixa():
+    if 'usuario' not in session: return jsonify({}), 403
+    if session.get('funcao') != 'Admin':
+        return jsonify({'success': False, 'message': 'Permissão negada'}), 403
+
+    db.excluir_saida_caixa(session['usuario'], request.json['id'])
+    return jsonify({'success': True})
+
 @app.route('/api/exportar_fluxo_excel', methods=['GET'])
 def exportar_fluxo_excel():
     if 'usuario' not in session: return "", 403
