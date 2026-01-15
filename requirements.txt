@@ -1,4 +1,6 @@
-streamlit
+flask
+gunicorn
 pandas
 openpyxl
 sqlalchemy
+psycopg2-binary

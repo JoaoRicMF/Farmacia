@@ -20,12 +20,12 @@
         <p>Gestão Financeira & Auditoria</p>
 
         <div class="input-wrapper">
-            <input type="text" id="login-user" placeholder="Usuário">
+            <input type="text" id="login-user" placeholder="Usuário" aria-label="Nome de Usuário">
         </div>
 
         <div class="input-wrapper">
-            <input type="password" id="login-pass" placeholder="Senha">
-            <span class="toggle-pass" onclick="toggleSenha()">👁️</span>
+            <input type="password" id="login-pass" placeholder="Senha" aria-label="Senha">
+            <span class="toggle-pass" onclick="toggleSenha()" role="button" tabindex="0">👁️</span>
         </div>
 
         <button class="btn-login" id="btn-entrar" onclick="fazerLogin()">Acessar Painel</button>
@@ -51,31 +51,31 @@
         </div>
 
         <nav class="sidebar-menu">
-            <div class="menu-item active" onclick="nav('dashboard', this)">
+            <div class="menu-item active" onclick="nav('dashboard', this)" role="button" tabindex="0">
                 <span class="icon">📊</span> Dashboard
             </div>
-            <div class="menu-item" onclick="nav('novo', this)">
+            <div class="menu-item" onclick="nav('novo', this)" role="button" tabindex="0">
                 <span class="icon">📑</span> Novo Lançamento
             </div>
-            <div class="menu-item" onclick="nav('lista', this)">
+            <div class="menu-item" onclick="nav('lista', this)" role="button" tabindex="0">
                 <span class="icon">📋</span> Registros
             </div>
-            <div class="menu-item admin-only hidden" onclick="nav('logs', this)">
+            <div class="menu-item admin-only hidden" onclick="nav('logs', this)" role="button" tabindex="0">
                 <span class="icon">🛡️</span> Auditoria
             </div>
-            <div class="menu-item" onclick="nav('fluxo', this)">
+            <div class="menu-item" onclick="nav('fluxo', this)" role="button" tabindex="0">
                 <span class="icon">💰</span> Fluxo de Caixa
             </div>
-            <div class="menu-item" onclick="nav('config', this)">
+            <div class="menu-item" onclick="nav('config', this)" role="button" tabindex="0">
                 <span class="icon">⚙️</span> Configurações
             </div>
         </nav>
 
         <div class="menu-footer">
-            <div class="menu-item" onclick="toggleDarkMode()" style="margin-bottom: 5px;">
+            <div class="menu-item" onclick="toggleDarkMode()" style="margin-bottom: 5px;" role="button" tabindex="0">
                 <span class="icon">🌙</span> <span id="text-theme">Modo Escuro</span>
             </div>
-            <div class="menu-item logout" onclick="confirmarLogout()">
+            <div class="menu-item logout" onclick="confirmarLogout()" role="button" tabindex="0">
                 <span class="icon">🚪</span> Sair
             </div>
         </div>
@@ -86,10 +86,10 @@
         <div id="view-dashboard">
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
                     <h1>Dashboard</h1>
                 </div>
-                <select class="periodo-select">
+                <select class="periodo-select" aria-label="Selecionar Período">
                     <option>Este Mês</option>
                     <option>Visão Geral</option>
                 </select>
@@ -97,7 +97,7 @@
 
 
             <div class="dashboard-cards">
-                <div class="summary-card card-blue" onclick="verDetalhes('pagar_mes', 'Total a Pagar (Pendente)')">
+                <div class="summary-card card-blue" onclick="verDetalhes('pagar_mes', 'Total a Pagar (Pendente)')" role="button" tabindex="0">
                     <div class="card-icon">💸</div>
                     <div class="card-info">
                         <h3>A Pagar (Total)</h3>
@@ -106,7 +106,7 @@
                     </div>
                 </div>
 
-                <div class="summary-card card-red" onclick="verDetalhes('vencidos', 'Boletos Vencidos')">
+                <div class="summary-card card-red" onclick="verDetalhes('vencidos', 'Boletos Vencidos')" role="button" tabindex="0">
                     <div class="card-icon">🚨</div>
                     <div class="card-info">
                         <h3>Vencidos</h3>
@@ -115,7 +115,7 @@
                     </div>
                 </div>
 
-                <div class="summary-card card-yellow" onclick="verDetalhes('proximos', 'Vencendo em 7 Dias')">
+                <div class="summary-card card-yellow" onclick="verDetalhes('proximos', 'Vencendo em 7 Dias')" role="button" tabindex="0">
                     <div class="card-icon">⏳</div>
                     <div class="card-info">
                         <h3>Próximos</h3>
@@ -124,7 +124,7 @@
                     </div>
                 </div>
 
-                <div class="summary-card card-green" onclick="verDetalhes('pago_mes', 'Contas Pagas (Este Mês)')">
+                <div class="summary-card card-green" onclick="verDetalhes('pago_mes', 'Contas Pagas (Este Mês)')" role="button" tabindex="0">
                     <div class="card-icon">✅</div>
                     <div class="card-info">
                         <h3>Pagos</h3>
@@ -146,7 +146,7 @@
             </div>
 
             <div class="card" style="padding: 0; overflow: hidden; margin-top: 30px;">
-                <div class="toggle-header" onclick="toggleCalendarSection()">
+                <div class="toggle-header" onclick="toggleCalendarSection()" role="button" tabindex="0">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 1.2rem;">📅</span>
                         <h3 style="margin:0; font-size: 1rem;">Calendário de Vencimentos</h3>
@@ -163,12 +163,12 @@
         <div id="view-fluxo" class="hidden">
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
                     <h1>Fluxo de Caixa</h1>
                 </div>
 
                 <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="month" id="filtro-mes-fluxo" class="periodo-select" onchange="carregarFluxo()">
+                    <input type="month" id="filtro-mes-fluxo" class="periodo-select" onchange="carregarFluxo()" aria-label="Filtrar Mês">
 
                     <button class="btn btn-secondary" onclick="window.print()" title="Salvar como PDF (Imprimir)">
                         🖨️ PDF
@@ -181,7 +181,7 @@
 
             <div class="dashboard-cards">
 
-                <div class="summary-card card-green" onclick="filtrarFluxo('entrada')" style="cursor: pointer;">
+                <div class="summary-card card-green" onclick="filtrarFluxo('entrada')" style="cursor: pointer;" role="button" tabindex="0">
                     <div class="card-icon">📥</div>
                     <div class="card-info">
                         <h3>Entradas (Total)</h3>
@@ -192,7 +192,7 @@
                     </div>
                 </div>
 
-                <div class="summary-card card-red" onclick="filtrarFluxo('saida')" style="cursor: pointer;">
+                <div class="summary-card card-red" onclick="filtrarFluxo('saida')" style="cursor: pointer;" role="button" tabindex="0">
                     <div class="card-icon">📤</div>
                     <div class="card-info">
                         <h3>Saídas (Pagas)</h3>
@@ -201,7 +201,7 @@
                     </div>
                 </div>
 
-                <div class="summary-card card-blue" onclick="filtrarFluxo('todos')" style="cursor: pointer;">
+                <div class="summary-card card-blue" onclick="filtrarFluxo('todos')" style="cursor: pointer;" role="button" tabindex="0">
                     <div class="card-icon">⚖️</div>
                     <div class="card-info">
                         <h3>Saldo Líquido</h3>
@@ -220,15 +220,19 @@
                             ➕ Entrada
                         </h3>
                         <div class="form-row">
-                            <div class="half-width"><label>Data</label><input type="date" id="ent-data"></div>
-                            <div class="half-width"><label>Forma</label>
+                            <div class="half-width">
+                                <label for="ent-data">Data</label>
+                                <input type="date" id="ent-data">
+                            </div>
+                            <div class="half-width">
+                                <label for="ent-forma">Forma</label>
                                 <select id="ent-forma">
                                     <option>Dinheiro</option><option>PIX</option><option>Cartão</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-group" style="margin-top:10px;">
-                            <label>Valor</label>
+                            <label for="ent-valor">Valor</label>
                             <input type="text" id="ent-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
                         </div>
                         <button class="btn btn-success" style="width: 100%; margin-top: 15px;" onclick="salvarEntradaCaixa()">Registrar Entrada</button>
@@ -239,8 +243,12 @@
                             ➖ Saída
                         </h3>
                         <div class="form-row">
-                            <div class="half-width"><label>Data</label><input type="date" id="sai-data"></div>
-                            <div class="half-width"><label>Forma</label>
+                            <div class="half-width">
+                                <label for="sai-data">Data</label>
+                                <input type="date" id="sai-data">
+                            </div>
+                            <div class="half-width">
+                                <label for="sai-forma">Forma</label>
                                 <select id="sai-forma">
                                     <option>Dinheiro</option><option>PIX</option><option>Cartão</option>
                                 </select>
@@ -248,12 +256,12 @@
                         </div>
 
                         <div class="form-group" style="margin-top:10px;">
-                            <label>Descrição</label>
+                            <label for="sai-desc">Descrição</label>
                             <input type="text" id="sai-desc" placeholder="Ex: Sangria, Vale transporte...">
                         </div>
 
                         <div class="form-group" style="margin-top:10px;">
-                            <label>Valor</label>
+                            <label for="sai-valor">Valor</label>
                             <input type="text" id="sai-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
                         </div>
                         <button class="btn btn-danger" style="width: 100%; margin-top: 15px;" onclick="salvarSaidaCaixa()">Registrar Saída</button>
@@ -281,10 +289,11 @@
                 </div>
             </div>
         </div>
+
         <div id="view-novo" class="hidden">
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
                     <h1>Novo Lançamento</h1>
                 </div>
             </div>
@@ -292,7 +301,7 @@
             <div class="card" style="max-width: 800px;">
                 <div class="form-row">
                     <div class="full-width">
-                        <label>Código de Barras</label>
+                        <label for="boleto-cod">Código de Barras</label>
                         <input type="text" id="boleto-cod" onblur="lerCodigoBarras()" placeholder="Cole o código aqui...">
                         <small class="hint">💡 Preenche Valor e Vencimento automaticamente.</small>
                     </div>
@@ -300,7 +309,7 @@
 
                 <div class="form-row">
                     <div class="full-width">
-                        <label>Descrição <span class="required">*</span></label>
+                        <label for="boleto-desc">Descrição <span class="required">*</span></label>
                         <input type="text" id="boleto-desc" placeholder="Ex: Fornecedor XYZ">
                         <span class="error-msg" id="err-desc">Campo obrigatório</span>
                     </div>
@@ -308,17 +317,17 @@
 
                 <div class="form-row three-col">
                     <div class="form-group">
-                        <label>Valor <span class="required">*</span></label>
+                        <label for="boleto-valor">Valor <span class="required">*</span></label>
                         <input type="text" id="boleto-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
                         <span class="error-msg" id="err-valor">Informe o valor</span>
                     </div>
                     <div class="form-group">
-                        <label>Vencimento <span class="required">*</span></label>
+                        <label for="boleto-venc">Vencimento <span class="required">*</span></label>
                         <input type="date" id="boleto-venc">
                         <span class="error-msg" id="err-venc">Data inválida</span>
                     </div>
                     <div class="form-group">
-                        <label>Categoria</label>
+                        <label for="boleto-cat">Categoria</label>
                         <select id="boleto-cat">
                             <option value="">Selecione...</option>
                             <option>Medicamentos (Estoque)</option>
@@ -336,7 +345,7 @@
 
                 <div class="form-row">
                     <div class="half-width">
-                        <label>Status</label>
+                        <label for="boleto-status">Status</label>
                         <select id="boleto-status">
                             <option value="Pendente">Pendente</option>
                             <option value="Pago">Pago</option>
@@ -354,7 +363,7 @@
         <div id="view-lista" class="hidden">
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
                     <h1>Registros</h1>
                 </div>
 
@@ -367,15 +376,15 @@
             <div class="card">
                 <div class="toolbar">
                     <div class="search-box">
-                        <input type="text" id="filtro-busca" placeholder="🔍 Buscar por descrição..." onkeyup="if(event.key === 'Enter') carregarLista(1)">
+                        <input type="text" id="filtro-busca" placeholder="🔍 Buscar por descrição..." onkeyup="if(event.key === 'Enter') carregarLista(1)" aria-label="Buscar Registros">
                     </div>
                     <div class="filters">
-                        <select id="filtro-status" onchange="carregarLista(1)">
+                        <select id="filtro-status" onchange="carregarLista(1)" aria-label="Filtrar por Status">
                             <option value="Todos">Status: Todos</option>
                             <option value="Pendente">Pendente</option>
                             <option value="Pago">Pago</option>
                         </select>
-                        <select id="filtro-cat" onchange="carregarLista(1)">
+                        <select id="filtro-cat" onchange="carregarLista(1)" aria-label="Filtrar por Categoria">
                             <option value="Todas">Categoria: Todas</option>
                             <option>Medicamentos (Estoque)</option>
                             <option>Materiais de Consumo</option>
@@ -418,7 +427,7 @@
         <div id="view-logs" class="hidden">
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
                     <h1>Auditoria</h1>
                 </div>
             </div>
@@ -443,7 +452,7 @@
         <div id="view-config" class="hidden">
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle" onclick="toggleSidebar()">☰</button>
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
                     <h1>Configurações</h1>
                 </div>
             </div>
@@ -451,17 +460,17 @@
             <div class="card" style="max-width: 600px;">
                 <h3>👤 Editar Perfil</h3>
                 <div class="form-group">
-                    <label>Login de Acesso</label>
+                    <label for="conf-login">Login de Acesso</label>
                     <input type="text" id="conf-login">
                 </div>
                 <div class="form-group">
-                    <label>Nome de Exibição</label>
+                    <label for="conf-nome">Nome de Exibição</label>
                     <input type="text" id="conf-nome">
                 </div>
 
                 <h3 style="margin-top: 30px;">🔒 Segurança</h3>
                 <div class="form-group">
-                    <label>Nova Senha</label>
+                    <label for="conf-senha">Nova Senha</label>
                     <input type="password" id="conf-senha" placeholder="********">
                 </div>
 
@@ -502,22 +511,22 @@
         <div class="modal-body">
             <input type="hidden" id="edit-id">
             <div class="form-group">
-                <label>Descrição</label>
+                <label for="edit-desc">Descrição</label>
                 <input type="text" id="edit-desc">
             </div>
             <div class="form-row">
                 <div class="half-width">
-                    <label>Valor</label>
+                    <label for="edit-valor">Valor</label>
                     <input type="text" id="edit-valor" oninput="mascaraMoeda(this)">
                 </div>
                 <div class="half-width">
-                    <label>Vencimento</label>
+                    <label for="edit-venc">Vencimento</label>
                     <input type="date" id="edit-venc">
                 </div>
             </div>
             <div class="form-row">
                 <div class="half-width">
-                    <label>Categoria</label>
+                    <label for="edit-cat">Categoria</label>
                     <select id="edit-cat">
                         <option>Medicamentos (Estoque)</option>
                         <option>Materiais de Consumo</option>
@@ -531,7 +540,7 @@
                     </select>
                 </div>
                 <div class="half-width">
-                    <label>Status</label>
+                    <label for="edit-status">Status</label>
                     <select id="edit-status">
                         <option value="Pendente">Pendente</option>
                         <option value="Pago">Pago</option>

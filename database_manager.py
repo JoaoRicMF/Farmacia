@@ -1,16 +1,24 @@
 import os
-import shutil
 import pandas as pd
 from datetime import datetime
 import hashlib
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError  # Importado para tratar erros específicos do Banco
 
-# CONFIGURAÇÕES
+# CONFIGURAÇÕES DE AMBIENTE
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 DB_FOLDER = 'database'
-BACKUP_FOLDER = 'backups'
 DB_FILE = 'financeiro.db'
 DB_PATH = os.path.join(DB_FOLDER, DB_FILE)
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+
+# Se não houver variável de ambiente, usa SQLite local (Desenvolvimento)
+if not DATABASE_URL:
+    DATABASE_URL = f"sqlite:///{DB_PATH}"
+else:
+    # Correção para SQLAlchemy 1.4+ (Heroku/Render usam 'postgres://' antigo)
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 engine = create_engine(DATABASE_URL)
 
@@ -70,13 +78,21 @@ def obter_logs():
 
 # --- INICIALIZAÇÃO E BACKUP ---
 def init_db():
-    if not os.path.exists(DB_FOLDER): os.makedirs(DB_FOLDER)
+    # Cria pasta local apenas se estiver usando SQLite
+    if "sqlite" in DATABASE_URL and not os.path.exists(DB_FOLDER):
+        os.makedirs(DB_FOLDER)
+
+    # Define sintaxe de chave primária baseada no banco
+    if "sqlite" in DATABASE_URL:
+        pk_type = "INTEGER PRIMARY KEY AUTOINCREMENT"
+    else:
+        pk_type = "SERIAL PRIMARY KEY" # Sintaxe PostgreSQL
 
     # Criação das Tabelas
     with engine.connect() as conn:
-        conn.execute(text('''
+        conn.execute(text(f'''
                           CREATE TABLE IF NOT EXISTS financeiro (
-                                                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                                    id {pk_type},
                                                                     data_processamento TEXT,
                                                                     descricao TEXT,
                                                                     valor REAL,
@@ -86,27 +102,27 @@ def init_db():
                                                                     categoria TEXT DEFAULT 'Outros'
                           )
                           '''))
-        conn.execute(text('''
+        conn.execute(text(f'''
                           CREATE TABLE IF NOT EXISTS usuarios (
-                                                                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                                  id {pk_type},
                                                                   usuario TEXT UNIQUE,
                                                                   senha TEXT,
                                                                   nome TEXT,
                                                                   funcao TEXT
                           )
                           '''))
-        conn.execute(text('''
+        conn.execute(text(f'''
                           CREATE TABLE IF NOT EXISTS logs (
-                                                              id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                              id {pk_type},
                                                               data_hora TEXT,
                                                               usuario TEXT,
                                                               acao TEXT,
                                                               detalhes TEXT
                           )
                           '''))
-        conn.execute(text('''
+        conn.execute(text(f'''
                           CREATE TABLE IF NOT EXISTS entradas_caixa (
-                                                                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                                        id {pk_type},
                                                                         data_registro TEXT,
                                                                         descricao TEXT,
                                                                         valor REAL,
@@ -114,9 +130,9 @@ def init_db():
                                                                         usuario TEXT
                           )
                           '''))
-        conn.execute(text('''
+        conn.execute(text(f'''
                           CREATE TABLE IF NOT EXISTS saidas_caixa (
-                                                                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                                                      id {pk_type},
                                                                       data_registro TEXT,
                                                                       descricao TEXT, 
                                                                       valor REAL,
@@ -125,23 +141,28 @@ def init_db():
                           )
                           '''))
 
+        # Migrações e verificações de colunas existentes
         try:
-            cols = pd.read_sql(text("PRAGMA table_info(saidas_caixa)"), conn)['name'].tolist()
-            if 'descricao' not in cols:
-                conn.execute(text("ALTER TABLE saidas_caixa ADD COLUMN descricao TEXT"))
-        except: pass
+            if "sqlite" in DATABASE_URL:
+                cols = pd.read_sql(text("PRAGMA table_info(saidas_caixa)"), conn)['name'].tolist()
+                if 'descricao' not in cols:
+                    conn.execute(text("ALTER TABLE saidas_caixa ADD COLUMN descricao TEXT"))
+        except SQLAlchemyError:
+            # Ignora erro se a tabela não existir ou a coluna já existir (comum em migrações manuais)
+            pass
 
-        # Migração simples para garantir colunas novas
         try:
-            cols = pd.read_sql(text("PRAGMA table_info(financeiro)"), conn)['name'].tolist()
-            if 'categoria' not in cols:
-                conn.execute(text("ALTER TABLE financeiro ADD COLUMN categoria TEXT DEFAULT 'Outros'"))
-        except: pass
+            if "sqlite" in DATABASE_URL:
+                cols = pd.read_sql(text("PRAGMA table_info(financeiro)"), conn)['name'].tolist()
+                if 'categoria' not in cols:
+                    conn.execute(text("ALTER TABLE financeiro ADD COLUMN categoria TEXT DEFAULT 'Outros'"))
+        except SQLAlchemyError:
+            pass
 
     criar_usuario_inicial()
 
 # --- FUNÇÕES DE LEITURA ---
-def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas", d_ini=None, d_fim=None, limit=None, offset=0):
+def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas", limit=None, offset=0):
     try:
         q = "SELECT * FROM financeiro WHERE 1=1"
         p = {}
@@ -158,7 +179,6 @@ def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas"
             q += " AND categoria = :c"
             p['c'] = categoria_filtro
 
-        # CORREÇÃO: Ordena por ID DESC (Mais seguro que data string)
         q += " ORDER BY id DESC"
 
         if limit:
@@ -169,8 +189,12 @@ def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas"
         with engine.connect() as conn:
             return pd.read_sql(text(q), conn, params=p)
 
+    except SQLAlchemyError as e:
+        print(f"Erro de Banco de Dados ao listar: {e}")
+        return pd.DataFrame()
     except Exception as e:
-        print(f"Erro ao listar: {e}")
+        # Mantém catch genérico apenas para erros não relacionados ao banco (ex: Pandas memory)
+        print(f"Erro inesperado ao listar: {e}")
         return pd.DataFrame()
 
 def contar_registros_filtro(busca=None, status_filtro="Todos", categoria_filtro="Todas"):
@@ -185,7 +209,6 @@ def contar_registros_filtro(busca=None, status_filtro="Todos", categoria_filtro=
 
 def obter_dados_grafico_tempo():
     with engine.connect() as c:
-        # Tenta agrupar por mês/ano usando substr da data string
         return pd.read_sql(text("SELECT substr(vencimento, 7, 4) || '-' || substr(vencimento, 4, 2) as mes, SUM(valor) as total FROM financeiro GROUP BY mes ORDER BY mes ASC"), c)
 
 def obter_dados_grafico_categoria():
@@ -235,7 +258,6 @@ def excluir_registro(usuario_log, id_reg):
 
     # --- FLUXO DE CAIXA ---
 def adicionar_entrada(usuario, valor, forma_pagamento, data_iso):
-    # data_iso deve vir YYYY-MM-DD
     with engine.connect() as conn:
         conn.execute(text("INSERT INTO entradas_caixa (data_registro, valor, forma_pagamento, usuario) VALUES (:d, :v, :fp, :u)"),
                      {'d': data_iso, 'v': valor, 'fp': forma_pagamento, 'u': usuario})
@@ -250,7 +272,6 @@ def excluir_entrada(usuario, id_entrada):
 
 def adicionar_saida_caixa(usuario, descricao, valor, forma_pagamento, data_iso):
     with engine.connect() as conn:
-        # Agora incluímos :desc no INSERT
         conn.execute(text("INSERT INTO saidas_caixa (data_registro, descricao, valor, forma_pagamento, usuario) VALUES (:d, :desc, :v, :fp, :u)"),
                      {'d': data_iso, 'desc': descricao, 'v': valor, 'fp': forma_pagamento, 'u': usuario})
         conn.commit()
@@ -263,23 +284,11 @@ def excluir_saida_caixa(usuario, id_saida):
     registrar_log(usuario, "Exclusão Caixa", f"Removeu saída ID {id_saida}")
 
 def obter_resumo_fluxo(mes=None, ano=None):
-    # ... (INÍCIO DA FUNÇÃO MANTÉM IGUAL) ...
     if not mes or not ano:
         hoje = datetime.now()
         mes, ano = f"{hoje.month:02d}", str(hoje.year)
-    filtro_data = f"{ano}-{mes}%"
 
-    with engine.connect() as conn:
-        # Entradas
-        entradas_df = pd.read_sql(text("SELECT id, data_registro, valor, forma_pagamento FROM entradas_caixa WHERE data_registro LIKE :d ORDER BY data_registro DESC"),
-                                  conn, params={'d': filtro_data})
-
-        # Saídas (AGORA PEGANDO A DESCRIÇÃO)
-        saidas_caixa_df = pd.read_sql(text("SELECT id, data_registro, descricao, valor, forma_pagamento FROM saidas_caixa WHERE data_registro LIKE :d ORDER BY data_registro DESC"),
-                                      conn, params={'d': filtro_data})
-
-        # Saídas Boletos
-        saidas_boletos = pd.read_sql(text("SELECT vencimento, descricao, valor, status FROM financeiro WHERE status = 'Pago'"), conn)
+    filtro_data_iso = f"{ano}-{mes}%"
 
     resumo = {
         'entradas_total': 0.0, 'entradas_dinheiro': 0.0, 'entradas_pix': 0.0, 'entradas_cartao': 0.0,
@@ -288,52 +297,90 @@ def obter_resumo_fluxo(mes=None, ano=None):
         'extrato': []
     }
 
-    # ... (PROCESSAMENTO DAS ENTRADAS MANTÉM IGUAL) ...
-    if not entradas_df.empty:
-        resumo['entradas_total'] = entradas_df['valor'].sum()
-        resumo['entradas_dinheiro'] = entradas_df[entradas_df['forma_pagamento'] == 'Dinheiro']['valor'].sum()
-        resumo['entradas_pix'] = entradas_df[entradas_df['forma_pagamento'] == 'PIX']['valor'].sum()
-        resumo['entradas_cartao'] = entradas_df[entradas_df['forma_pagamento'] == 'Cartão']['valor'].sum()
+    with engine.connect() as conn:
+        # 1. ENTRADAS (Soma Otimizada SQL)
+        sql_entradas_sum = text("""
+                                SELECT
+                                    COALESCE(SUM(valor), 0) as total,
+                                    COALESCE(SUM(CASE WHEN forma_pagamento = 'Dinheiro' THEN valor ELSE 0 END), 0) as dinheiro,
+                                    COALESCE(SUM(CASE WHEN forma_pagamento = 'PIX' THEN valor ELSE 0 END), 0) as pix,
+                                    COALESCE(SUM(CASE WHEN forma_pagamento = 'Cartão' THEN valor ELSE 0 END), 0) as cartao
+                                FROM entradas_caixa
+                                WHERE data_registro LIKE :d
+                                """)
+        res_entradas = conn.execute(sql_entradas_sum, {'d': filtro_data_iso}).fetchone()
 
-        for _, row in entradas_df.iterrows():
+        if res_entradas:
+            resumo['entradas_total'] = res_entradas.total
+            resumo['entradas_dinheiro'] = res_entradas.dinheiro
+            resumo['entradas_pix'] = res_entradas.pix
+            resumo['entradas_cartao'] = res_entradas.cartao
+
+        # 2. SAÍDAS CAIXA (Soma Otimizada SQL)
+        sql_saidas_sum = text("SELECT COALESCE(SUM(valor), 0) FROM saidas_caixa WHERE data_registro LIKE :d")
+        total_saidas_caixa = conn.execute(sql_saidas_sum, {'d': filtro_data_iso}).scalar()
+        resumo['saidas_total'] += total_saidas_caixa
+
+        # 3. SAÍDAS BOLETOS (Soma Otimizada SQL)
+        sql_boletos_sum = text("""
+                               SELECT COALESCE(SUM(valor), 0) FROM financeiro
+                               WHERE status = 'Pago'
+                                 AND substr(vencimento, 7, 4) = :ano
+                                 AND substr(vencimento, 4, 2) = :mes
+                               """)
+        total_boletos = conn.execute(sql_boletos_sum, {'ano': ano, 'mes': mes}).scalar()
+        resumo['saidas_total'] += total_boletos
+
+        # 4. EXTRATO (Recuperação de dados)
+        entradas_rows = conn.execute(text(
+            "SELECT id, data_registro, valor, forma_pagamento FROM entradas_caixa WHERE data_registro LIKE :d ORDER BY data_registro DESC"
+        ), {'d': filtro_data_iso}).fetchall()
+
+        for row in entradas_rows:
             resumo['extrato'].append({
-                'data': row['data_registro'],
+                'data': row.data_registro,
                 'descricao': 'Entrada Avulsa',
-                'valor': row['valor'],
+                'valor': row.valor,
                 'tipo': 'entrada',
-                'categoria': row['forma_pagamento'],
-                'id': row['id']
+                'categoria': row.forma_pagamento,
+                'id': row.id
             })
 
-    # ... (ATUALIZE O PROCESSAMENTO DAS SAÍDAS RÁPIDAS) ...
-    if not saidas_caixa_df.empty:
-        resumo['saidas_total'] += saidas_caixa_df['valor'].sum()
-        for _, row in saidas_caixa_df.iterrows():
-            # Tenta pegar a descrição, se estiver vazia (banco antigo), usa "Saída Avulsa"
-            desc_texto = row['descricao'] if row['descricao'] else 'Saída Avulsa'
+        saidas_rows = conn.execute(text(
+            "SELECT id, data_registro, descricao, valor, forma_pagamento FROM saidas_caixa WHERE data_registro LIKE :d ORDER BY data_registro DESC"
+        ), {'d': filtro_data_iso}).fetchall()
 
+        for row in saidas_rows:
+            desc_texto = row.descricao if row.descricao else 'Saída Avulsa'
             resumo['extrato'].append({
-                'data': row['data_registro'],
-                'descricao': desc_texto, # Usa a descrição do banco
-                'valor': row['valor'],
+                'data': row.data_registro,
+                'descricao': desc_texto,
+                'valor': row.valor,
                 'tipo': 'saida_caixa',
-                'categoria': row['forma_pagamento'],
-                'id': row['id']
+                'categoria': row.forma_pagamento,
+                'id': row.id
             })
 
-    # ... (PROCESSAMENTO DOS BOLETOS MANTÉM IGUAL E RETORNO) ...
-    if not saidas_boletos.empty:
-        saidas_boletos['dt_obj'] = pd.to_datetime(saidas_boletos['vencimento'], dayfirst=True, errors='coerce')
-        mask = (saidas_boletos['dt_obj'].dt.month == int(mes)) & (saidas_boletos['dt_obj'].dt.year == int(ano))
-        saidas_mes = saidas_boletos[mask]
+        boletos_rows = conn.execute(text("""
+                                         SELECT vencimento, descricao, valor
+                                         FROM financeiro
+                                         WHERE status = 'Pago'
+                                           AND substr(vencimento, 7, 4) = :ano
+                                           AND substr(vencimento, 4, 2) = :mes
+                                         """), {'ano': ano, 'mes': mes}).fetchall()
 
-        resumo['saidas_total'] += saidas_mes['valor'].sum()
+        for row in boletos_rows:
+            # Correção do Broad Exception (agora captura apenas ValueError se a data estiver errada)
+            try:
+                dt_obj = datetime.strptime(row.vencimento, '%d/%m/%Y')
+                data_fmt = dt_obj.strftime('%Y-%m-%d')
+            except ValueError:
+                data_fmt = row.vencimento
 
-        for _, row in saidas_mes.iterrows():
             resumo['extrato'].append({
-                'data': row['dt_obj'].strftime('%Y-%m-%d') if pd.notnull(row['dt_obj']) else row['vencimento'],
-                'descricao': row['descricao'],
-                'valor': row['valor'],
+                'data': data_fmt,
+                'descricao': row.descricao,
+                'valor': row.valor,
                 'tipo': 'saida_boleto',
                 'categoria': 'Conta Paga',
                 'id': 0
@@ -341,4 +388,5 @@ def obter_resumo_fluxo(mes=None, ano=None):
 
     resumo['extrato'].sort(key=lambda x: x['data'], reverse=True)
     resumo['saldo'] = resumo['entradas_total'] - resumo['saidas_total']
+
     return resumo
