@@ -14,43 +14,82 @@
 <div id="mobile-overlay" onclick="toggleSidebar()"></div>
 <div id="toast-container"></div>
 
-<div id="login-screen">
-    <div class="login-box">
-        <h2>🏥 Farmácia</h2>
-        <p>Gestão Financeira & Auditoria</p>
+<div class="login-box">
+    <h2>🏥 Farmácia</h2>
+    <p>Gestão Financeira & Auditoria</p>
 
+    <form onsubmit="event.preventDefault(); fazerLogin();">
         <div class="input-wrapper">
-            <input type="text" id="login-user" placeholder="Usuário" aria-label="Nome de Usuário">
+            <input type="text" id="login-user" name="usuario" placeholder="Usuário" aria-label="Nome de Usuário" autocomplete="username" required>
         </div>
 
         <div class="input-wrapper">
-            <input type="password" id="login-pass" placeholder="Senha" aria-label="Senha">
+            <input type="password" id="login-pass" name="senha" placeholder="Senha" aria-label="Senha" autocomplete="current-password" required>
             <span class="toggle-pass" onclick="toggleSenha()" role="button" tabindex="0">👁️</span>
         </div>
 
-        <button class="btn-login" id="btn-entrar" onclick="fazerLogin()">Acessar Painel</button>
-    </div>
+        <button type="submit" class="btn-login" id="btn-entrar">Acessar Painel</button>
+    </form>
 </div>
 
 <div id="app-screen" class="hidden">
 
-    <div id="mobile-overlay" onclick="toggleSidebar()"></div>
 
     <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h2 id="logo-text">🏥 Financeiro</h2>
+        <div class="sidebar-brand">
+            <h2><i data-lucide="pill" style="width: 24px; height: 24px;"></i> Farmácia</h2>
         </div>
 
-        <div class="user-info">
+        <div class="sidebar-user" onclick="nav('config')" role="button" tabindex="0" title="Meu Perfil">
             <div class="avatar-circle">
-                <span id="avatar-icon">👤</span>
-            </div>
-            <div class="user-text">
-                <small>Bem-vindo,</small>
+                <span id="avatar-icon">J</span> </div>
+            <div class="user-info-text">
                 <div id="user-display" class="user-name">Usuário</div>
-                <small id="user-role" style="color: #60a5fa; font-size: 0.75rem;">Carregando...</small>
+                <small id="user-role">Operador</small>
+            </div>
+            <i data-lucide="chevron-right" style="margin-left: auto; width: 16px; opacity: 0.4;"></i>
+        </div>
+
+        <nav class="sidebar-menu">
+            <div class="menu-label">Módulos</div>
+
+            <div class="menu-item active" onclick="nav('dashboard', this)">
+                <i data-lucide="layout-dashboard"></i> <span>Dashboard</span>
+            </div>
+            <div class="menu-item" onclick="nav('novo', this)">
+                <i data-lucide="file-plus-2"></i> <span>Novo Lançamento</span>
+            </div>
+            <div class="menu-item" onclick="nav('lista', this)">
+                <i data-lucide="clipboard-list"></i> <span>Registros</span>
+            </div>
+            <div class="menu-item" onclick="nav('fluxo', this)">
+                <i data-lucide="banknote"></i> <span>Fluxo de Caixa</span>
+            </div>
+            <div class="menu-item admin-only hidden" onclick="nav('logs', this)">
+                <i data-lucide="shield-alert"></i> <span>Auditoria</span>
+            </div>
+            <div class="menu-item" onclick="nav('config', this)">
+                <i data-lucide="settings"></i> <span>Configurações</span>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="menu-label">Sistema</div>
+
+            <div class="menu-item" onclick="toggleDarkMode()">
+                <i data-lucide="moon"></i> <span id="text-theme">Tema</span>
+            </div>
+            <div class="menu-item logout" onclick="confirmarLogout()">
+                <i data-lucide="log-out"></i> <span>Sair</span>
             </div>
         </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            lucide.createIcons();
+        });
+    </script>
 
         <nav class="sidebar-menu">
             <div class="logo-container">
@@ -622,6 +661,6 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
 </body>
 </html>

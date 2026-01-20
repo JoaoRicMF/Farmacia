@@ -1066,7 +1066,22 @@ document.addEventListener("DOMContentLoaded", () => {
     if (i1) i1.value = hoje;
     if (i2) i2.value = hoje;
 
-    // 5. Listener Enter para Formulário
+    // --- CORREÇÃO AQUI: ADICIONE ESTE BLOCO PARA O LOGIN FUNCIONAR COM ENTER ---
+    const inputUser = document.getElementById('login-user');
+    const inputPass = document.getElementById('login-pass');
+
+    function checkLoginEnter(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // Evita qualquer comportamento estranho do navegador
+            fazerLogin();       // Chama a função de login diretamente
+        }
+    }
+
+    if (inputUser) inputUser.addEventListener('keydown', checkLoginEnter);
+    if (inputPass) inputPass.addEventListener('keydown', checkLoginEnter);
+    // --------------------------------------------------------------------------
+
+    // 5. Listener Enter para Formulário (Código existente...)
     const campos = ['boleto-cod', 'boleto-desc', 'boleto-valor', 'boleto-venc', 'boleto-cat', 'boleto-status'];
     campos.forEach((id, idx) => {
         const el = document.getElementById(id);
