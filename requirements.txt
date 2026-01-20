@@ -1,6 +1,7 @@
 flask
-gunicorn
 pandas
 openpyxl
 sqlalchemy
-psycopg2-binary
+werkzeug
+flask-sqlalchemy
+flask-migrate
