@@ -21,13 +21,13 @@ class Financeiro(db.Model):
     status = db.Column(db.String(20), default='Pendente')
     categoria = db.Column(db.String(50), default='Outros')
 
-    # Método auxiliar para serializar JSON (já que Date não serializa nativamente fácil)
     def to_dict(self):
         return {
             'id': self.id,
             'data_processamento': self.data_processamento.isoformat() if self.data_processamento else None,
             'descricao': self.descricao,
             'valor': self.valor,
+            'codigo_barras': self.codigo_barras,
             'vencimento': self.vencimento.strftime('%d/%m/%Y') if self.vencimento else None,
             'status': self.status,
             'categoria': self.categoria

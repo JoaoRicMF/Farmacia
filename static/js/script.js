@@ -771,14 +771,30 @@ async function carregarLista(pagina = 1) {
                 }
             }
 
+            let btnCopiar = '';
+            if (item.codigo_barras) {
+                btnCopiar = `<button class="action-btn" title="Copiar Código de Barras" onclick="copiarCodigo('${item.codigo_barras}')">📋</button>`;
+            }
+
+            // 2. Botão Site Caixa (Sempre visível)
+            const btnCaixa = `<button class="action-btn" title="Acessar Site da Caixa (Internet Banking)" style="color:#005ca9; font-weight:bold;" onclick="abrirSiteCaixa()">🏦</button>`;
+
+            // 3. Botão Excluir (Só se tiver permissão)
+            const btnExcluir = data.perm_excluir
+                ? `<button class="action-btn" title="Excluir Registro Permanentemente" style="color:#ef4444" onclick="excluir(${item.id})">🗑️</button>`
+                : '';
+
+            // 4. Botão de Ação Principal (Pagar ou Reabrir)
+            const btnAcao = item.status === 'Pendente'
+                ? `<button class="action-btn" title="Marcar como Pago (Baixar)" style="color:#059669; font-weight:bold;" onclick="mudarStatus(${item.id}, 'Pago')">✔</button>`
+                : `<button class="action-btn" title="Reabrir (Marcar como Pendente)" style="color:#d97706" onclick="mudarStatus(${item.id}, 'Pendente')">↺</button>`;
+
+            // --- MONTAGEM DA LINHA ---
             const tr = document.createElement('tr');
             if (classeLinha) tr.className = classeLinha;
 
+            // Prepara o objeto para passar na função de edição
             const itemSafe = JSON.stringify(item).replace(/"/g, '&quot;');
-            const btnExcluir = data.perm_excluir ? `<button class="action-btn" title="Excluir" style="color:#ef4444" onclick="excluir(${item.id})">🗑️</button>` : '';
-            const btnAcao = item.status === 'Pendente'
-                ? `<button class="action-btn" title="Pagar" style="color:#059669; font-weight:bold;" onclick="mudarStatus(${item.id}, 'Pago')">✔</button>`
-                : `<button class="action-btn" title="Reabrir" style="color:#d97706" onclick="mudarStatus(${item.id}, 'Pendente')">↺</button>`;
 
             tr.innerHTML = `
                 <td style="font-family:monospace;">${item.vencimento || '--'}</td>
@@ -786,10 +802,14 @@ async function carregarLista(pagina = 1) {
                 <td><small style="background:var(--bg-body);padding:4px 8px;border-radius:4px;border:1px solid var(--border);">${item.categoria || 'Geral'}</small></td>
                 <td style="font-weight:700;">R$ ${valorFmt}</td>
                 <td><span class="${classeStatus} status-badge">${textoStatus}</span></td>
-                <td style="text-align:right;">
-                    <button class="action-btn" title="Editar" onclick="abrirModalEdicao(${itemSafe})">✏️</button>
+                <td style="text-align:right; white-space: nowrap;">
+                    ${btnCopiar}
+                    ${btnCaixa}
+                    <span style="border-left:1px solid var(--border); margin:0 5px; height:20px; vertical-align:middle; display:inline-block;"></span>
+                    <button class="action-btn" title="Editar Detalhes do Lançamento" onclick="abrirModalEdicao(${itemSafe})">✏️</button>
                     ${btnAcao} ${btnExcluir}
                 </td>`;
+
             tr.children[1].textContent = item.descricao || 'Sem Descrição';
             tbody.appendChild(tr);
         });
@@ -1148,4 +1168,24 @@ async function criarNovoUsuario() {
     } catch (e) {
         showToast("Erro de conexão.", "error");
     }
+}
+/* ==========================================================================
+   NOVAS FUNÇÕES: UTILITÁRIOS DE PAGAMENTO
+   ========================================================================== */
+function copiarCodigo(codigo) {
+    if (!codigo || codigo === 'null' || codigo === 'undefined') {
+        return showToast("Não há código de barras cadastrado.", "warning");
+    }
+
+    navigator.clipboard.writeText(codigo).then(() => {
+        showToast("Código copiado para a área de transferência!", "success");
+    }).catch(err => {
+        console.error(err);
+        showToast("Erro ao copiar código.", "error");
+    });
+}
+
+function abrirSiteCaixa() {
+    // Abre o site da Caixa em nova aba
+    window.open('https://www.caixa.gov.br', '_blank');
 }

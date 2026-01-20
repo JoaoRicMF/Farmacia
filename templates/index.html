@@ -672,5 +672,20 @@
         }
     });
 </script>
+<div id="modal-qrcode" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 350px; text-align: center;">
+        <div class="modal-header" style="justify-content: center;">
+            <h2>📱 QR Code</h2>
+            <button class="close-btn" style="position:absolute; right:20px;" onclick="fecharModalQR()">×</button>
+        </div>
+        <div class="modal-body">
+            <img id="img-qrcode" src="" alt="QR Code" style="width: 200px; height: 200px; margin-bottom: 15px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
+            <p style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 15px;">
+                Use o aplicativo do seu banco para ler o código acima.
+            </p>
+            <button class="btn btn-secondary" onclick="fecharModalQR()">Fechar</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
