@@ -399,9 +399,9 @@
         </div>
 
         <div class="card">
-            <div class="toolbar">
+            <div class="toolbar" style="margin-bottom: 10px;">
                 <div class="search-box">
-                    <input type="text" id="filtro-busca" placeholder="🔍 Buscar por descrição..." onkeyup="if(event.key === 'Enter') carregarLista(1)" aria-label="Buscar Registros">
+                    <input type="text" id="filtro-busca" placeholder="🔍 Buscar por descrição..." oninput="debounceCarregarLista()" aria-label="Buscar Registros">
                 </div>
                 <div class="filters">
                     <select id="filtro-status" onchange="carregarLista(1)" aria-label="Filtrar por Status">
@@ -421,9 +421,10 @@
                         <option>Manutenção</option>
                         <option>Outros</option>
                     </select>
-                    <button class="btn btn-primary" onclick="carregarLista(1)">Filtrar</button>
                 </div>
             </div>
+
+            <div id="filtro-resumo" class="filter-summary"></div>
 
             <div style="overflow-x: auto;">
                 <table id="tabela-registros">
@@ -434,7 +435,7 @@
                         <th>Categoria</th>
                         <th>Valor</th>
                         <th>Status</th>
-                        <th style="text-align: right;">Ações</th>
+                        <th style="text-align: right;">Ações Rápidas</th>
                     </tr>
                     </thead>
                     <tbody></tbody>

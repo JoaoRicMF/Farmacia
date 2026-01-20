@@ -551,6 +551,29 @@ async function salvarBoleto(manterAberto = true) {
 /* ==========================================================================
    LISTAGEM & CRUD
    ========================================================================== */
+let debounceTimer;
+
+function debounceCarregarLista() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+        carregarLista(1);
+    }, 400); // Aguarda 400ms após parar de digitar
+}
+
+// Atualiza o texto de resumo (Ex: "Mostrando: Pendentes • Energia")
+function atualizarResumoFiltros(busca, status, cat) {
+    const div = document.getElementById('filtro-resumo');
+    if (!div) return;
+
+    let html = '<span>Visualizando:</span>';
+
+    if (busca) html += `<span class="filter-tag">🔍 "${busca}"</span>`;
+    html += `<span class="filter-tag">${status === 'Todos' ? 'Todos os Status' : status}</span>`;
+    html += `<span class="filter-tag">${cat === 'Todas' ? 'Todas as Categorias' : cat}</span>`;
+
+    div.innerHTML = html;
+}
+
 async function carregarLista(pagina = 1) {
     paginaAtual = pagina;
     const busca = document.getElementById('filtro-busca').value;
@@ -558,6 +581,7 @@ async function carregarLista(pagina = 1) {
     const cat = document.getElementById('filtro-cat').value;
     const tbody = document.querySelector('#tabela-registros tbody');
     tbody.innerHTML = LOADER_HTML;
+    atualizarResumoFiltros(busca, status, cat);
 
     const params = new URLSearchParams({ pagina: paginaAtual, busca: busca, status: status, categoria: cat });
 
@@ -584,12 +608,23 @@ async function carregarLista(pagina = 1) {
             let valorFmt = item.valor ? parseFloat(item.valor).toFixed(2).replace('.', ',') : '0,00';
 
             // Verifica vencimento visualmente
+            // Lógica de Cores da Linha (Highlight)
             if (item.status === 'Pendente' && item.vencimento) {
                 const parts = item.vencimento.split('/');
                 if (parts.length === 3) {
                     const dtVenc = new Date(parts[2], parts[1] - 1, parts[0]);
-                    const hoje = new Date(); hoje.setHours(0,0,0,0);
-                    if (dtVenc < hoje) { classeStatus = 'status-Vencido'; textoStatus = 'Vencido'; }
+
+                    // Cálculo de diferença em dias
+                    const diffTempo = dtVenc - hoje;
+                    const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24));
+
+                    if (dtVenc < hoje) {
+                        classeStatus = 'status-Vencido';
+                        textoStatus = 'Vencido';
+                        classeLinha = 'row-vencido'; // Vermelho
+                    } else if (diffDias >= 0 && diffDias <= 5) {
+                        classeLinha = 'row-proximo'; // Amarelo (Vence em até 5 dias)
+                    }
                 }
             }
 

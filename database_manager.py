@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import text, func, or_
+from sqlalchemy import func, extract, case
 from models import db, Usuario, Financeiro, Log, EntradaCaixa, SaidaCaixa
 
 logger = logging.getLogger(__name__)
@@ -82,21 +82,30 @@ def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas"
     try:
         query = Financeiro.query
 
+        # Filtros
         if busca:
             query = query.filter(Financeiro.descricao.like(f"%{busca}%"))
+
         if status_filtro and status_filtro != "Todos":
             query = query.filter_by(status=status_filtro)
+
         if categoria_filtro and categoria_filtro != "Todas":
             query = query.filter_by(categoria=categoria_filtro)
 
+        # Ordenação
         query = query.order_by(Financeiro.id.desc())
 
+        # Paginação
         if limit:
             query = query.limit(limit).offset(offset)
 
+        # --- CORREÇÃO AQUI ---
+        # Usamos db.session.connection() para garantir compatibilidade com o Pandas novo
         return pd.read_sql(query.statement, db.session.connection())
+
     except Exception as e:
-        logger.error(f"Erro listar: {e}", exc_info=True)
+        # Log do erro no terminal para facilitar o debug
+        print(f"Erro em listar_registros: {e}")
         return pd.DataFrame()
 
 def contar_registros_filtro(busca=None, status_filtro="Todos", categoria_filtro="Todas") -> int:
@@ -185,56 +194,83 @@ def obter_resumo_fluxo(mes=None, ano=None):
     resumo = {'entradas_total': 0.0, 'entradas_dinheiro': 0.0, 'entradas_pix': 0.0,
               'entradas_cartao': 0.0, 'saidas_total': 0.0, 'saldo': 0.0, 'extrato': []}
 
-    # Somas via SQL Alchemy
-    # Entradas
-    entradas_q = db.session.query(
-        func.sum(EntradaCaixa.valor).label('total'),
-        func.sum(func.case((EntradaCaixa.forma_pagamento == 'Dinheiro', EntradaCaixa.valor), else_=0)).label('dinheiro'),
-        func.sum(func.case((EntradaCaixa.forma_pagamento == 'PIX', EntradaCaixa.valor), else_=0)).label('pix'),
-        func.sum(func.case((EntradaCaixa.forma_pagamento == 'Cartão', EntradaCaixa.valor), else_=0)).label('cartao')
-    ).filter(EntradaCaixa.data_registro.like(filtro_data)).first()
+    try:
+        # Somas via SQL Alchemy (Correção: uso de case sem func.)
+        entradas_q = db.session.query(
+            func.sum(EntradaCaixa.valor).label('total'),
+            func.sum(case([(EntradaCaixa.forma_pagamento == 'Dinheiro', EntradaCaixa.valor)], else_=0)).label('dinheiro'),
+            func.sum(case([(EntradaCaixa.forma_pagamento == 'Pix', EntradaCaixa.valor)], else_=0)).label('pix'),
+            func.sum(case([(EntradaCaixa.forma_pagamento == 'Cartão', EntradaCaixa.valor)], else_=0)).label('cartao')
+        ).filter(EntradaCaixa.data_registro.like(filtro_data)).first()
 
-    if entradas_q and entradas_q.total:
-        resumo['entradas_total'] = float(entradas_q.total)
-        resumo['entradas_dinheiro'] = float(entradas_q.dinheiro or 0)
-        resumo['entradas_pix'] = float(entradas_q.pix or 0)
-        resumo['entradas_cartao'] = float(entradas_q.cartao or 0)
+        if entradas_q and entradas_q.total:
+            resumo['entradas_total'] = float(entradas_q.total or 0)
+            resumo['entradas_dinheiro'] = float(entradas_q.dinheiro or 0)
+            resumo['entradas_pix'] = float(entradas_q.pix or 0)
+            resumo['entradas_cartao'] = float(entradas_q.cartao or 0)
 
-    # Saidas Caixa
-    saidas_caixa_total = db.session.query(func.sum(SaidaCaixa.valor)) \
-                             .filter(SaidaCaixa.data_registro.like(filtro_data)).scalar() or 0.0
-    resumo['saidas_total'] += float(saidas_caixa_total)
+        # Saidas Caixa
+        saidas_caixa_total = db.session.query(func.sum(SaidaCaixa.valor)) \
+                                 .filter(SaidaCaixa.data_registro.like(filtro_data)).scalar() or 0.0
+        resumo['saidas_total'] += float(saidas_caixa_total)
 
-    # Boletos Pagos (Vencimento na String formatada d/m/y, precisamos tratar no banco ou carregar tudo)
-    # Como as datas de vencimento são strings 'dd/mm/yyyy', filtrar via SQL 'like' é arriscado se formato mudar.
-    # Mas mantendo a lógica original (substr), em sqlite:
-    # substr(vencimento, 7, 4) = ano AND substr(vencimento, 4, 2) = mes
-    boletos_total = db.session.query(func.sum(Financeiro.valor)) \
-                        .filter(Financeiro.status == 'Pago') \
-                        .filter(func.substr(Financeiro.vencimento, 7, 4) == ano) \
-                        .filter(func.substr(Financeiro.vencimento, 4, 2) == mes).scalar() or 0.0
-    resumo['saidas_total'] += float(boletos_total)
+        # Boletos Pagos (Lógica mantida)
+        boletos_total = db.session.query(func.sum(Financeiro.valor)) \
+                            .filter(Financeiro.status == 'Pago') \
+                            .filter(func.substr(Financeiro.vencimento, 7, 4) == ano) \
+                            .filter(func.substr(Financeiro.vencimento, 4, 2) == mes).scalar() or 0.0
+        resumo['saidas_total'] += float(boletos_total)
 
-    # Preencher Extrato (Listas)
-    entradas = EntradaCaixa.query.filter(EntradaCaixa.data_registro.like(filtro_data)).order_by(EntradaCaixa.data_registro.desc()).all()
-    for e in entradas:
-        resumo['extrato'].append({'data': e.data_registro, 'descricao': 'Entrada Avulsa', 'valor': e.valor, 'tipo': 'entrada', 'categoria': e.forma_pagamento, 'id': e.id})
+        # Preencher Extrato (Entradas)
+        entradas = EntradaCaixa.query.filter(EntradaCaixa.data_registro.like(filtro_data)).order_by(EntradaCaixa.data_registro.desc()).all()
+        for e in entradas:
+            resumo['extrato'].append({
+                'data': e.data_registro,
+                'descricao': 'Entrada Avulsa',
+                'valor': e.valor,
+                'tipo': 'entrada',
+                'categoria': e.forma_pagamento,
+                'id': e.id
+            })
 
-    saidas = SaidaCaixa.query.filter(SaidaCaixa.data_registro.like(filtro_data)).order_by(SaidaCaixa.data_registro.desc()).all()
-    for s in saidas:
-        resumo['extrato'].append({'data': s.data_registro, 'descricao': s.descricao or 'Saída Avulsa', 'valor': s.valor, 'tipo': 'saida_caixa', 'categoria': s.forma_pagamento, 'id': s.id})
+        # Preencher Extrato (Saídas Caixa)
+        saidas = SaidaCaixa.query.filter(SaidaCaixa.data_registro.like(filtro_data)).order_by(SaidaCaixa.data_registro.desc()).all()
+        for s in saidas:
+            resumo['extrato'].append({
+                'data': s.data_registro,
+                'descricao': s.descricao or 'Saída Avulsa',
+                'valor': s.valor,
+                'tipo': 'saida_caixa',
+                'categoria': s.forma_pagamento,
+                'id': s.id
+            })
 
-    # Boletos Pagos
-    boletos = Financeiro.query.filter(Financeiro.status == 'Pago') \
-        .filter(func.substr(Financeiro.vencimento, 7, 4) == ano) \
-        .filter(func.substr(Financeiro.vencimento, 4, 2) == mes).all()
+        # Preencher Extrato (Boletos)
+        boletos = Financeiro.query.filter(Financeiro.status == 'Pago') \
+            .filter(func.substr(Financeiro.vencimento, 7, 4) == ano) \
+            .filter(func.substr(Financeiro.vencimento, 4, 2) == mes).all()
 
-    for b in boletos:
-        try: dt_obj = datetime.strptime(b.vencimento, '%d/%m/%Y'); data_fmt = dt_obj.strftime('%Y-%m-%d')
-        except: data_fmt = b.vencimento
-        resumo['extrato'].append({'data': data_fmt, 'descricao': b.descricao, 'valor': b.valor, 'tipo': 'saida_boleto', 'categoria': 'Conta Paga', 'id': 0})
+        for b in boletos:
+            try:
+                dt_obj = datetime.strptime(b.vencimento, '%d/%m/%Y')
+                data_fmt = dt_obj.strftime('%Y-%m-%d')
+            except:
+                data_fmt = b.vencimento
+            resumo['extrato'].append({
+                'data': data_fmt,
+                'descricao': b.descricao,
+                'valor': b.valor,
+                'tipo': 'saida_boleto',
+                'categoria': 'Conta Paga',
+                'id': 0
+            })
 
-    resumo['extrato'].sort(key=lambda x: x['data'], reverse=True)
-    resumo['saldo'] = resumo['entradas_total'] - resumo['saidas_total']
+        # Ordenação final e saldo
+        resumo['extrato'].sort(key=lambda x: x['data'], reverse=True)
+        resumo['saldo'] = resumo['entradas_total'] - resumo['saidas_total']
+
+    except Exception as e:
+        print(f"Erro no Fluxo: {e}") # Log no terminal para debug
+        return resumo # Retorna vazio em caso de erro para não travar o front
 
     return resumo
