@@ -73,3 +73,20 @@ class SaidaCaixa(db.Model):
     valor = db.Column(db.Float)
     forma_pagamento = db.Column(db.String(50))
     usuario = db.Column(db.String(50))
+
+class Fornecedor(db.Model):
+    __tablename__ = 'fornecedores'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), unique=True, nullable=False)
+    categoria_padrao = db.Column(db.String(50), nullable=True)
+
+    # Opcional: Saber quem cadastrou
+    usuario_criacao = db.Column(db.String(50))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nome': self.nome,
+            'categoria_padrao': self.categoria_padrao
+        }

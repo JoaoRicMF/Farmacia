@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import func, extract, case
-from models import db, Usuario, Financeiro, Log, EntradaCaixa, SaidaCaixa
+from models import db, Usuario, Financeiro, Log, EntradaCaixa, SaidaCaixa, Fornecedor
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +220,45 @@ def excluir_saida_caixa(usuario, id_saida):
         db.session.commit()
         registrar_log(usuario, "Exclusão Caixa", f"Removeu saída ID {id_saida}")
 
+        # --- GESTÃO DE FORNECEDORES ---
+def listar_fornecedores():
+    try:
+        # Retorna lista de objetos ordenados por nome
+        return Fornecedor.query.order_by(Fornecedor.nome).all()
+    except Exception as e:
+        print(f"Erro ao listar fornecedores: {e}")
+        return []
+
+def adicionar_fornecedor(usuario_log, nome, categoria):
+    try:
+        # Verifica se já existe (case insensitive opcional, aqui exato)
+        if Fornecedor.query.filter_by(nome=nome).first():
+            return False, "Fornecedor já cadastrado."
+
+        novo = Fornecedor(
+            nome=nome,
+            categoria_padrao=categoria,
+            usuario_criacao=usuario_log
+        )
+        db.session.add(novo)
+        db.session.commit()
+
+        registrar_log(usuario_log, "Configuração", f"Cadastrou fornecedor: {nome}")
+        return True, "Sucesso"
+    except Exception as e:
+        return False, f"Erro: {str(e)}"
+
+def excluir_fornecedor(usuario_log, id_forn):
+    try:
+        f = Fornecedor.query.get(id_forn)
+        if f:
+            nome = f.nome
+            db.session.delete(f)
+            db.session.commit()
+            registrar_log(usuario_log, "Configuração", f"Removeu fornecedor: {nome}")
+    except Exception as e:
+        print(f"Erro ao excluir fornecedor: {e}")
+
 # --- FLUXO (Query Complexa convertida para ORM/Pandas) ---
 def obter_resumo_fluxo(mes=None, ano=None):
     if not mes or not ano:
@@ -271,10 +310,13 @@ def obter_resumo_fluxo(mes=None, ano=None):
             })
 
         # Preencher Extrato (Saídas Caixa)
-        saidas = SaidaCaixa.query.filter(SaidaCaixa.data_registro.like(filtro_data)).order_by(SaidaCaixa.data_registro.desc()).all()
+        saidas = SaidaCaixa.query.filter(extract('year', SaidaCaixa.data_registro) == ano) \
+            .filter(extract('month', SaidaCaixa.data_registro) == mes) \
+            .order_by(SaidaCaixa.data_registro.desc()).all()
+
         for s in saidas:
             resumo['extrato'].append({
-                'data': s.data_registro,
+                'data': s.data_registro.strftime('%d/%m/%Y'), # Formata data objeto
                 'descricao': s.descricao or 'Saída Avulsa',
                 'valor': s.valor,
                 'tipo': 'saida_caixa',
@@ -308,6 +350,8 @@ def obter_resumo_fluxo(mes=None, ano=None):
 
     except Exception as e:
         print(f"Erro no Fluxo: {e}") # Log no terminal para debug
+        import traceback
+        traceback.print_exc()
         return resumo # Retorna vazio em caso de erro para não travar o front
 
     return resumo

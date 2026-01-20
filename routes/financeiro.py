@@ -155,3 +155,32 @@ def exportar_fluxo_excel():
         df_export.to_excel(writer, index=False, sheet_name=f'Fluxo {mes}-{ano}')
     out.seek(0)
     return Response(out.getvalue(), mimetype='application/vnd.openxmlformats', headers={"Content-Disposition": "attachment;filename=fluxo.xlsx"})
+# --- FORNECEDORES ---
+@bp.route('/api/fornecedores', methods=['GET'])
+def api_listar_fornecedores():
+    if 'usuario' not in session: return jsonify([]), 403
+    lista = db.listar_fornecedores()
+    # Converte os objetos do banco para dicionários (JSON)
+    return jsonify([f.to_dict() for f in lista])
+
+@bp.route('/api/novo_fornecedor', methods=['POST'])
+def api_novo_fornecedor():
+    if 'usuario' not in session: return jsonify({'success': False}), 403
+    d = request.json or {}
+
+    sucesso, msg = db.adicionar_fornecedor(
+        session['usuario'],
+        d.get('nome'),
+        d.get('categoria')
+    )
+    return jsonify({'success': sucesso, 'message': msg})
+
+@bp.route('/api/excluir_fornecedor', methods=['POST'])
+def api_excluir_fornecedor():
+    if 'usuario' not in session: return jsonify({'success': False}), 403
+    # Opcional: Restringir apenas para Admin se quiser
+    # if session.get('funcao') != 'Admin': return jsonify({'success': False}), 403
+
+    d = request.json or {}
+    db.excluir_fornecedor(session['usuario'], d.get('id'))
+    return jsonify({'success': True})

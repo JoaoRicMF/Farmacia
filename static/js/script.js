@@ -28,6 +28,8 @@ let calendarInstance = null;
 let paginaAtual = 1;
 let totalPaginas = 1;
 let debounceTimer;
+let listaFornecedoresCache = [];
+
 
 /* ==========================================================================
    GERENCIAMENTO DE CATEGORIAS (LOCAL STORAGE)
@@ -111,7 +113,7 @@ function renderizarCategoriasConfig() {
 function carregarCategoriasNosSelects() {
     const lista = obterCategorias();
     // IDs dos selects que precisam de categorias
-    const selects = ['boleto-cat', 'filtro-cat', 'edit-cat'];
+    const selects = ['boleto-cat', 'filtro-cat', 'edit-cat', 'novo-forn-cat'];
 
     selects.forEach(id => {
         const el = document.getElementById(id);
@@ -1079,6 +1081,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 3. Inicializa Categorias (Carrega nos selects e config)
     carregarCategoriasNosSelects();
     renderizarCategoriasConfig();
+    carregarFornecedores();
 
     // 4. Define datas padrão (Hoje)
     const hoje = new Date().toISOString().split('T')[0];
@@ -1188,4 +1191,115 @@ function copiarCodigo(codigo) {
 function abrirSiteCaixa() {
     // Abre o site da Caixa em nova aba
     window.open('https://www.caixa.gov.br', '_blank');
+}
+
+/*FORNECEDORES*/
+async function carregarFornecedores() {
+    try {
+        const res = await fetch('/api/fornecedores');
+        const lista = await res.json();
+        listaFornecedoresCache = lista; // Guarda na memória: [{nome: 'Cimed', categoria_padrao: 'Medicamentos'}, ...]
+
+        // 1. Preenche o DataList (Autocomplete do Novo Lançamento)
+        const datalist = document.getElementById('lista-fornecedores');
+        if (datalist) {
+            datalist.innerHTML = '';
+            lista.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.nome;
+                // Dica: Adicione a categoria como label visual (alguns browsers mostram)
+                if(f.categoria_padrao) opt.label = f.categoria_padrao;
+                datalist.appendChild(opt);
+            });
+        }
+
+        // 2. Preenche a tabela na Configuração (se estiver na tela)
+        renderizarTabelaFornecedores();
+
+    } catch (e) {
+        console.error("Erro ao buscar fornecedores", e);
+    }
+}
+
+function verificarFornecedorPreenchido() {
+    const inputDesc = document.getElementById('boleto-desc');
+    const selectCat = document.getElementById('boleto-cat');
+
+    if (!inputDesc || !selectCat) return;
+
+    const valorDigitado = inputDesc.value.trim();
+
+    // Procura na memória se existe um fornecedor com esse nome (case insensitive)
+    const fornecedorEncontrado = listaFornecedoresCache.find(f =>
+        f.nome.toLowerCase() === valorDigitado.toLowerCase()
+    );
+
+    if (fornecedorEncontrado && fornecedorEncontrado.categoria_padrao) {
+        selectCat.value = fornecedorEncontrado.categoria_padrao;
+
+        // Efeito visual
+        selectCat.style.backgroundColor = "#dcfce7";
+        selectCat.style.transition = "background-color 0.5s";
+        setTimeout(() => selectCat.style.backgroundColor = "", 1000);
+    } else {
+        // Se não achou, usa a lógica antiga de palavras-chave
+        sugerirCategoria();
+    }
+}
+
+// Renderiza a lista na tela de Configurações
+function renderizarTabelaFornecedores() {
+    const tbody = document.getElementById('tabela-fornecedores-config');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    listaFornecedoresCache.forEach(f => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="padding: 10px;">${f.nome}</td>
+            <td style="padding: 10px; color:var(--text-light);"><small>${f.categoria_padrao || '-'}</small></td>
+            <td style="text-align:right; padding: 10px;">
+                <button class="action-btn" style="color:var(--danger); border:none;" onclick="removerFornecedor(${f.id})">×</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// Função para cadastrar via tela de Configuração
+async function cadastrarFornecedor() {
+    const nome = document.getElementById('novo-forn-nome').value;
+    const cat = document.getElementById('novo-forn-cat').value; // Opcional
+
+    if (!nome) return showToast("Digite o nome do fornecedor.", "warning");
+
+    try {
+        const res = await fetch('/api/novo_fornecedor', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: nome, categoria: cat })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast("Fornecedor cadastrado!", "success");
+            document.getElementById('novo-forn-nome').value = '';
+            carregarFornecedores(); // Atualiza tudo
+        } else {
+            showToast(data.message, "error");
+        }
+    } catch (e) {
+        showToast("Erro de conexão.", "error");
+    }
+}
+
+async function removerFornecedor(id) {
+    if(!confirm("Remover este fornecedor da lista de sugestões?")) return;
+
+    await fetch('/api/excluir_fornecedor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    });
+    carregarFornecedores();
 }

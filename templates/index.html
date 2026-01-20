@@ -332,6 +332,7 @@
             </div>
 
             <div class="card" style="max-width: 800px;">
+
                 <div class="form-row">
                     <div class="full-width">
                         <label for="boleto-cod">Código de Barras (Autofocus)</label>
@@ -342,8 +343,16 @@
 
                 <div class="form-row">
                     <div class="full-width">
-                        <label for="boleto-desc">Descrição <span class="required">*</span></label>
-                        <input type="text" id="boleto-desc" onblur="sugerirCategoria()" placeholder="Ex: Enel, Cimed, Aluguel...">
+                        <label for="boleto-desc">Descrição / Fornecedor <span class="required">*</span></label>
+                        <input
+                                type="text"
+                                id="boleto-desc"
+                                list="lista-fornecedores"
+                                oninput="verificarFornecedorPreenchido()"
+                                autocomplete="off"
+                                placeholder="Digite ou selecione o fornecedor..."
+                        >
+                        <datalist id="lista-fornecedores"></datalist>
                         <span class="error-msg" id="err-desc">Campo obrigatório</span>
                     </div>
                 </div>
@@ -486,10 +495,29 @@
         </div>
 
         <div id="view-config" class="hidden">
-            <div class="header-flex">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle no-print" onclick="toggleSidebar()" style="display:none;">☰</button>
-                    <h1>Configurações</h1>
+            <div class="card" style="margin-top: 20px;">
+                <h3>🚚 Cadastro de Fornecedores</h3>
+                <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 15px;">
+                    Padronize os nomes para evitar duplicidades no financeiro.
+                </p>
+
+                <div class="form-row">
+                    <div class="half-width">
+                        <input type="text" id="novo-forn-nome" placeholder="Nome da Empresa (Ex: Cimed)">
+                    </div>
+                    <div class="half-width" style="display:flex; gap:10px;">
+                        <select id="novo-forn-cat">
+                            <option value="">Categoria Padrão (Opcional)</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="cadastrarFornecedor()">Salvar</button>
+                    </div>
+                </div>
+
+                <div style="max-height: 200px; overflow-y: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px;">
+                    <table style="width:100%; font-size: 0.9rem;">
+                        <tbody id="tabela-fornecedores-config">
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
