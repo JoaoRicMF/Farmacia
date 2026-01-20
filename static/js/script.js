@@ -171,20 +171,29 @@ let chartM = null;
 let chartC = null;
 let calendarInstance = null;
 
-async function carregarDashboard() {
+function filtrarDashboard(periodo, btn) {
+    // Remove classe active de todos
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    // Adiciona no clicado
+    btn.classList.add('active');
+
+    // Recarrega
+    carregarDashboard(periodo);
+}
+
+async function carregarDashboard(periodo = '7d') {
     try {
-        const res = await fetch('/api/dashboard');
+        // Passa o periodo na query string
+        const res = await fetch(`/api/dashboard?periodo=${periodo}`);
         const data = await res.json();
 
-        // Verifica se data.cards existe antes de usar
+        // Cards (não mudam com filtro de gráfico, pois são visões gerais fixas)
         if (data.cards) {
             const fmt = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
             const setVal = (id, val) => {
                 const el = document.getElementById(id);
                 if(el) el.innerText = val;
             };
-
             setVal('card-pagar-mes', fmt(data.cards.pagar_mes));
             setVal('card-vencidos-val', fmt(data.cards.vencidos_val));
             setVal('card-vencidos-qtd', data.cards.vencidos_qtd || 0);
@@ -199,7 +208,6 @@ async function carregarDashboard() {
             const ctxM = canvasM.getContext('2d');
             if(chartM) chartM.destroy();
 
-            // ...configuração do gráfico...
             let gradient = ctxM.createLinearGradient(0, 0, 0, 400);
             gradient.addColorStop(0, 'rgba(37, 99, 235, 0.2)');
             gradient.addColorStop(1, 'rgba(37, 99, 235, 0.0)');

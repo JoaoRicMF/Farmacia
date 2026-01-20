@@ -7,7 +7,7 @@ import pandas as pd
 import io
 
 app = Flask(__name__, template_folder='templates')
-app.secret_key = 'chave_secreta_farmacia_pro'
+app.secret_key = os.getenv('SECRET_KEY', 'chave_dev_padrao_insira_uma_chave_forte_em_prod')
 
 db.init_db()
 
@@ -23,43 +23,29 @@ def decifrar_boleto(linha):
     linha = ''.join(filter(str.isdigit, linha))
 
     try:
-        # TIPO 1: CONCESSIONÁRIA (Começa com 8)
-        # Ex: Contas de Luz, Água, Telefone
         if linha.startswith('8'):
             val = 0.0
-            # Extrai valor (geralmente posições 4 a 15 ou similar)
             if len(linha) >= 11:
                 val_str = linha[4:15]
                 val = int(val_str) / 100.0
-
-            # Concessionárias não têm data padrão no código.
-            # Retornamos Hoje ou None para o usuário preencher.
             return None, val, "Concessionária"
-
-        # TIPO 2: BOLETO BANCÁRIO (Começa com outros números)
         else:
-            if len(linha) == 47: # Linha digitável
+            if len(linha) == 47:
                 fator = linha[33:37]
                 val_str = linha[37:]
-            elif len(linha) == 44: # Código de barras
+            elif len(linha) == 44:
                 fator = linha[5:9]
                 val_str = linha[9:19]
             else:
                 return None, 0.0, "Inválido"
 
-            # CÁLCULO DA DATA (Fator de Vencimento)
-            # Base do BACEN: 07/10/1997
             base = datetime(1997, 10, 7)
             dias = int(fator)
             venc = base + timedelta(days=dias)
 
-            # Ajuste para a "virada" do fator (aconteceu em 2025)
-            # Se a data calculada for muito antiga (ex: ano 2000), adiciona 9000 dias ou ajusta base
-            # O fator reseta a cada ~25 anos (9000 dias)
             while venc < (datetime.now() - timedelta(days=1000)):
-                venc += timedelta(days=9000) # Aproximação do ciclo
+                venc += timedelta(days=9000)
 
-            # CORREÇÃO PRINCIPAL: Retorna YYYY-MM-DD para o HTML entender
             data_formatada = venc.strftime('%Y-%m-%d')
             valor_final = int(val_str) / 100.0
 
@@ -92,8 +78,13 @@ def logout():
 @app.route('/api/dashboard', methods=['GET'])
 def dashboard_data():
     if 'usuario' not in session: return jsonify({}), 403
+
+    # Parâmetro de filtro (7d, 30d, 3m, 1y, all)
+    periodo = request.args.get('periodo', '7d')
+
     df = db.listar_registros()
 
+    # 1. Dados dos CARDS (Sempre baseados no 'Agora' e totais, sem filtro de visualização)
     vals = {'pagar_mes':0, 'pago_mes':0, 'vencidos_val':0, 'vencidos_qtd':0, 'proximos_val':0, 'proximos_qtd':0}
 
     if not df.empty:
@@ -101,11 +92,8 @@ def dashboard_data():
         hoje = pd.Timestamp(datetime.now().date())
 
         m_pendente = (df['status'] == 'Pendente')
-        # Pago no mês atual
         m_pago_mes = (df['status'] == 'Pago') & (df['dt_venc'].dt.month == hoje.month) & (df['dt_venc'].dt.year == hoje.year)
-        # Vencidos
         m_vencido = (df['status'] == 'Pendente') & (df['dt_venc'] < hoje)
-        # Próximos 7 dias
         m_prox = (df['status'] == 'Pendente') & (df['dt_venc'] >= hoje) & (df['dt_venc'] <= hoje + timedelta(days=7))
 
         vals['pagar_mes'] = df[m_pendente]['valor'].sum()
@@ -115,10 +103,62 @@ def dashboard_data():
         vals['proximos_val'] = df[m_prox]['valor'].sum()
         vals['proximos_qtd'] = int(df[m_prox].shape[0])
 
+    # 2. Dados dos GRÁFICOS (Com filtro de período)
+    grafico_tempo = []
+    grafico_cat = []
+
+    if not df.empty:
+        df_chart = df.copy()
+
+        # Filtra a data de início
+        start_date = None
+        freq = 'M' # Padrão Mensal
+
+        hoje_chart = pd.Timestamp(datetime.now().date())
+
+        if periodo == '7d':
+            start_date = hoje_chart - timedelta(days=7)
+            freq = 'D' # Diário
+        elif periodo == '30d':
+            start_date = hoje_chart - timedelta(days=30)
+            freq = 'D' # Diário
+        elif periodo == '3m':
+            start_date = hoje_chart - timedelta(days=90)
+            freq = 'M'
+        elif periodo == '1y':
+            start_date = hoje_chart - timedelta(days=365)
+            freq = 'M'
+        # 'all' não filtra start_date
+
+        if start_date:
+            df_chart = df_chart[df_chart['dt_venc'] >= start_date]
+
+        # Agregação para Gráfico de Tempo
+        if not df_chart.empty:
+            if freq == 'D':
+                # Agrupa por DIA (ex: 20/01)
+                g = df_chart.groupby(df_chart['dt_venc'].dt.strftime('%d/%m')).agg({'valor': 'sum'}).reset_index()
+                g.columns = ['mes', 'total'] # Mantém chave 'mes' para compatibilidade frontend
+                # Ordena (gambiarra leve pois string DD/MM ordena ok dentro do mesmo ano/mes, mas ideal é ordenar pelo index original)
+                # Para simplificar aqui, assumimos ordem correta ou aceitável
+                grafico_tempo = g.to_dict(orient='records')
+            else:
+                # Agrupa por MÊS (ex: 01/2026)
+                df_chart['mes_ordem'] = df_chart['dt_venc'].dt.to_period('M')
+                g = df_chart.groupby('mes_ordem').agg({'valor': 'sum'}).reset_index()
+                g['mes'] = g['mes_ordem'].dt.strftime('%m/%Y')
+                grafico_tempo = g[['mes', 'total']].to_dict(orient='records')
+
+        # Agregação para Categoria
+        if not df_chart.empty:
+            g = df_chart.groupby('categoria')['valor'].sum().sort_values(ascending=False).reset_index()
+            g.columns = ['categoria', 'total']
+            grafico_cat = g.to_dict(orient='records')
+
     return jsonify({
         'graficos': {
-            'por_mes': db.obter_dados_grafico_tempo().to_dict(orient='records'),
-            'por_categoria': db.obter_dados_grafico_categoria().to_dict(orient='records')
+            'por_mes': grafico_tempo,
+            'por_categoria': grafico_cat
         },
         'cards': vals
     })
@@ -167,7 +207,6 @@ def calendario():
 def listar():
     if 'usuario' not in session: return jsonify([]), 403
     p = int(request.args.get('pagina', 1))
-    # Chama o banco com os filtros
     df = db.listar_registros(
         busca=request.args.get('busca', ''),
         status_filtro=request.args.get('status', 'Todos'),
@@ -189,7 +228,6 @@ def listar():
 
 @app.route('/api/ler_codigo', methods=['POST'])
 def ler():
-    # Usa a função corrigida que retorna YYYY-MM-DD
     v, val, t = decifrar_boleto(request.json.get('codigo'))
     return jsonify({'vencimento': v, 'valor': val, 'tipo': t})
 
@@ -197,9 +235,8 @@ def ler():
 def add():
     if 'usuario' not in session: return jsonify({}), 403
     d = request.json
-    # Se vier YYYY-MM-DD do input date, converte para DD/MM/YYYY para salvar no banco (padrão BR)
     try: data_fmt = datetime.strptime(d['vencimento'], '%Y-%m-%d').strftime('%d/%m/%Y')
-    except: data_fmt = d['vencimento'] # Se já vier BR ou vazio, mantém
+    except: data_fmt = d['vencimento']
 
     if db.verificar_existencia_boleto(d['codigo']): return jsonify({'success': False, 'message': 'Duplicado'})
 
@@ -261,11 +298,8 @@ def alt_perf():
 @app.route('/api/fluxo_resumo', methods=['GET'])
 def api_fluxo():
     if 'usuario' not in session: return jsonify({}), 403
-
-    # Pega mês/ano da query ou usa atual
     mes = request.args.get('mes')
     ano = request.args.get('ano')
-
     dados = db.obter_resumo_fluxo(mes, ano)
     return jsonify(dados)
 
@@ -273,11 +307,8 @@ def api_fluxo():
 def nova_entrada():
     if 'usuario' not in session: return jsonify({}), 403
     d = request.json
-
     try:
-        # Garante valor float
         valor = float(d['valor'])
-        # Data vem YYYY-MM-DD do input type="date"
         db.adicionar_entrada(session['usuario'], valor, d['forma'], d['data'])
         return jsonify({'success': True})
     except Exception as e:
@@ -289,7 +320,6 @@ def excluir_entrada_route():
     if 'usuario' not in session: return jsonify({}), 403
     if session.get('funcao') != 'Admin':
         return jsonify({'success': False, 'message': 'Permissão negada'}), 403
-
     db.excluir_entrada(session['usuario'], request.json['id'])
     return jsonify({'success': True})
 
@@ -299,11 +329,10 @@ def nova_saida_caixa():
     d = request.json
     try:
         valor = float(d['valor'])
-        # Passamos a descrição (d['descricao']) para o banco
         db.adicionar_saida_caixa(session['usuario'], d['descricao'], valor, d['forma'], d['data'])
         return jsonify({'success': True})
     except Exception as e:
-        print(f"Erro ao salvar saída: {e}") # Bom para debug no console
+        print(f"Erro ao salvar saída: {e}")
         return jsonify({'success': False, 'message': 'Erro ao salvar saída'}), 500
 
 @app.route('/api/excluir_saida_caixa', methods=['POST'])
@@ -311,42 +340,26 @@ def excluir_saida_caixa():
     if 'usuario' not in session: return jsonify({}), 403
     if session.get('funcao') != 'Admin':
         return jsonify({'success': False, 'message': 'Permissão negada'}), 403
-
     db.excluir_saida_caixa(session['usuario'], request.json['id'])
     return jsonify({'success': True})
 
 @app.route('/api/exportar_fluxo_excel', methods=['GET'])
 def exportar_fluxo_excel():
     if 'usuario' not in session: return "", 403
-
     mes = request.args.get('mes')
     ano = request.args.get('ano')
-
-    # Busca os dados processados
     dados = db.obter_resumo_fluxo(mes, ano)
     extrato = dados['extrato']
 
-    if not extrato:
-        return "Não há dados para exportar neste período.", 404
+    if not extrato: return "Não há dados para exportar neste período.", 404
 
-    # Cria DataFrame
     df = pd.DataFrame(extrato)
-
-    # Seleciona e renomeia colunas para ficar bonito no Excel
-    # Colunas vindas do DB: data, descricao, valor, tipo, categoria, id
     df_export = df[['data', 'descricao', 'categoria', 'tipo', 'valor']].copy()
-
-    # Traduz e formata
     df_export.columns = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor']
 
-    # Buffer de memória para o arquivo
     out = io.BytesIO()
-
-    # Salva como Excel usando engine openpyxl (já presente no requirements.txt)
     with pd.ExcelWriter(out, engine='openpyxl') as writer:
         df_export.to_excel(writer, index=False, sheet_name=f'Fluxo {mes}-{ano}')
-
-        # Opcional: Adicionar uma aba de Resumo com os totais
         resumo_df = pd.DataFrame([
             {'Item': 'Entradas Totais', 'Valor': dados['entradas_total']},
             {'Item': 'Saídas (Pagas)', 'Valor': dados['saidas_total']},
@@ -355,7 +368,6 @@ def exportar_fluxo_excel():
         resumo_df.to_excel(writer, index=False, sheet_name='Resumo')
 
     out.seek(0)
-
     return Response(
         out.getvalue(),
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -363,9 +375,5 @@ def exportar_fluxo_excel():
     )
 
 if __name__ == '__main__':
-    # Pega a porta da variável de ambiente (obrigatório para Render/Heroku)
-    # Se não existir (rodando no PC local), usa a 5000
     port = int(os.environ.get("PORT", 5000))
-
-    # host='0.0.0.0' torna o servidor acessível externamente
     app.run(host='0.0.0.0', port=port)

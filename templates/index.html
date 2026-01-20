@@ -60,17 +60,21 @@
             <div class="menu-item" onclick="nav('lista', this)" role="button" tabindex="0">
                 <span class="icon">📋</span> Registros
             </div>
-            <div class="menu-item admin-only hidden" onclick="nav('logs', this)" role="button" tabindex="0">
-                <span class="icon">🛡️</span> Auditoria
-            </div>
+
             <div class="menu-item" onclick="nav('fluxo', this)" role="button" tabindex="0">
                 <span class="icon">💰</span> Fluxo de Caixa
             </div>
+
+            <div class="menu-item admin-only hidden" onclick="nav('logs', this)" role="button" tabindex="0">
+                <span class="icon">🛡️</span> Auditoria
+            </div>
+
             <div class="menu-item" onclick="nav('config', this)" role="button" tabindex="0">
                 <span class="icon">⚙️</span> Configurações
             </div>
         </nav>
 
+        <div class="menu-footer">
         <div class="menu-footer">
             <div class="menu-item" onclick="toggleDarkMode()" style="margin-bottom: 5px;" role="button" tabindex="0">
                 <span class="icon">🌙</span> <span id="text-theme">Modo Escuro</span>
@@ -89,12 +93,15 @@
                     <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
                     <h1>Dashboard</h1>
                 </div>
-                <select class="periodo-select" aria-label="Selecionar Período">
-                    <option>Este Mês</option>
-                    <option>Visão Geral</option>
-                </select>
             </div>
 
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
+                <button class="btn btn-secondary filter-btn active" onclick="filtrarDashboard('7d', this)">7 Dias</button>
+                <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('30d', this)">1 Mês</button>
+                <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('3m', this)">3 Meses</button>
+                <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('1y', this)">1 Ano</button>
+                <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('all', this)">Tudo</button>
+            </div>
 
             <div class="dashboard-cards">
                 <div class="summary-card card-blue" onclick="verDetalhes('pagar_mes', 'Total a Pagar (Pendente)')" role="button" tabindex="0">
@@ -136,7 +143,7 @@
 
             <div class="charts-row">
                 <div class="chart-box">
-                    <h3>📈 Evolução Mensal</h3>
+                    <h3>📈 Evolução (Período)</h3>
                     <div class="chart-container"><canvas id="chartMes"></canvas></div>
                 </div>
                 <div class="chart-box">
@@ -227,8 +234,10 @@
                             <div class="half-width">
                                 <label for="ent-forma">Forma</label>
                                 <select id="ent-forma">
-                                    <option>Dinheiro</option><option>PIX</option><option>Cartão</option>
-                                </select>
+                                    <option>Dinheiro</option>
+                                    <option>PIX</option>
+                                    <option>Cartão</option>
+                                    <option>Correção</option> </select>
                             </div>
                         </div>
                         <div class="form-group" style="margin-top:10px;">
@@ -250,8 +259,10 @@
                             <div class="half-width">
                                 <label for="sai-forma">Forma</label>
                                 <select id="sai-forma">
-                                    <option>Dinheiro</option><option>PIX</option><option>Cartão</option>
-                                </select>
+                                    <option>Dinheiro</option>
+                                    <option>PIX</option>
+                                    <option>Cartão</option>
+                                    <option>Retirada</option> <option>Correção</option> </select>
                             </div>
                         </div>
 
@@ -297,7 +308,6 @@
                     <h1>Novo Lançamento</h1>
                 </div>
             </div>
-
             <div class="card" style="max-width: 800px;">
                 <div class="form-row">
                     <div class="full-width">
