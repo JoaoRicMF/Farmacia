@@ -9,31 +9,36 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
+
 <div id="mobile-overlay" onclick="toggleSidebar()"></div>
 <div id="toast-container"></div>
 
-<div class="login-box">
-    <h2>🏥 Farmácia</h2>
-    <p>Gestão Financeira & Auditoria</p>
+<div id="login-screen">
 
-    <form onsubmit="event.preventDefault(); fazerLogin();">
-        <div class="input-wrapper">
-            <input type="text" id="login-user" name="usuario" placeholder="Usuário" aria-label="Nome de Usuário" autocomplete="username" required>
-        </div>
+    <div class="login-box">
+        <h2>🏥 Farmácia</h2>
+        <p>Gestão Financeira & Auditoria</p>
 
-        <div class="input-wrapper">
-            <input type="password" id="login-pass" name="senha" placeholder="Senha" aria-label="Senha" autocomplete="current-password" required>
-            <span class="toggle-pass" onclick="toggleSenha()" role="button" tabindex="0">👁️</span>
-        </div>
+        <form onsubmit="event.preventDefault(); fazerLogin();">
+            <div class="input-wrapper">
+                <input type="text" id="login-user" name="usuario" placeholder="Usuário" aria-label="Nome de Usuário" autocomplete="username" required>
+            </div>
 
-        <button type="submit" class="btn-login" id="btn-entrar">Acessar Painel</button>
-    </form>
-</div>
+            <div class="input-wrapper">
+                <input type="password" id="login-pass" name="senha" placeholder="Senha" aria-label="Senha" autocomplete="current-password" required>
+                <span class="toggle-pass" onclick="toggleSenha()" role="button" tabindex="0">👁️</span>
+            </div>
+
+            <button type="submit" class="btn-login" id="btn-entrar">Acessar Painel</button>
+        </form>
+    </div>
+
+</div> ```
 
 <div id="app-screen" class="hidden">
-
 
     <div class="sidebar" id="sidebar">
         <div class="sidebar-brand">
@@ -42,7 +47,8 @@
 
         <div class="sidebar-user" onclick="nav('config')" role="button" tabindex="0" title="Meu Perfil">
             <div class="avatar-circle">
-                <span id="avatar-icon">J</span> </div>
+                <span id="avatar-icon">U</span>
+            </div>
             <div class="user-info-text">
                 <div id="user-display" class="user-name">Usuário</div>
                 <small id="user-role">Operador</small>
@@ -73,7 +79,7 @@
             </div>
         </nav>
 
-        <div class="sidebar-footer">
+        <div class="sidebar-footer" style="padding: 10px 12px; margin-top: auto;">
             <div class="menu-label">Sistema</div>
 
             <div class="menu-item" onclick="toggleDarkMode()">
@@ -85,264 +91,392 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            lucide.createIcons();
-        });
-    </script>
+    <div class="content" id="main-content">
 
-        <nav class="sidebar-menu">
-            <div class="logo-container">
-                <h2>💊 Farmácia</h2>
-            </div>
-            <div class="menu-item active" onclick="nav('dashboard', this)" role="button" tabindex="0">
-                <span class="icon">📊</span> Dashboard
-            </div>
-            <div class="menu-item" onclick="nav('novo', this)" role="button" tabindex="0">
-                <span class="icon">📑</span> Novo Lançamento
-            </div>
-            <div class="menu-item" onclick="nav('lista', this)" role="button" tabindex="0">
-                <span class="icon">📋</span> Registros
-            </div>
-            <div class="menu-item" onclick="nav('fluxo', this)" role="button" tabindex="0">
-                <span class="icon">💰</span> Fluxo de Caixa
-            </div>
-            <div class="menu-item admin-only hidden" onclick="nav('logs', this)" role="button" tabindex="0">
-                <span class="icon">🛡️</span> Auditoria
-            </div>
-            <div class="menu-item" onclick="nav('config', this)" role="button" tabindex="0">
-                <span class="icon">⚙️</span> Configurações
-            </div>
-        </nav>
-
-        <div class="menu-footer">
-            <div class="menu-item" onclick="toggleDarkMode()" style="margin-bottom: 5px;" role="button" tabindex="0">
-                <span class="icon">🌙</span> <span id="text-theme">Modo Escuro</span>
-            </div>
-            <div class="menu-item logout" onclick="confirmarLogout()" role="button" tabindex="0">
-                <span class="icon">🚪</span> Sair
-            </div>
-        </div>
-    </div> <div class="content" id="main-content">
-
-    <div id="view-dashboard">
-        <div class="header-flex">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
-                <h1>Dashboard</h1>
-            </div>
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
-            <button class="btn btn-secondary filter-btn active" onclick="filtrarDashboard('7d', this)">7 Dias</button>
-            <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('30d', this)">1 Mês</button>
-            <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('3m', this)">3 Meses</button>
-            <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('1y', this)">1 Ano</button>
-            <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('all', this)">Tudo</button>
-        </div>
-
-        <div class="dashboard-cards">
-            <div class="summary-card card-blue" onclick="nav('lista', null); preFiltrarLista('Pendente')" role="button" tabindex="0">
-                <div class="card-icon">💸</div>
-                <div class="card-info">
-                    <h3>A Pagar (Total)</h3>
-                    <div class="card-value-row">
-                        <p id="card-pagar-mes">R$ 0,00</p>
-                    </div>
-                    <small>Boletos pendentes</small>
+        <div id="view-dashboard">
+            <div class="header-flex">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+                    <h1>Dashboard</h1>
                 </div>
             </div>
 
-            <div class="summary-card card-red" onclick="nav('lista', null); preFiltrarLista('Pendente')" role="button" tabindex="0">
-                <div class="card-icon">🚨</div>
-                <div class="card-info">
-                    <h3>Vencidos</h3>
-                    <div class="card-value-row">
-                        <p id="card-vencidos-val">R$ 0,00</p>
-                        <span class="bullet-separator">•</span>
-                        <span class="qty-indicator" id="card-vencidos-qtd">0</span>
-                    </div>
-                    <small style="color: var(--danger);">atrasados</small>
-                </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
+                <button class="btn btn-secondary filter-btn active" onclick="filtrarDashboard('7d', this)">7 Dias</button>
+                <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('30d', this)">1 Mês</button>
+                <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('3m', this)">3 Meses</button>
+                <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('1y', this)">1 Ano</button>
+                <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('all', this)">Tudo</button>
             </div>
 
-            <div class="summary-card card-yellow" onclick="verDetalhes('proximos', 'Vencendo em 7 Dias')" role="button" tabindex="0">
-                <div class="card-icon">⏳</div>
-                <div class="card-info">
-                    <h3>Próximos (7 dias)</h3>
-                    <div class="card-value-row">
-                        <p id="card-proximos-val">R$ 0,00</p>
-                        <span class="bullet-separator">•</span>
-                        <span class="qty-indicator" id="card-proximos-qtd">0</span>
-                    </div>
-                    <small>a vencer</small>
-                </div>
-            </div>
-
-            <div class="summary-card card-green" onclick="nav('lista', null); preFiltrarLista('Pago')" role="button" tabindex="0">
-                <div class="card-icon">✅</div>
-                <div class="card-info">
-                    <h3>Pagos (Mês)</h3>
-                    <p id="card-pago-mes">R$ 0,00</p>
-                    <small>Total liquidado</small>
-                </div>
-            </div>
-        </div>
-
-        <div id="dashboard-empty-state" class="hidden" style="text-align: center; padding: 40px; background: var(--bg-card); border-radius: 16px; border: 1px dashed var(--border);">
-            <div style="font-size: 3rem; margin-bottom: 10px;">📉</div>
-            <h3 style="color: var(--text-main); margin-bottom: 10px;">Sem dados neste período</h3>
-            <p style="color: var(--text-light); margin-bottom: 20px;">Não encontramos lançamentos para os filtros selecionados.</p>
-            <button class="btn btn-primary" onclick="nav('novo', null)">➕ Criar Novo Lançamento</button>
-        </div>
-
-        <div class="charts-row" id="charts-container">
-            <div class="chart-box">
-                <h3>📈 Evolução (Período)</h3>
-                <div class="chart-container"><canvas id="chartMes"></canvas></div>
-            </div>
-            <div class="chart-box">
-                <h3>🥧 Gastos por Categoria</h3>
-                <div class="chart-container"><canvas id="chartCat"></canvas></div>
-            </div>
-        </div>
-
-        <div class="card" style="padding: 0; overflow: hidden; margin-top: 30px;">
-            <div class="toggle-header" onclick="toggleCalendarSection()" role="button" tabindex="0">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 1.2rem;">📅</span>
-                    <h3 style="margin:0; font-size: 1rem;">Calendário de Vencimentos</h3>
-                </div>
-                <span class="arrow-icon">▼</span>
-            </div>
-            <div id="calendar-wrapper" class="hidden-content">
-                <div id="calendar" style="padding: 20px;"></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="view-fluxo" class="hidden">
-        <div class="header-flex">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
-                <h1>Fluxo de Caixa</h1>
-            </div>
-
-            <div style="display: flex; gap: 10px; align-items: center;">
-                <input type="month" id="filtro-mes-fluxo" class="periodo-select" onchange="carregarFluxo()" aria-label="Filtrar Mês">
-                <button class="btn btn-secondary" onclick="window.print()" title="Salvar como PDF (Imprimir)">
-                    🖨️ PDF
-                </button>
-                <button class="btn btn-success" onclick="baixarExcelFluxo()" title="Baixar Planilha (.xlsx)">
-                    📊 Excel
-                </button>
-            </div>
-        </div>
-
-        <div class="dashboard-cards">
-            <div class="summary-card card-green" onclick="filtrarFluxo('entrada')" style="cursor: pointer;" role="button" tabindex="0">
-                <div class="card-icon">📥</div>
-                <div class="card-info">
-                    <h3>Entradas (Total)</h3>
-                    <p id="fluxo-entradas">R$ 0,00</p>
-                    <small id="detalhe-entradas" style="font-size:0.75rem; color:var(--text-light)">
-                        Din: 0 | Pix: 0 | Cart: 0
-                    </small>
-                </div>
-            </div>
-
-            <div class="summary-card card-red" onclick="filtrarFluxo('saida')" style="cursor: pointer;" role="button" tabindex="0">
-                <div class="card-icon">📤</div>
-                <div class="card-info">
-                    <h3>Saídas (Pagas)</h3>
-                    <p id="fluxo-saidas">R$ 0,00</p>
-                    <small>Boletos quitados no mês</small>
-                </div>
-            </div>
-
-            <div class="summary-card card-blue" onclick="filtrarFluxo('todos')" style="cursor: pointer;" role="button" tabindex="0">
-                <div class="card-icon">⚖️</div>
-                <div class="card-info">
-                    <h3>Saldo Líquido</h3>
-                    <p id="fluxo-saldo">R$ 0,00</p>
-                    <small id="fluxo-status-texto">Balanço do mês</small>
-                </div>
-            </div>
-        </div>
-
-        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 20px;">
-                <div class="card no-print" style="margin-bottom: 0;">
-                    <h3 style="margin-bottom: 10px; color: var(--success); border-bottom: 1px solid var(--border); padding-bottom: 5px;">
-                        ➕ Entrada
-                    </h3>
-                    <div class="form-row">
-                        <div class="half-width">
-                            <label for="ent-data">Data</label>
-                            <input type="date" id="ent-data">
+            <div class="dashboard-cards">
+                <div class="summary-card card-blue" onclick="nav('lista', null); preFiltrarLista('Pendente')" role="button" tabindex="0">
+                    <div class="card-icon">💸</div>
+                    <div class="card-info">
+                        <h3>A Pagar (Total)</h3>
+                        <div class="card-value-row">
+                            <p id="card-pagar-mes">R$ 0,00</p>
                         </div>
-                        <div class="half-width">
-                            <label for="ent-forma">Forma</label>
-                            <select id="ent-forma">
-                                <option>Dinheiro</option>
-                                <option>PIX</option>
-                                <option>Cartão</option>
-                                <option>Correção</option>
-                            </select>
-                        </div>
+                        <small>Boletos pendentes</small>
                     </div>
-                    <div class="form-group" style="margin-top:10px;">
-                        <label for="ent-valor">Valor</label>
-                        <input type="text" id="ent-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
-                    </div>
-                    <button class="btn btn-success" style="width: 100%; margin-top: 15px;" onclick="salvarEntradaCaixa()">Registrar Entrada</button>
                 </div>
 
-                <div class="card no-print" style="margin-bottom: 0;">
-                    <h3 style="margin-bottom: 10px; color: var(--danger); border-bottom: 1px solid var(--border); padding-bottom: 5px;">
-                        ➖ Saída
-                    </h3>
-                    <div class="form-row">
-                        <div class="half-width">
-                            <label for="sai-data">Data</label>
-                            <input type="date" id="sai-data">
+                <div class="summary-card card-red" onclick="nav('lista', null); preFiltrarLista('Pendente')" role="button" tabindex="0">
+                    <div class="card-icon">🚨</div>
+                    <div class="card-info">
+                        <h3>Vencidos</h3>
+                        <div class="card-value-row">
+                            <p id="card-vencidos-val">R$ 0,00</p>
+                            <span class="bullet-separator">•</span>
+                            <span class="qty-indicator" id="card-vencidos-qtd">0</span>
                         </div>
-                        <div class="half-width">
-                            <label for="sai-forma">Forma</label>
-                            <select id="sai-forma">
-                                <option>Dinheiro</option>
-                                <option>PIX</option>
-                                <option>Cartão</option>
-                                <option>Retirada</option>
-                                <option>Correção</option>
-                            </select>
+                        <small style="color: var(--danger);">atrasados</small>
+                    </div>
+                </div>
+
+                <div class="summary-card card-yellow" onclick="verDetalhes('proximos', 'Vencendo em 7 Dias')" role="button" tabindex="0">
+                    <div class="card-icon">⏳</div>
+                    <div class="card-info">
+                        <h3>Próximos (7 dias)</h3>
+                        <div class="card-value-row">
+                            <p id="card-proximos-val">R$ 0,00</p>
+                            <span class="bullet-separator">•</span>
+                            <span class="qty-indicator" id="card-proximos-qtd">0</span>
                         </div>
+                        <small>a vencer</small>
                     </div>
+                </div>
 
-                    <div class="form-group" style="margin-top:10px;">
-                        <label for="sai-desc">Descrição</label>
-                        <input type="text" id="sai-desc" placeholder="Ex: Sangria, Vale transporte...">
+                <div class="summary-card card-green" onclick="nav('lista', null); preFiltrarLista('Pago')" role="button" tabindex="0">
+                    <div class="card-icon">✅</div>
+                    <div class="card-info">
+                        <h3>Pagos (Mês)</h3>
+                        <p id="card-pago-mes">R$ 0,00</p>
+                        <small>Total liquidado</small>
                     </div>
-
-                    <div class="form-group" style="margin-top:10px;">
-                        <label for="sai-valor">Valor</label>
-                        <input type="text" id="sai-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
-                    </div>
-                    <button class="btn btn-danger" style="width: 100%; margin-top: 15px;" onclick="salvarSaidaCaixa()">Registrar Saída</button>
                 </div>
             </div>
 
-            <div class="card" style="flex: 2; min-width: 400px; height: fit-content;">
-                <h3 style="margin-bottom: 15px;">📝 Extrato do Mês</h3>
-                <div style="overflow-x: auto; max-height: 600px; overflow-y: auto;">
-                    <table id="tabela-fluxo">
+            <div id="dashboard-empty-state" class="hidden" style="text-align: center; padding: 40px; background: var(--bg-card); border-radius: 16px; border: 1px dashed var(--border);">
+                <div style="font-size: 3rem; margin-bottom: 10px;">📉</div>
+                <h3 style="color: var(--text-main); margin-bottom: 10px;">Sem dados neste período</h3>
+                <p style="color: var(--text-light); margin-bottom: 20px;">Não encontramos lançamentos para os filtros selecionados.</p>
+                <button class="btn btn-primary" onclick="nav('novo', null)">➕ Criar Novo Lançamento</button>
+            </div>
+
+            <div class="charts-row" id="charts-container">
+                <div class="chart-box">
+                    <h3>📈 Evolução (Período)</h3>
+                    <div class="chart-container"><canvas id="chartMes"></canvas></div>
+                </div>
+                <div class="chart-box">
+                    <h3>🥧 Gastos por Categoria</h3>
+                    <div class="chart-container"><canvas id="chartCat"></canvas></div>
+                </div>
+            </div>
+
+            <div class="card" style="padding: 0; overflow: hidden; margin-top: 30px;">
+                <div class="toggle-header" onclick="toggleCalendarSection()" role="button" tabindex="0">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2rem;">📅</span>
+                        <h3 style="margin:0; font-size: 1rem;">Calendário de Vencimentos</h3>
+                    </div>
+                    <span class="arrow-icon">▼</span>
+                </div>
+                <div id="calendar-wrapper" class="hidden-content">
+                    <div id="calendar" style="padding: 20px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-fluxo" class="hidden">
+            <div class="header-flex">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+                    <h1>Fluxo de Caixa</h1>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="month" id="filtro-mes-fluxo" class="periodo-select" onchange="carregarFluxo()" aria-label="Filtrar Mês">
+                    <button class="btn btn-secondary" onclick="window.print()" title="Salvar como PDF (Imprimir)">
+                        🖨️ PDF
+                    </button>
+                    <button class="btn btn-success" onclick="baixarExcelFluxo()" title="Baixar Planilha (.xlsx)">
+                        📊 Excel
+                    </button>
+                </div>
+            </div>
+
+            <div class="dashboard-cards">
+                <div class="summary-card card-green" onclick="filtrarFluxo('entrada')" style="cursor: pointer;" role="button" tabindex="0">
+                    <div class="card-icon">📥</div>
+                    <div class="card-info">
+                        <h3>Entradas (Total)</h3>
+                        <p id="fluxo-entradas">R$ 0,00</p>
+                        <small id="detalhe-entradas" style="font-size:0.75rem; color:var(--text-light)">
+                            Din: 0 | Pix: 0 | Cart: 0
+                        </small>
+                    </div>
+                </div>
+
+                <div class="summary-card card-red" onclick="filtrarFluxo('saida')" style="cursor: pointer;" role="button" tabindex="0">
+                    <div class="card-icon">📤</div>
+                    <div class="card-info">
+                        <h3>Saídas (Pagas)</h3>
+                        <p id="fluxo-saidas">R$ 0,00</p>
+                        <small>Boletos quitados no mês</small>
+                    </div>
+                </div>
+
+                <div class="summary-card card-blue" onclick="filtrarFluxo('todos')" style="cursor: pointer;" role="button" tabindex="0">
+                    <div class="card-icon">⚖️</div>
+                    <div class="card-info">
+                        <h3>Saldo Líquido</h3>
+                        <p id="fluxo-saldo">R$ 0,00</p>
+                        <small id="fluxo-status-texto">Balanço do mês</small>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 20px;">
+                    <div class="card no-print" style="margin-bottom: 0;">
+                        <h3 style="margin-bottom: 10px; color: var(--success); border-bottom: 1px solid var(--border); padding-bottom: 5px;">
+                            ➕ Entrada
+                        </h3>
+                        <div class="form-row">
+                            <div class="half-width">
+                                <label for="ent-data">Data</label>
+                                <input type="date" id="ent-data">
+                            </div>
+                            <div class="half-width">
+                                <label for="ent-forma">Forma</label>
+                                <select id="ent-forma">
+                                    <option>Dinheiro</option>
+                                    <option>PIX</option>
+                                    <option>Cartão</option>
+                                    <option>Correção</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top:10px;">
+                            <label for="ent-valor">Valor</label>
+                            <input type="text" id="ent-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
+                        </div>
+                        <button class="btn btn-success" style="width: 100%; margin-top: 15px;" onclick="salvarEntradaCaixa()">Registrar Entrada</button>
+                    </div>
+
+                    <div class="card no-print" style="margin-bottom: 0;">
+                        <h3 style="margin-bottom: 10px; color: var(--danger); border-bottom: 1px solid var(--border); padding-bottom: 5px;">
+                            ➖ Saída
+                        </h3>
+                        <div class="form-row">
+                            <div class="half-width">
+                                <label for="sai-data">Data</label>
+                                <input type="date" id="sai-data">
+                            </div>
+                            <div class="half-width">
+                                <label for="sai-forma">Forma</label>
+                                <select id="sai-forma">
+                                    <option>Dinheiro</option>
+                                    <option>PIX</option>
+                                    <option>Cartão</option>
+                                    <option>Retirada</option>
+                                    <option>Correção</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top:10px;">
+                            <label for="sai-desc">Descrição</label>
+                            <input type="text" id="sai-desc" placeholder="Ex: Sangria, Vale transporte...">
+                        </div>
+
+                        <div class="form-group" style="margin-top:10px;">
+                            <label for="sai-valor">Valor</label>
+                            <input type="text" id="sai-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
+                        </div>
+                        <button class="btn btn-danger" style="width: 100%; margin-top: 15px;" onclick="salvarSaidaCaixa()">Registrar Saída</button>
+                    </div>
+                </div>
+
+                <div class="card" style="flex: 2; min-width: 400px; height: fit-content;">
+                    <h3 style="margin-bottom: 15px;">📝 Extrato do Mês</h3>
+                    <div style="overflow-x: auto; max-height: 600px; overflow-y: auto;">
+                        <table id="tabela-fluxo">
+                            <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Tipo</th>
+                                <th>Valor</th>
+                                <th class="no-print"></th>
+                            </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-novo" class="hidden">
+            <div class="header-flex">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+                    <h1>Novo Lançamento</h1>
+                </div>
+                <small class="no-print" style="color: var(--text-light);">
+                    Atalhos: <b>Enter</b> Salvar | <b>Esc</b> Limpar
+                </small>
+            </div>
+
+            <div class="card" style="max-width: 800px;">
+                <div class="form-row">
+                    <div class="full-width">
+                        <label for="boleto-cod">Código de Barras (Autofocus)</label>
+                        <input type="text" id="boleto-cod" onblur="lerCodigoBarras()" oninput="this.classList.remove('input-error')" placeholder="Cole ou leia o código aqui...">
+                        <small class="hint">💡 Preenche Valor e Vencimento automaticamente.</small>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="full-width">
+                        <label for="boleto-desc">Descrição <span class="required">*</span></label>
+                        <input type="text" id="boleto-desc" onblur="sugerirCategoria()" placeholder="Ex: Enel, Cimed, Aluguel...">
+                        <span class="error-msg" id="err-desc">Campo obrigatório</span>
+                    </div>
+                </div>
+
+                <div class="form-row three-col">
+                    <div class="form-group">
+                        <label for="boleto-valor">Valor <span class="required">*</span></label>
+                        <input type="text" id="boleto-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
+                        <span class="error-msg" id="err-valor">Informe o valor</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="boleto-venc">Vencimento <span class="required">*</span></label>
+                        <input type="date" id="boleto-venc" onchange="verificarVencimento()">
+                        <span class="error-msg" id="err-venc">Data inválida</span>
+                        <small id="aviso-vencido" style="color: var(--danger); display: none; font-weight: bold; margin-top: 5px;">⚠️ Vencido</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="boleto-cat">Categoria (Auto)</label>
+                        <select id="boleto-cat">
+                            <option value="">Selecione...</option>
+                            <option>Medicamentos (Estoque)</option>
+                            <option>Materiais de Consumo</option>
+                            <option>Impostos & Taxas</option>
+                            <option>Folha de Pagamento</option>
+                            <option>Aluguel & Condomínio</option>
+                            <option>Água/Luz/Internet</option>
+                            <option>Marketing</option>
+                            <option>Manutenção</option>
+                            <option>Outros</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="half-width">
+                        <label for="boleto-status">Status</label>
+                        <select id="boleto-status">
+                            <option value="Pendente">Pendente</option>
+                            <option value="Pago">Pago</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-secondary" onclick="limparFormulario()" title="Esc">Limpar</button>
+                    <button class="btn btn-primary" onclick="salvarBoleto(false)" style="background-color: var(--text-light); border: none;">Salvar e Sair</button>
+                    <button class="btn btn-primary" onclick="salvarBoleto(true)" title="Enter">💾 Salvar + Novo</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-lista" class="hidden">
+            <div class="header-flex">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+                    <h1>Registros</h1>
+                </div>
+
+                <div style="display:flex; gap:10px">
+                    <button class="btn btn-secondary" onclick="window.print()">🖨️ PDF</button>
+                    <button class="btn btn-success" onclick="window.location.href='/api/exportar'">📊 Baixar Excel</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="toolbar" style="margin-bottom: 10px;">
+                    <div class="search-box">
+                        <input type="text" id="filtro-busca" placeholder="🔍 Buscar por descrição..." oninput="debounceCarregarLista()" aria-label="Buscar Registros">
+                    </div>
+                    <div class="filters">
+                        <select id="filtro-status" onchange="carregarLista(1)" aria-label="Filtrar por Status">
+                            <option value="Todos">Status: Todos</option>
+                            <option value="Pendente">Pendente</option>
+                            <option value="Pago">Pago</option>
+                        </select>
+                        <select id="filtro-cat" onchange="carregarLista(1)" aria-label="Filtrar por Categoria">
+                            <option value="Todas">Categoria: Todas</option>
+                            <option>Medicamentos (Estoque)</option>
+                            <option>Materiais de Consumo</option>
+                            <option>Impostos & Taxas</option>
+                            <option>Folha de Pagamento</option>
+                            <option>Aluguel & Condomínio</option>
+                            <option>Água/Luz/Internet</option>
+                            <option>Marketing</option>
+                            <option>Manutenção</option>
+                            <option>Outros</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="filtro-resumo" class="filter-summary"></div>
+
+                <div style="overflow-x: auto;">
+                    <table id="tabela-registros">
                         <thead>
                         <tr>
-                            <th>Data</th>
+                            <th>Vencimento</th>
                             <th>Descrição</th>
-                            <th>Tipo</th>
+                            <th>Categoria</th>
                             <th>Valor</th>
-                            <th class="no-print"></th>
+                            <th>Status</th>
+                            <th style="text-align: right;">Ações Rápidas</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div class="pagination">
+                    <button class="btn btn-secondary" id="btn-ant" onclick="mudarPagina(-1)">❮</button>
+                    <span id="info-paginas" style="font-weight: 600; color: var(--text-light);">1</span>
+                    <button class="btn btn-secondary" id="btn-prox" onclick="mudarPagina(1)">❯</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-logs" class="hidden">
+            <div class="header-flex">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+                    <h1>Auditoria</h1>
+                </div>
+            </div>
+            <div class="card">
+                <p style="color: var(--text-light); margin-bottom: 20px;">Histórico de ações (últimos 100 registros).</p>
+                <div style="overflow-x: auto;">
+                    <table id="tabela-logs" style="font-size: 0.9rem;">
+                        <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Usuário</th>
+                            <th>Ação</th>
+                            <th>Detalhes</th>
                         </tr>
                         </thead>
                         <tbody></tbody>
@@ -350,231 +484,63 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <div id="view-novo" class="hidden">
-        <div class="header-flex">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
-                <h1>Novo Lançamento</h1>
-            </div>
-            <small class="no-print" style="color: var(--text-light);">
-                Atalhos: <b>Enter</b> Salvar | <b>Esc</b> Limpar
-            </small>
-        </div>
-
-        <div class="card" style="max-width: 800px;">
-            <div class="form-row">
-                <div class="full-width">
-                    <label for="boleto-cod">Código de Barras (Autofocus)</label>
-                    <input type="text" id="boleto-cod" onblur="lerCodigoBarras()" oninput="this.classList.remove('input-error')" placeholder="Cole ou leia o código aqui...">
-                    <small class="hint">💡 Preenche Valor e Vencimento automaticamente.</small>
+        <div id="view-config" class="hidden">
+            <div class="header-flex">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn-toggle no-print" onclick="toggleSidebar()" style="display:none;">☰</button>
+                    <h1>Configurações</h1>
                 </div>
             </div>
 
-            <div class="form-row">
-                <div class="full-width">
-                    <label for="boleto-desc">Descrição <span class="required">*</span></label>
-                    <input type="text" id="boleto-desc" onblur="sugerirCategoria()" placeholder="Ex: Enel, Cimed, Aluguel...">
-                    <span class="error-msg" id="err-desc">Campo obrigatório</span>
+            <div class="card" style="margin-bottom: 20px;">
+                <h3>🎨 Aparência</h3>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 15px;">
+                    <span>Tema do Sistema</span>
+                    <button class="btn btn-secondary" onclick="toggleDarkMode()">
+                        <span id="text-theme">Alternar Tema</span> 🌗
+                    </button>
                 </div>
             </div>
 
-            <div class="form-row three-col">
-                <div class="form-group">
-                    <label for="boleto-valor">Valor <span class="required">*</span></label>
-                    <input type="text" id="boleto-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
-                    <span class="error-msg" id="err-valor">Informe o valor</span>
+            <div class="card">
+                <h3>📂 Categorias Financeiras</h3>
+                <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 15px;">Adicione categorias personalizadas para usar nos lançamentos.</p>
+
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" id="nova-cat-nome" placeholder="Nome da nova categoria..." style="flex:1;">
+                    <button class="btn btn-primary" onclick="adicionarCategoriaPersonalizada()">➕ Adicionar</button>
                 </div>
-                <div class="form-group">
-                    <label for="boleto-venc">Vencimento <span class="required">*</span></label>
-                    <input type="date" id="boleto-venc" onchange="verificarVencimento()">
-                    <span class="error-msg" id="err-venc">Data inválida</span>
-                    <small id="aviso-vencido" style="color: var(--danger); display: none; font-weight: bold; margin-top: 5px;">⚠️ Vencido</small>
+
+                <div id="lista-categorias-config" style="display: flex; flex-wrap: wrap; gap: 10px;">
                 </div>
-                <div class="form-group">
-                    <label for="boleto-cat">Categoria (Auto)</label>
-                    <select id="boleto-cat">
-                        <option value="">Selecione...</option>
-                        <option>Medicamentos (Estoque)</option>
-                        <option>Materiais de Consumo</option>
-                        <option>Impostos & Taxas</option>
-                        <option>Folha de Pagamento</option>
-                        <option>Aluguel & Condomínio</option>
-                        <option>Água/Luz/Internet</option>
-                        <option>Marketing</option>
-                        <option>Manutenção</option>
-                        <option>Outros</option>
-                    </select>
-                </div>
+                <br>
+                <button class="btn btn-secondary" onclick="resetarCategorias()">Restaurar Padrões</button>
             </div>
 
-            <div class="form-row">
-                <div class="half-width">
-                    <label for="boleto-status">Status</label>
-                    <select id="boleto-status">
-                        <option value="Pendente">Pendente</option>
-                        <option value="Pago">Pago</option>
-                    </select>
+            <div class="card" style="margin-top: 20px;">
+                <h3>👤 Perfil de Acesso</h3>
+                <div class="form-row">
+                    <div class="half-width">
+                        <label>Login Atual</label>
+                        <input type="text" id="conf-login" readonly style="background: var(--bg-body); opacity: 0.7;">
+                    </div>
+                    <div class="half-width">
+                        <label>Nome de Exibição</label>
+                        <input type="text" id="conf-nome">
+                    </div>
                 </div>
-            </div>
-
-            <div class="form-actions">
-                <button class="btn btn-secondary" onclick="limparFormulario()" title="Esc">Limpar</button>
-
-                <button class="btn btn-primary" onclick="salvarBoleto(false)" style="background-color: var(--text-light); border: none;">Salvar e Sair</button>
-
-                <button class="btn btn-primary" onclick="salvarBoleto(true)" title="Enter">💾 Salvar + Novo</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="view-lista" class="hidden">
-        <div class="header-flex">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
-                <h1>Registros</h1>
-            </div>
-
-            <div style="display:flex; gap:10px">
-                <button class="btn btn-secondary" onclick="window.print()">🖨️ PDF</button>
-                <button class="btn btn-success" onclick="window.location.href='/api/exportar'">📊 Baixar Excel</button>
+                <div class="form-row">
+                    <div class="full-width">
+                        <label>Nova Senha (deixe em branco para manter)</label>
+                        <input type="password" id="conf-senha">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="salvarConfiguracoes()">💾 Salvar Perfil</button>
             </div>
         </div>
 
-        <div class="card">
-            <div class="toolbar" style="margin-bottom: 10px;">
-                <div class="search-box">
-                    <input type="text" id="filtro-busca" placeholder="🔍 Buscar por descrição..." oninput="debounceCarregarLista()" aria-label="Buscar Registros">
-                </div>
-                <div class="filters">
-                    <select id="filtro-status" onchange="carregarLista(1)" aria-label="Filtrar por Status">
-                        <option value="Todos">Status: Todos</option>
-                        <option value="Pendente">Pendente</option>
-                        <option value="Pago">Pago</option>
-                    </select>
-                    <select id="filtro-cat" onchange="carregarLista(1)" aria-label="Filtrar por Categoria">
-                        <option value="Todas">Categoria: Todas</option>
-                        <option>Medicamentos (Estoque)</option>
-                        <option>Materiais de Consumo</option>
-                        <option>Impostos & Taxas</option>
-                        <option>Folha de Pagamento</option>
-                        <option>Aluguel & Condomínio</option>
-                        <option>Água/Luz/Internet</option>
-                        <option>Marketing</option>
-                        <option>Manutenção</option>
-                        <option>Outros</option>
-                    </select>
-                </div>
-            </div>
-
-            <div id="filtro-resumo" class="filter-summary"></div>
-
-            <div style="overflow-x: auto;">
-                <table id="tabela-registros">
-                    <thead>
-                    <tr>
-                        <th>Vencimento</th>
-                        <th>Descrição</th>
-                        <th>Categoria</th>
-                        <th>Valor</th>
-                        <th>Status</th>
-                        <th style="text-align: right;">Ações Rápidas</th>
-                    </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-
-            <div class="pagination">
-                <button class="btn btn-secondary" id="btn-ant" onclick="mudarPagina(-1)">❮</button>
-                <span id="info-paginas" style="font-weight: 600; color: var(--text-light);">1</span>
-                <button class="btn btn-secondary" id="btn-prox" onclick="mudarPagina(1)">❯</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="view-logs" class="hidden">
-        <div class="header-flex">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
-                <h1>Auditoria</h1>
-            </div>
-        </div>
-        <div class="card">
-            <p style="color: var(--text-light); margin-bottom: 20px;">Histórico de ações (últimos 100 registros).</p>
-            <div style="overflow-x: auto;">
-                <table id="tabela-logs" style="font-size: 0.9rem;">
-                    <thead>
-                    <tr>
-                        <th>Data/Hora</th>
-                        <th>Usuário</th>
-                        <th>Ação</th>
-                        <th>Detalhes</th>
-                    </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <div id="view-config" class="hidden">
-        <div class="header-flex">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <button class="btn-toggle no-print" onclick="toggleSidebar()" style="display:none;">☰</button>
-                <h1>Configurações</h1>
-            </div>
-        </div>
-
-        <div class="card" style="margin-bottom: 20px;">
-            <h3>🎨 Aparência</h3>
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 15px;">
-                <span>Tema do Sistema</span>
-                <button class="btn btn-secondary" onclick="toggleDarkMode()">
-                    <span id="text-theme">Alternar Tema</span> 🌗
-                </button>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>📂 Categorias Financeiras</h3>
-            <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 15px;">Adicione categorias personalizadas para usar nos lançamentos.</p>
-
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <input type="text" id="nova-cat-nome" placeholder="Nome da nova categoria..." style="flex:1;">
-                <button class="btn btn-primary" onclick="adicionarCategoriaPersonalizada()">➕ Adicionar</button>
-            </div>
-
-            <div id="lista-categorias-config" style="display: flex; flex-wrap: wrap; gap: 10px;">
-            </div>
-            <br>
-            <button class="btn btn-secondary" onclick="resetarCategorias()">Restaurar Padrões</button>
-        </div>
-
-        <div class="card" style="margin-top: 20px;">
-            <h3>👤 Perfil de Acesso</h3>
-            <div class="form-row">
-                <div class="half-width">
-                    <label>Login Atual</label>
-                    <input type="text" id="conf-login" readonly style="background: var(--bg-body); opacity: 0.7;">
-                </div>
-                <div class="half-width">
-                    <label>Nome de Exibição</label>
-                    <input type="text" id="conf-nome">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="full-width">
-                    <label>Nova Senha (deixe em branco para manter)</label>
-                    <input type="password" id="conf-senha">
-                </div>
-            </div>
-            <button class="btn btn-primary" onclick="salvarConfiguracoes()">💾 Salvar Perfil</button>
-        </div>
-    </div>
-
-</div> </div> <div id="modal-detalhes" class="modal-overlay hidden">
+    </div> </div> <div id="modal-detalhes" class="modal-overlay hidden">
     <div class="modal-content">
         <div class="modal-header">
             <h2 id="modal-titulo">Detalhes</h2>
@@ -661,6 +627,14 @@
     </div>
 </div>
 
-<script src="https://unpkg.com/lucide@latest"></script>
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+<script>
+    // Inicializa ícones Lucide após o carregamento do DOM
+    document.addEventListener("DOMContentLoaded", () => {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    });
+</script>
 </body>
 </html>

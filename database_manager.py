@@ -99,7 +99,6 @@ def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas"
         if limit:
             query = query.limit(limit).offset(offset)
 
-        # --- CORREÇÃO AQUI ---
         # Usamos db.session.connection() para garantir compatibilidade com o Pandas novo
         return pd.read_sql(query.statement, db.session.connection())
 
@@ -195,12 +194,12 @@ def obter_resumo_fluxo(mes=None, ano=None):
               'entradas_cartao': 0.0, 'saidas_total': 0.0, 'saldo': 0.0, 'extrato': []}
 
     try:
-        # Somas via SQL Alchemy (Correção: uso de case sem func.)
+        # --- CORREÇÃO: Sintaxe do case() atualizada ---
         entradas_q = db.session.query(
             func.sum(EntradaCaixa.valor).label('total'),
-            func.sum(case([(EntradaCaixa.forma_pagamento == 'Dinheiro', EntradaCaixa.valor)], else_=0)).label('dinheiro'),
-            func.sum(case([(EntradaCaixa.forma_pagamento == 'Pix', EntradaCaixa.valor)], else_=0)).label('pix'),
-            func.sum(case([(EntradaCaixa.forma_pagamento == 'Cartão', EntradaCaixa.valor)], else_=0)).label('cartao')
+            func.sum(case((EntradaCaixa.forma_pagamento == 'Dinheiro', EntradaCaixa.valor), else_=0)).label('dinheiro'),
+            func.sum(case((EntradaCaixa.forma_pagamento == 'Pix', EntradaCaixa.valor), else_=0)).label('pix'),
+            func.sum(case((EntradaCaixa.forma_pagamento == 'Cartão', EntradaCaixa.valor), else_=0)).label('cartao')
         ).filter(EntradaCaixa.data_registro.like(filtro_data)).first()
 
         if entradas_q and entradas_q.total:

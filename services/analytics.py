@@ -66,6 +66,9 @@ def gerar_dados_graficos(df: pd.DataFrame, periodo: str) -> dict:
         else:
             df_chart['mes_ordem'] = df_chart['dt_venc'].dt.to_period('M')
             g = df_chart.groupby('mes_ordem').agg({'valor': 'sum'}).reset_index()
+            # --- CORREÇÃO AQUI ---
+            # Renomeia 'valor' para 'total' antes de selecionar
+            g = g.rename(columns={'valor': 'total'})
             g['mes'] = g['mes_ordem'].dt.strftime('%m/%Y')
             grafico_tempo = g[['mes', 'total']].to_dict(orient='records')
 
