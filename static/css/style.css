@@ -530,3 +530,28 @@ tr.loading-row td {
     background-color: var(--bg-body);
     pointer-events: none;
 }
+/* --- Dashboard Improvements --- */
+.card-value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.bullet-separator {
+    color: var(--text-light);
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.qty-indicator {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+[data-theme="dark"] .qty-indicator {
+    background: rgba(255, 255, 255, 0.1);
+}

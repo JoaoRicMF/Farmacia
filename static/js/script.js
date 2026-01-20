@@ -236,101 +236,135 @@ function filtrarDashboard(periodo, btn) {
     carregarDashboard(periodo);
 }
 
-async function carregarDashboard(periodo = '7d') {
-    // LOADER: Aplica opacidade para indicar carregamento sem layout shift
-    const containerCharts = document.querySelector('.charts-row');
-    const containerCards = document.querySelector('.dashboard-cards');
+function preFiltrarLista(status) {
+    // Seta o valor no select
+    const select = document.getElementById('filtro-status');
+    if(select) select.value = status;
 
+    // Força o recarregamento da lista com o novo filtro
+    carregarLista(1);
+
+    // Feedback visual
+    showToast(`Filtrando por: ${status}`, "success");
+}
+
+async function carregarDashboard(periodo = null) {
+    // 1. PERSISTÊNCIA DE PERÍODO
+    // Se o periodo não foi passado, tenta pegar do localStorage, senão usa '7d'
+    if (!periodo) {
+        periodo = localStorage.getItem('dashboard_periodo') || '7d';
+    }
+    // Salva a escolha atual
+    localStorage.setItem('dashboard_periodo', periodo);
+
+    // Atualiza botões ativos na UI
+    document.querySelectorAll('.filter-btn').forEach(b => {
+        b.classList.remove('active');
+        // Verifica se o onclick do botão contém o período atual
+        if(b.getAttribute('onclick').includes(`'${periodo}'`)) {
+            b.classList.add('active');
+        }
+    });
+
+    const containerCharts = document.getElementById('charts-container');
+    const containerEmpty = document.getElementById('dashboard-empty-state');
+
+    // Loader visual (opacidade)
     if (containerCharts) containerCharts.style.opacity = '0.5';
-    if (containerCards) containerCards.style.opacity = '0.5';
 
     try {
         const res = await fetch(`/api/dashboard?periodo=${periodo}`);
         const data = await res.json();
 
-        // Atualiza Cards
+        // Atualiza Cards com Quantidades
         if (data.cards) {
             const fmt = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            const setVal = (id, val) => {
-                const el = document.getElementById(id);
-                if (el) el.innerText = val;
-            };
+            const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
 
-            setVal('card-pagar-mes', fmt(data.cards.pagar_mes));
-            setVal('card-vencidos-val', fmt(data.cards.vencidos_val));
-            setVal('card-vencidos-qtd', data.cards.vencidos_qtd || 0);
-            setVal('card-proximos-val', fmt(data.cards.proximos_val));
-            setVal('card-proximos-qtd', data.cards.proximos_qtd || 0);
-            setVal('card-pago-mes', fmt(data.cards.pago_mes));
+            setTxt('card-pagar-mes', fmt(data.cards.pagar_mes));
+            setTxt('card-vencidos-val', fmt(data.cards.vencidos_val));
+            setTxt('card-vencidos-qtd', `${data.cards.vencidos_qtd} un.`); // Ex: 5 un.
+            setTxt('card-proximos-val', fmt(data.cards.proximos_val));
+            setTxt('card-proximos-qtd', `${data.cards.proximos_qtd} un.`);
+            setTxt('card-pago-mes', fmt(data.cards.pago_mes));
         }
 
-        // Gráfico de Linha (Evolução)
-        const canvasM = document.getElementById('chartMes');
-        if (canvasM && data.graficos) {
-            const ctxM = canvasM.getContext('2d');
-            if (chartM) chartM.destroy();
+        // 2. ESTADO VAZIO INTELIGENTE
+        const temDados = data.graficos.por_mes && data.graficos.por_mes.length > 0;
 
-            let gradient = ctxM.createLinearGradient(0, 0, 0, 400);
-            gradient.addColorStop(0, 'rgba(37, 99, 235, 0.2)');
-            gradient.addColorStop(1, 'rgba(37, 99, 235, 0.0)');
+        if (!temDados) {
+            // Esconde gráficos, mostra Empty State
+            if (containerCharts) containerCharts.classList.add('hidden');
+            if (containerEmpty) containerEmpty.classList.remove('hidden');
+        } else {
+            // Mostra gráficos, esconde Empty State
+            if (containerCharts) {
+                containerCharts.classList.remove('hidden');
+                containerCharts.style.opacity = '1';
+            }
+            if (containerEmpty) containerEmpty.classList.add('hidden');
 
-            chartM = new Chart(ctxM, {
-                type: 'line',
-                data: {
-                    labels: data.graficos.por_mes.map(d => d.mes),
-                    datasets: [{
-                        label: 'Total R$',
-                        data: data.graficos.por_mes.map(d => d.total),
-                        borderColor: '#2563eb',
-                        backgroundColor: gradient,
-                        borderWidth: 3,
-                        pointBackgroundColor: '#ffffff',
-                        pointBorderColor: '#2563eb',
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { borderDash: [5, 5], color: '#e2e8f0' } },
-                        x: { grid: { display: false } }
+            // Renderiza Gráficos (Código existente...)
+            const canvasM = document.getElementById('chartMes');
+            if (canvasM) {
+                const ctxM = canvasM.getContext('2d');
+                if (chartM) chartM.destroy();
+
+                let gradient = ctxM.createLinearGradient(0, 0, 0, 400);
+                gradient.addColorStop(0, 'rgba(37, 99, 235, 0.2)');
+                gradient.addColorStop(1, 'rgba(37, 99, 235, 0.0)');
+
+                chartM = new Chart(ctxM, {
+                    type: 'line',
+                    data: {
+                        labels: data.graficos.por_mes.map(d => d.mes),
+                        datasets: [{
+                            label: 'Total R$',
+                            data: data.graficos.por_mes.map(d => d.total),
+                            borderColor: '#2563eb',
+                            backgroundColor: gradient,
+                            borderWidth: 3,
+                            pointBackgroundColor: '#ffffff',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { borderDash: [5, 5], color: '#e2e8f0' } },
+                            x: { grid: { display: false } }
+                        }
                     }
-                }
-            });
-        }
+                });
+            }
 
-        // Gráfico de Rosca (Categorias)
-        const canvasC = document.getElementById('chartCat');
-        if (canvasC && data.graficos) {
-            const ctxC = canvasC.getContext('2d');
-            if (chartC) chartC.destroy();
-            chartC = new Chart(ctxC, {
-                type: 'doughnut',
-                data: {
-                    labels: data.graficos.por_categoria.map(d => d.categoria),
-                    datasets: [{
-                        data: data.graficos.por_categoria.map(d => d.total),
-                        backgroundColor: ['#2563eb', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#64748b']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right' } },
-                    cutout: '70%'
-                }
-            });
+            const canvasC = document.getElementById('chartCat');
+            if (canvasC) {
+                const ctxC = canvasC.getContext('2d');
+                if (chartC) chartC.destroy();
+                chartC = new Chart(ctxC, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.graficos.por_categoria.map(d => d.categoria),
+                        datasets: [{
+                            data: data.graficos.por_categoria.map(d => d.total),
+                            backgroundColor: ['#2563eb', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'right' } },
+                        cutout: '70%'
+                    }
+                });
+            }
         }
-
     } catch (e) {
         console.error("Erro no dashboard:", e);
-    } finally {
-        // Remove opacidade (Loader off)
-        if (containerCharts) containerCharts.style.opacity = '1';
-        if (containerCards) containerCards.style.opacity = '1';
     }
 }
 
