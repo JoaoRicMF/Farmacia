@@ -32,6 +32,24 @@ def criar_usuario_inicial():
     except Exception:
         pass # Tabelas podem não existir ainda na primeira execução
 
+def criar_novo_usuario(admin_log, novo_usuario, senha, nome, funcao):
+    """Cria um novo usuário no sistema se o login não existir."""
+    try:
+        # Verifica duplicidade
+        if Usuario.query.filter_by(usuario=novo_usuario).first():
+            return False, "Nome de usuário (login) já existe."
+
+        senha_hash = gerar_hash_senha(senha)
+        novo = Usuario(usuario=novo_usuario, senha=senha_hash, nome=nome, funcao=funcao)
+        db.session.add(novo)
+        db.session.commit()
+
+        registrar_log(admin_log, "Gestão Usuários", f"Criou usuário: {novo_usuario} ({funcao})")
+        return True, "Usuário criado com sucesso!"
+    except Exception as e:
+        logger.error(f"Erro ao criar usuário: {e}")
+        return False, "Erro interno ao criar usuário."
+
 def obter_dados_usuario(nome_exibicao: str):
     user = Usuario.query.filter_by(nome=nome_exibicao).first()
     return (user.usuario, user.nome) if user else None

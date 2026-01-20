@@ -364,7 +364,8 @@ function nav(viewId, elementoMenu, addToHistory = true) {
     if (viewId === 'logs') carregarLogs();
     if (viewId === 'config') {
         carregarConfiguracoes();
-        renderizarCategoriasConfig(); // Atualiza a lista de categorias na tela de config
+        renderizarCategoriasConfig();
+        verificarPermissoesUI();
     }
     if (viewId === 'fluxo') {
         const inputMes = document.getElementById('filtro-mes-fluxo');
@@ -1118,3 +1119,33 @@ document.addEventListener('keydown', function(e) {
         salvarBoleto(true);
     }
 });
+
+async function criarNovoUsuario() {
+    const nome = document.getElementById('novo-user-nome').value;
+    const login = document.getElementById('novo-user-login').value;
+    const senha = document.getElementById('novo-user-senha').value;
+    const funcao = document.getElementById('novo-user-funcao').value;
+
+    if(!nome || !login || !senha) return showToast("Preencha todos os campos.", "warning");
+
+    try {
+        const res = await fetch('/api/criar_usuario', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: nome, usuario: login, senha: senha, funcao: funcao })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message, "success");
+            // Limpa os campos após sucesso
+            document.getElementById('novo-user-nome').value = "";
+            document.getElementById('novo-user-login').value = "";
+            document.getElementById('novo-user-senha').value = "";
+        } else {
+            showToast(data.message, "error");
+        }
+    } catch (e) {
+        showToast("Erro de conexão.", "error");
+    }
+}

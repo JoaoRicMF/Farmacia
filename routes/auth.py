@@ -47,3 +47,27 @@ def logs():
     if 'usuario' not in session: return jsonify([]), 403
     if session.get('funcao') != 'Admin': return jsonify([]), 403 # Segurança extra
     return jsonify(db.obter_logs().to_dict(orient='records'))
+@bp.route('/api/criar_usuario', methods=['POST'])
+def criar_usuario_rota():
+    # Segurança: Apenas logados e Admins podem criar usuários
+    if 'usuario' not in session or session.get('funcao') != 'Admin':
+        return jsonify({'success': False, 'message': 'Permissão negada.'}), 403
+
+    d = request.json or {}
+
+    # Validação básica
+    if not d.get('usuario') or not d.get('senha') or not d.get('nome'):
+        return jsonify({'success': False, 'message': 'Preencha todos os campos.'}), 400
+
+    sucesso, msg = db.criar_novo_usuario(
+        session['usuario'], # Quem está criando (para o log)
+        d.get('usuario'),   # Novo login
+        d.get('senha'),     # Nova senha
+        d.get('nome'),      # Nome de exibição
+        d.get('funcao')     # Operador ou Admin
+    )
+
+    if sucesso:
+        return jsonify({'success': True, 'message': msg})
+    else:
+        return jsonify({'success': False, 'message': msg}), 400

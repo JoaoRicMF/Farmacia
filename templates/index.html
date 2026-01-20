@@ -518,6 +518,42 @@
                 <button class="btn btn-secondary" onclick="resetarCategorias()">Restaurar Padrões</button>
             </div>
 
+            <div class="card admin-only hidden" style="border-left: 5px solid var(--primary);">
+                <h3>👥 Criar Novo Usuário</h3>
+                <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 15px;">
+                    Cadastre novos membros da equipe para acesso ao sistema.
+                </p>
+
+                <div class="form-row">
+                    <div class="half-width">
+                        <label>Nome Completo</label>
+                        <input type="text" id="novo-user-nome" placeholder="Ex: Maria Silva">
+                    </div>
+                    <div class="half-width">
+                        <label>Usuário de Login</label>
+                        <input type="text" id="novo-user-login" placeholder="Ex: maria.silva">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="half-width">
+                        <label>Senha Inicial</label>
+                        <input type="password" id="novo-user-senha" placeholder="******">
+                    </div>
+                    <div class="half-width">
+                        <label>Função</label>
+                        <select id="novo-user-funcao">
+                            <option value="Operador">Operador (Acesso padrão)</option>
+                            <option value="Admin">Administrador (Acesso total)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="criarNovoUsuario()">➕ Cadastrar Usuário</button>
+                </div>
+            </div>
+
             <div class="card" style="margin-top: 20px;">
                 <h3>👤 Perfil de Acesso</h3>
                 <div class="form-row">
