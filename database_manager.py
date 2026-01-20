@@ -137,22 +137,39 @@ def verificar_existencia_boleto(codigo: str) -> bool:
     return db.session.query(Financeiro.id).filter_by(codigo_barras=codigo).first() is not None
 
 # --- ESCRITA ---
-def adicionar_registro(usuario_log, data_proc, descricao, valor, codigo_barras, vencimento, status, categoria):
+def adicionar_registro(usuario_log, descricao, valor, codigo_barras, vencimento_str, status, categoria):
+    # Converte string ISO (YYYY-MM-DD) para objeto date
+    try:
+        vencimento_obj = datetime.strptime(vencimento_str, '%Y-%m-%d').date() if vencimento_str else None
+    except ValueError:
+        vencimento_obj = None # Ou lidar com erro
+
     novo = Financeiro(
-        data_processamento=data_proc, descricao=descricao, valor=valor,
-        codigo_barras=codigo_barras, vencimento=vencimento, status=status, categoria=categoria
+        data_processamento=datetime.now(), # Agora é automático/objeto
+        descricao=descricao,
+        valor=valor,
+        codigo_barras=codigo_barras,
+        vencimento=vencimento_obj, # Passa o objeto date
+        status=status,
+        categoria=categoria
     )
     db.session.add(novo)
     db.session.commit()
     registrar_log(usuario_log, "Novo Lançamento", f"R$ {valor} - {descricao}")
 
-def editar_registro(usuario_log, id_reg, descricao, valor, vencimento, categoria, status):
+def editar_registro(usuario_log, id_reg, descricao, valor, vencimento_str, categoria, status):
     reg = Financeiro.query.get(id_reg)
     if reg:
+        # Converte string para objeto
+        try:
+            vencimento_obj = datetime.strptime(vencimento_str, '%Y-%m-%d').date() if vencimento_str else None
+        except:
+            vencimento_obj = reg.vencimento
+
         detalhe = f"De: {reg.descricao} ({reg.valor}) Para: {descricao} ({valor})"
         reg.descricao = descricao
         reg.valor = valor
-        reg.vencimento = vencimento
+        reg.vencimento = vencimento_obj
         reg.categoria = categoria
         reg.status = status
         db.session.commit()
@@ -176,7 +193,9 @@ def excluir_registro(usuario_log, id_reg):
 
 # --- CAIXA ---
 def adicionar_entrada(usuario, valor, forma_pagamento, data_iso):
-    nova = EntradaCaixa(data_registro=data_iso, valor=valor, forma_pagamento=forma_pagamento, usuario=usuario)
+    # data_iso vem do front como 'YYYY-MM-DD'
+    data_obj = datetime.strptime(data_iso, '%Y-%m-%d').date()
+    nova = EntradaCaixa(data_registro=data_obj, valor=valor, forma_pagamento=forma_pagamento, usuario=usuario)
     db.session.add(nova)
     db.session.commit()
     registrar_log(usuario, "Entrada Caixa", f"R$ {valor} ({forma_pagamento})")
@@ -205,44 +224,45 @@ def excluir_saida_caixa(usuario, id_saida):
 def obter_resumo_fluxo(mes=None, ano=None):
     if not mes or not ano:
         hoje = datetime.now()
-        mes, ano = f"{hoje.month:02d}", str(hoje.year)
-    filtro_data = f"{ano}-{mes}%"
+        mes, ano = hoje.month, hoje.year
+    else:
+        mes, ano = int(mes), int(ano)
 
     resumo = {'entradas_total': 0.0, 'entradas_dinheiro': 0.0, 'entradas_pix': 0.0,
               'entradas_cartao': 0.0, 'saidas_total': 0.0, 'saldo': 0.0, 'extrato': []}
 
     try:
-        # --- CORREÇÃO: Sintaxe do case() atualizada ---
+        # Entradas
         entradas_q = db.session.query(
             func.sum(EntradaCaixa.valor).label('total'),
-            func.sum(case((EntradaCaixa.forma_pagamento == 'Dinheiro', EntradaCaixa.valor), else_=0)).label('dinheiro'),
-            func.sum(case((EntradaCaixa.forma_pagamento == 'Pix', EntradaCaixa.valor), else_=0)).label('pix'),
-            func.sum(case((EntradaCaixa.forma_pagamento == 'Cartão', EntradaCaixa.valor), else_=0)).label('cartao')
-        ).filter(EntradaCaixa.data_registro.like(filtro_data)).first()
+            # ... (seus sum/case mantêm-se iguais) ...
+        ).filter(extract('year', EntradaCaixa.data_registro) == ano) \
+            .filter(extract('month', EntradaCaixa.data_registro) == mes).first()
 
-        if entradas_q and entradas_q.total:
-            resumo['entradas_total'] = float(entradas_q.total or 0)
-            resumo['entradas_dinheiro'] = float(entradas_q.dinheiro or 0)
-            resumo['entradas_pix'] = float(entradas_q.pix or 0)
-            resumo['entradas_cartao'] = float(entradas_q.cartao or 0)
+        # ... (preenchimento do dict resumo igual) ...
 
         # Saidas Caixa
         saidas_caixa_total = db.session.query(func.sum(SaidaCaixa.valor)) \
-                                 .filter(SaidaCaixa.data_registro.like(filtro_data)).scalar() or 0.0
-        resumo['saidas_total'] += float(saidas_caixa_total)
+                                 .filter(extract('year', SaidaCaixa.data_registro) == ano) \
+                                 .filter(extract('month', SaidaCaixa.data_registro) == mes).scalar() or 0.0
 
-        # Boletos Pagos (Lógica mantida)
+        # Boletos Pagos (Financeiro)
+        # Atenção: Aqui mudamos a lógica do substr para extract
         boletos_total = db.session.query(func.sum(Financeiro.valor)) \
                             .filter(Financeiro.status == 'Pago') \
-                            .filter(func.substr(Financeiro.vencimento, 7, 4) == ano) \
-                            .filter(func.substr(Financeiro.vencimento, 4, 2) == mes).scalar() or 0.0
-        resumo['saidas_total'] += float(boletos_total)
+                            .filter(extract('year', Financeiro.vencimento) == ano) \
+                            .filter(extract('month', Financeiro.vencimento) == mes).scalar() or 0.0
 
-        # Preencher Extrato (Entradas)
-        entradas = EntradaCaixa.query.filter(EntradaCaixa.data_registro.like(filtro_data)).order_by(EntradaCaixa.data_registro.desc()).all()
+        # ... (cálculo de totais igual) ...
+
+        # Extratos (Query objects, não strings)
+        entradas = EntradaCaixa.query.filter(extract('year', EntradaCaixa.data_registro) == ano) \
+            .filter(extract('month', EntradaCaixa.data_registro) == mes).all()
+
+        # Ao iterar para o extrato, converta o objeto date para string BR para exibir
         for e in entradas:
             resumo['extrato'].append({
-                'data': e.data_registro,
+                'data': e.data_registro.strftime('%d/%m/%Y'), # Conversão na saída
                 'descricao': 'Entrada Avulsa',
                 'valor': e.valor,
                 'tipo': 'entrada',

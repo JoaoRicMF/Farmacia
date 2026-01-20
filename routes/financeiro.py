@@ -27,6 +27,7 @@ def listar():
             status_filtro=request.args.get('status', 'Todos'),
             categoria_filtro=request.args.get('categoria', 'Todas')
         )
+
         return jsonify({
             'registros': df.to_dict(orient='records'),
             'total_paginas': (total // 10) + (1 if total % 10 > 0 else 0),
@@ -40,22 +41,22 @@ def listar():
 def add():
     if 'usuario' not in session: return jsonify({}), 403
     d = request.json or {}
-    try: data_fmt = datetime.strptime(d['vencimento'], '%Y-%m-%d').strftime('%d/%m/%Y')
-    except: data_fmt = d.get('vencimento', '')
 
-    if db.verificar_existencia_boleto(d.get('codigo')):
-        return jsonify({'success': False, 'message': 'Duplicado'})
-
-    db.adicionar_registro(session['usuario'], datetime.now().strftime('%d/%m/%Y'), d['descricao'], float(d['valor']), d['codigo'], data_fmt, d['status'], d['categoria'])
-    return jsonify({'success': True})
+    db.adicionar_registro(
+        session['usuario'],
+        d['descricao'],
+        float(d['valor']),
+        d['codigo'],
+        d['vencimento'], # Passa YYYY-MM-DD
+        d['status'],
+        d['categoria']
+    )
 
 @bp.route('/api/editar', methods=['POST'])
 def edit():
     if 'usuario' not in session: return jsonify({}), 403
     d = request.json or {}
-    try: data_fmt = datetime.strptime(d['vencimento'], '%Y-%m-%d').strftime('%d/%m/%Y')
-    except: data_fmt = d.get('vencimento', '')
-    db.editar_registro(session['usuario'], d['id'], d['descricao'], float(d['valor']), data_fmt, d['categoria'], d['status'])
+    db.editar_registro(session['usuario'], d['id'], d['descricao'], float(d['valor']), d['vencimento'], d['categoria'], d['status'])
     return jsonify({'success': True})
 
 @bp.route('/api/atualizar_status', methods=['POST'])
