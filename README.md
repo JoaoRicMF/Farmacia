@@ -1,4 +1,4 @@
-# 🏥 Farmácia Pro - Sistema Financeiro
+# 🏥 Farmácia - Sistema Financeiro
 
 Sistema de gestão financeira completo desenvolvido em Python com Flask, focado no controle de contas a pagar, fluxo de caixa e auditoria para farmácias.
 
