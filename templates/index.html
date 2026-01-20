@@ -314,12 +314,16 @@
                 <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
                 <h1>Novo Lançamento</h1>
             </div>
+            <small class="no-print" style="color: var(--text-light);">
+                Atalhos: <b>Enter</b> Salvar | <b>Esc</b> Limpar
+            </small>
         </div>
+
         <div class="card" style="max-width: 800px;">
             <div class="form-row">
                 <div class="full-width">
-                    <label for="boleto-cod">Código de Barras</label>
-                    <input type="text" id="boleto-cod" onblur="lerCodigoBarras()" placeholder="Cole o código aqui...">
+                    <label for="boleto-cod">Código de Barras (Autofocus)</label>
+                    <input type="text" id="boleto-cod" onblur="lerCodigoBarras()" oninput="this.classList.remove('input-error')" placeholder="Cole ou leia o código aqui...">
                     <small class="hint">💡 Preenche Valor e Vencimento automaticamente.</small>
                 </div>
             </div>
@@ -327,7 +331,7 @@
             <div class="form-row">
                 <div class="full-width">
                     <label for="boleto-desc">Descrição <span class="required">*</span></label>
-                    <input type="text" id="boleto-desc" placeholder="Ex: Fornecedor XYZ">
+                    <input type="text" id="boleto-desc" onblur="sugerirCategoria()" placeholder="Ex: Enel, Cimed, Aluguel...">
                     <span class="error-msg" id="err-desc">Campo obrigatório</span>
                 </div>
             </div>
@@ -340,11 +344,12 @@
                 </div>
                 <div class="form-group">
                     <label for="boleto-venc">Vencimento <span class="required">*</span></label>
-                    <input type="date" id="boleto-venc">
+                    <input type="date" id="boleto-venc" onchange="verificarVencimento()">
                     <span class="error-msg" id="err-venc">Data inválida</span>
+                    <small id="aviso-vencido" style="color: var(--danger); display: none; font-weight: bold; margin-top: 5px;">⚠️ Vencido</small>
                 </div>
                 <div class="form-group">
-                    <label for="boleto-cat">Categoria</label>
+                    <label for="boleto-cat">Categoria (Auto)</label>
                     <select id="boleto-cat">
                         <option value="">Selecione...</option>
                         <option>Medicamentos (Estoque)</option>
@@ -371,8 +376,11 @@
             </div>
 
             <div class="form-actions">
-                <button class="btn btn-secondary" onclick="limparFormulario()">Limpar</button>
-                <button class="btn btn-primary" onclick="salvarBoleto()">Salvar Lançamento</button>
+                <button class="btn btn-secondary" onclick="limparFormulario()" title="Esc">Limpar</button>
+
+                <button class="btn btn-primary" onclick="salvarBoleto(false)" style="background-color: var(--text-light); border: none;">Salvar e Sair</button>
+
+                <button class="btn btn-primary" onclick="salvarBoleto(true)" title="Enter">💾 Salvar + Novo</button>
             </div>
         </div>
     </div>

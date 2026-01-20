@@ -67,7 +67,7 @@ def registrar_log(usuario_nome: str, acao: str, detalhes: str = ""):
 
 def obter_logs() -> pd.DataFrame:
     query = Log.query.order_by(Log.id.desc()).limit(100).statement
-    return pd.read_sql(query, db.session.bind)
+    return pd.read_sql(query, db.session.connection())
 
 # --- INICIALIZAÇÃO ---
 def init_db(app):
@@ -94,7 +94,7 @@ def listar_registros(busca=None, status_filtro="Todos", categoria_filtro="Todas"
         if limit:
             query = query.limit(limit).offset(offset)
 
-        return pd.read_sql(query.statement, db.session.bind)
+        return pd.read_sql(query.statement, db.session.connection())
     except Exception as e:
         logger.error(f"Erro listar: {e}", exc_info=True)
         return pd.DataFrame()
