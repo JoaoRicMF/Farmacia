@@ -71,3 +71,30 @@ def criar_usuario_rota():
         return jsonify({'success': True, 'message': msg})
     else:
         return jsonify({'success': False, 'message': msg}), 400
+
+@bp.route('/api/lista_usuarios', methods=['GET'])
+def lista_usuarios():
+    # Apenas Admin pode ver a lista completa
+    if 'usuario' not in session or session.get('funcao') != 'Admin':
+        return jsonify([]), 403
+    return jsonify(db.listar_usuarios())
+
+@bp.route('/api/admin_reset_senha', methods=['POST'])
+def admin_reset_senha():
+    # Apenas Admin pode resetar senhas de terceiros
+    if 'usuario' not in session or session.get('funcao') != 'Admin':
+        return jsonify({'success': False, 'message': 'Sem permissão.'}), 403
+
+    d = request.json or {}
+    user_id = d.get('id')
+    nova_senha = d.get('nova_senha')
+
+    if not user_id or not nova_senha:
+        return jsonify({'success': False, 'message': 'Dados incompletos.'}), 400
+
+    sucesso, msg = db.admin_resetar_senha(session['usuario'], user_id, nova_senha)
+
+    if sucesso:
+        return jsonify({'success': True, 'message': msg})
+    else:
+        return jsonify({'success': False, 'message': msg}), 400

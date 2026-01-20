@@ -547,11 +547,29 @@
             </div>
 
             <div class="card admin-only hidden" style="border-left: 5px solid var(--primary);">
-                <h3>👥 Criar Novo Usuário</h3>
+                <h3>👥 Gestão de Equipe</h3>
                 <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 15px;">
-                    Cadastre novos membros da equipe para acesso ao sistema.
+                    Gerencie os usuários que têm acesso ao sistema.
                 </p>
 
+                <div style="margin-bottom: 25px; overflow-x: auto;">
+                    <table style="width:100%; font-size: 0.9rem; border: 1px solid var(--border); border-radius: 8px;">
+                        <thead>
+                        <tr style="background: var(--bg-body);">
+                            <th style="padding:10px;">Nome</th>
+                            <th style="padding:10px;">Login</th>
+                            <th style="padding:10px;">Função</th>
+                            <th style="padding:10px; text-align:right;">Ações</th>
+                        </tr>
+                        </thead>
+                        <tbody id="tabela-usuarios-config">
+                        </tbody>
+                    </table>
+                </div>
+
+                <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
+
+                <h4>➕ Cadastrar Novo</h4>
                 <div class="form-row">
                     <div class="half-width">
                         <label>Nome Completo</label>
@@ -578,7 +596,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <button class="btn btn-primary" onclick="criarNovoUsuario()">➕ Cadastrar Usuário</button>
+                    <button class="btn btn-primary" onclick="criarNovoUsuario()">Cadastrar Usuário</button>
                 </div>
             </div>
 
@@ -712,6 +730,28 @@
                 Use o aplicativo do seu banco para ler o código acima.
             </p>
             <button class="btn btn-secondary" onclick="fecharModalQR()">Fechar</button>
+        </div>
+    </div>
+</div>
+<div id="modal-reset-senha" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2>🔐 Resetar Senha</h2>
+            <button class="close-btn" onclick="fecharModalReset()">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom: 15px;">Defina a nova senha para <b id="reset-nome-user">...</b>:</p>
+            <input type="hidden" id="reset-id-user">
+
+            <div class="form-group">
+                <label>Nova Senha</label>
+                <input type="password" id="reset-nova-senha" placeholder="Digite a nova senha...">
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="fecharModalReset()">Cancelar</button>
+                <button class="btn btn-primary" onclick="confirmarResetSenha()">Salvar Nova Senha</button>
+            </div>
         </div>
     </div>
 </div>

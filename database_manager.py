@@ -69,6 +69,29 @@ def alterar_senha_usuario(usuario_nome: str, nova_senha: str):
         db.session.commit()
         registrar_log(usuario_nome, "Segurança", "Alterou a senha")
 
+def listar_usuarios():
+    """Retorna uma lista de dicionários com dados básicos dos usuários."""
+    try:
+        users = Usuario.query.order_by(Usuario.nome).all()
+        return [{'id': u.id, 'nome': u.nome, 'usuario': u.usuario, 'funcao': u.funcao} for u in users]
+    except Exception as e:
+        logger.error(f"Erro ao listar usuários: {e}")
+        return []
+
+def admin_resetar_senha(admin_log, user_id, nova_senha):
+    """Permite que um Admin resete a senha de outro usuário pelo ID."""
+    try:
+        user = Usuario.query.get(user_id)
+        if user:
+            user.senha = gerar_hash_senha(nova_senha)
+            db.session.commit()
+            registrar_log(admin_log, "Segurança", f"Resetou senha do usuário: {user.usuario}")
+            return True, "Senha alterada com sucesso."
+        return False, "Usuário não encontrado."
+    except Exception as e:
+        logger.error(f"Erro ao resetar senha: {e}")
+        return False, "Erro interno ao resetar senha."
+
 # --- AUDITORIA ---
 def registrar_log(usuario_nome: str, acao: str, detalhes: str = ""):
     try:

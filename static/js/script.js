@@ -368,6 +368,9 @@ function nav(viewId, elementoMenu, addToHistory = true) {
         carregarConfiguracoes();
         renderizarCategoriasConfig();
         verificarPermissoesUI();
+        if (sessionStorage.getItem('user_role') === 'Admin') {
+            carregarListaUsuarios();
+        }
     }
     if (viewId === 'fluxo') {
         const inputMes = document.getElementById('filtro-mes-fluxo');
@@ -1165,6 +1168,7 @@ async function criarNovoUsuario() {
             document.getElementById('novo-user-nome').value = "";
             document.getElementById('novo-user-login').value = "";
             document.getElementById('novo-user-senha').value = "";
+            carregarListaUsuarios();
         } else {
             showToast(data.message, "error");
         }
@@ -1302,4 +1306,81 @@ async function removerFornecedor(id) {
         body: JSON.stringify({ id: id })
     });
     carregarFornecedores();
+}
+
+/* ==========================================================================
+   GESTÃO DE USUÁRIOS (ADMIN)
+   ========================================================================== */
+async function carregarListaUsuarios() {
+    const tbody = document.getElementById('tabela-usuarios-config');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:10px;">Carregando...</td></tr>';
+
+    try {
+        const res = await fetch('/api/lista_usuarios');
+        const lista = await res.json();
+
+        tbody.innerHTML = '';
+        if (lista.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum usuário encontrado.</td></tr>';
+            return;
+        }
+
+        lista.forEach(u => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding:10px;">${u.nome}</td>
+                <td style="padding:10px;"><code>${u.usuario}</code></td>
+                <td style="padding:10px;"><span class="status-badge" style="background:${u.funcao==='Admin'?'#e0e7ff':'#f3f4f6'}; color:${u.funcao==='Admin'?'#3730a3':'#374151'}">${u.funcao}</span></td>
+                <td style="padding:10px; text-align:right;">
+                    <button class="action-btn" title="Resetar Senha" onclick="abrirModalReset('${u.id}', '${u.nome}')">🔑</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="4" style="color:red; text-align:center;">Erro ao carregar usuários.</td></tr>';
+    }
+}
+
+// Variável global para armazenar quem está sendo editado
+let usuarioIdReset = null;
+
+function abrirModalReset(id, nome) {
+    usuarioIdReset = id;
+    document.getElementById('reset-nome-user').innerText = nome;
+    document.getElementById('reset-nova-senha').value = '';
+    document.getElementById('modal-reset-senha').classList.remove('hidden');
+    setTimeout(() => document.getElementById('reset-nova-senha').focus(), 100);
+}
+
+function fecharModalReset() {
+    document.getElementById('modal-reset-senha').classList.add('hidden');
+    usuarioIdReset = null;
+}
+
+async function confirmarResetSenha() {
+    const novaSenha = document.getElementById('reset-nova-senha').value;
+    if (!novaSenha) return showToast("Digite a nova senha.", "warning");
+    if (!usuarioIdReset) return;
+
+    try {
+        const res = await fetch('/api/admin_reset_senha', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: usuarioIdReset, nova_senha: novaSenha })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message, "success");
+            fecharModalReset();
+        } else {
+            showToast(data.message, "error");
+        }
+    } catch (e) {
+        showToast("Erro de conexão.", "error");
+    }
 }
