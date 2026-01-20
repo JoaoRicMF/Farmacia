@@ -1,37 +1,49 @@
 :root {
-    /* --- CORES (MODO CLARO - PADRÃO) --- */
-    --primary: #2563eb;       /* Azul Royal */
+    /* Cores Claras (Light Mode) */
+    --primary: #2563eb;
     --primary-hover: #1d4ed8;
-    --primary-dark: #0f172a;  /* Cor de fundo da Sidebar */
-
-    --bg-body: #f8fafc;       /* Fundo da página (cinza muito claro) */
-    --bg-card: #ffffff;       /* Fundo dos cartões (branco) */
-
-    --text-main: #334155;     /* Texto principal (cinza escuro) */
-    --text-light: #64748b;    /* Texto secundário (cinza médio) */
-
-    --border: #e2e8f0;        /* Cor das bordas */
-
-    --success: #10b981;       /* Verde */
-    --danger: #ef4444;        /* Vermelho */
-    --warning: #f59e0b;       /* Laranja */
-
-    /* --- DIMENSÕES & EFEITOS --- */
+    --bg-body: #f8fafc;
+    --bg-card: #ffffff;
+    --text-main: #1e293b;
+    --text-light: #64748b;
+    --border: #e2e8f0;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     --sidebar-width: 260px;
-    --header-height: 70px;
-    --border-radius: 10px;
-    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-/* --- MODO ESCURO (VARIÁVEIS) --- */
 [data-theme="dark"] {
-    --bg-body: #0f172a;
-    --bg-card: #1e293b;
+    /* Cores Escuras (Dark Mode Real - Contraste Suave) */
+    --primary: #3b82f6; /* Azul mais claro para leitura em fundo escuro */
+    --primary-hover: #60a5fa;
+    --bg-body: #0f172a; /* Azul marinho muito escuro, não preto puro */
+    --bg-card: #1e293b; /* Cinza azulado para cards */
     --text-main: #f1f5f9;
     --text-light: #94a3b8;
     --border: #334155;
-    --primary-dark: #020617;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+
+    /* Ajustes específicos para inputs em dark mode */
+    --input-bg: #0f172a;
+}
+
+/* Aplicação de cores globais */
+body {
+    background-color: var(--bg-body);
+    color: var(--text-main);
+}
+
+.card, .sidebar, .summary-card, .modal-content {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border);
+}
+
+input, select, textarea {
+    background-color: var(--bg-body); /* Contraste dentro do card */
+    color: var(--text-main);
+    border: 1px solid var(--border);
 }
 
 /* --- RESET & GERAL --- */
@@ -592,3 +604,156 @@ tr.row-proximo td {
     align-items: center;
     gap: 5px;
 }
+
+@media (max-width: 1024px) {
+    /* Esconde Sidebar no Desktop/Tablet pequeno */
+    .sidebar {
+        transform: translateX(-100%);
+        z-index: 1000;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+    }
+
+    .sidebar.active {
+        transform: translateX(0);
+    }
+
+    /* Conteúdo expande */
+    .content {
+        margin-left: 0;
+        width: 100%;
+        padding: 15px;
+    }
+
+    /* Overlay escuro quando menu abre */
+    #mobile-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 999;
+    }
+
+    /* Cards do Dashboard viram coluna */
+    .dashboard-cards {
+        grid-template-columns: 1fr; /* Um por linha em mobile */
+    }
+
+    /* Ajuste de Botões no Header */
+    .header-flex {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .btn-toggle {
+        display: block !important; /* Mostra botão hamburger */
+        background: none;
+        border: none;
+        font-size: 1.8rem;
+        cursor: pointer;
+        color: var(--text-main);
+    }
+}
+
+/* Tabelas com Scroll Horizontal Suave */
+.table-responsive {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+body:not([data-theme="dark"]) .sidebar,
+body:not([data-theme="dark"]) .sidebar a,
+body:not([data-theme="dark"]) .sidebar .menu-item,
+body:not([data-theme="dark"]) .sidebar h2 {
+    color: #000000 !important;
+}
+
+/* Garante que os ícones também fiquem escuros */
+body:not([data-theme="dark"]) .sidebar .menu-item span {
+    color: #000000 !important;
+}
+
+/* Opcional: Ajustar o hover para não sumir o texto (fundo cinza claro) */
+body:not([data-theme="dark"]) .sidebar .menu-item:hover {
+    background-color: #e2e8f0;
+    color: #000000 !important;
+}
+
+/* --- AVATAR E PERFIL --- */
+.user-profile-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: rgba(0, 0, 0, 0.03); /* Fundo sutil */
+    border-radius: 12px;
+    margin-top: 10px;
+}
+
+.avatar-circle {
+    width: 42px;
+    height: 42px;
+    background-color: var(--primary);
+    color: #ffffff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.user-info-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+/* --- CORREÇÃO: Menu Lateral no Modo Claro --- */
+/* Força a cor preta no texto do menu quando NÃO estiver em modo escuro */
+body:not([data-theme="dark"]) .sidebar,
+body:not([data-theme="dark"]) .sidebar a,
+body:not([data-theme="dark"]) .sidebar .menu-item,
+body:not([data-theme="dark"]) .sidebar h2,
+body:not([data-theme="dark"]) .user-info-text {
+    color: #1e293b !important;
+}
+
+/* Mantém ícones visíveis */
+body:not([data-theme="dark"]) .menu-item span {
+    color: #334155 !important;
+}
+[data-theme="dark"] .sidebar {
+    background-color: var(--bg-card) !important;
+    border-right: 1px solid var(--border);
+}
+
+/* Ajuste do Hover no modo claro */
+body:not([data-theme="dark"]) .menu-item:hover {
+    background-color: #e2e8f0;
+    color: #0f172a !important;
+}
+body:not([data-theme="dark"]) .sidebar {
+    background-color: #ffffff !important; /* Remove o azul */
+    border-right: 1px solid #e2e8f0;      /* Separa do restante da página */
+}
+
+.logo-container {
+    /* Padding: Topo | Direita | Baixo | Esquerda */
+    padding: 25px 12px 10px 12px;
+    display: flex;
+    align-items: center;
+}
+
+.logo-container h2 {
+    margin: 0; /* Remove margens padrão que empurram o texto */
+    font-size: 1.5rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Espaço entre o ícone 💊 e o texto */
+    line-height: 1;
+}
+

@@ -11,7 +11,7 @@
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
 </head>
 <body>
-
+<div id="mobile-overlay" onclick="toggleSidebar()"></div>
 <div id="toast-container"></div>
 
 <div id="login-screen">
@@ -42,7 +42,9 @@
         </div>
 
         <div class="user-info">
-            <div class="avatar-circle">👤</div>
+            <div class="avatar-circle">
+                <span id="avatar-icon">👤</span>
+            </div>
             <div class="user-text">
                 <small>Bem-vindo,</small>
                 <div id="user-display" class="user-name">Usuário</div>
@@ -51,6 +53,9 @@
         </div>
 
         <nav class="sidebar-menu">
+            <div class="logo-container">
+                <h2>💊 Farmácia</h2>
+            </div>
             <div class="menu-item active" onclick="nav('dashboard', this)" role="button" tabindex="0">
                 <span class="icon">📊</span> Dashboard
             </div>
@@ -478,31 +483,55 @@
     <div id="view-config" class="hidden">
         <div class="header-flex">
             <div style="display: flex; align-items: center; gap: 15px;">
-                <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+                <button class="btn-toggle no-print" onclick="toggleSidebar()" style="display:none;">☰</button>
                 <h1>Configurações</h1>
             </div>
         </div>
 
-        <div class="card" style="max-width: 600px;">
-            <h3>👤 Editar Perfil</h3>
-            <div class="form-group">
-                <label for="conf-login">Login de Acesso</label>
-                <input type="text" id="conf-login">
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>🎨 Aparência</h3>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 15px;">
+                <span>Tema do Sistema</span>
+                <button class="btn btn-secondary" onclick="toggleDarkMode()">
+                    <span id="text-theme">Alternar Tema</span> 🌗
+                </button>
             </div>
-            <div class="form-group">
-                <label for="conf-nome">Nome de Exibição</label>
-                <input type="text" id="conf-nome">
+        </div>
+
+        <div class="card">
+            <h3>📂 Categorias Financeiras</h3>
+            <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 15px;">Adicione categorias personalizadas para usar nos lançamentos.</p>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="nova-cat-nome" placeholder="Nome da nova categoria..." style="flex:1;">
+                <button class="btn btn-primary" onclick="adicionarCategoriaPersonalizada()">➕ Adicionar</button>
             </div>
 
-            <h3 style="margin-top: 30px;">🔒 Segurança</h3>
-            <div class="form-group">
-                <label for="conf-senha">Nova Senha</label>
-                <input type="password" id="conf-senha" placeholder="********">
+            <div id="lista-categorias-config" style="display: flex; flex-wrap: wrap; gap: 10px;">
             </div>
+            <br>
+            <button class="btn btn-secondary" onclick="resetarCategorias()">Restaurar Padrões</button>
+        </div>
 
-            <div class="form-actions">
-                <button class="btn btn-primary" onclick="salvarConfiguracoes()">Salvar Alterações</button>
+        <div class="card" style="margin-top: 20px;">
+            <h3>👤 Perfil de Acesso</h3>
+            <div class="form-row">
+                <div class="half-width">
+                    <label>Login Atual</label>
+                    <input type="text" id="conf-login" readonly style="background: var(--bg-body); opacity: 0.7;">
+                </div>
+                <div class="half-width">
+                    <label>Nome de Exibição</label>
+                    <input type="text" id="conf-nome">
+                </div>
             </div>
+            <div class="form-row">
+                <div class="full-width">
+                    <label>Nova Senha (deixe em branco para manter)</label>
+                    <input type="password" id="conf-senha">
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="salvarConfiguracoes()">💾 Salvar Perfil</button>
         </div>
     </div>
 

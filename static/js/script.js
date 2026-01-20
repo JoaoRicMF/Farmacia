@@ -9,11 +9,137 @@ const LOADER_HTML = `
     </tr>
 `;
 
+// Categorias Padrão do Sistema
+const CATEGORIAS_PADRAO = [
+    "Medicamentos (Estoque)",
+    "Materiais de Consumo",
+    "Impostos & Taxas",
+    "Folha de Pagamento",
+    "Aluguel & Condomínio",
+    "Água/Luz/Internet",
+    "Marketing",
+    "Manutenção",
+    "Outros"
+];
+
 let chartM = null;
 let chartC = null;
 let calendarInstance = null;
 let paginaAtual = 1;
 let totalPaginas = 1;
+let debounceTimer;
+
+/* ==========================================================================
+   GERENCIAMENTO DE CATEGORIAS (LOCAL STORAGE)
+   ========================================================================== */
+function obterCategorias() {
+    const custom = localStorage.getItem('categorias_custom');
+    if (custom) {
+        return JSON.parse(custom);
+    }
+    return [...CATEGORIAS_PADRAO];
+}
+
+function salvarCategorias(lista) {
+    localStorage.setItem('categorias_custom', JSON.stringify(lista));
+    carregarCategoriasNosSelects();
+    renderizarCategoriasConfig();
+    showToast("Lista de categorias atualizada!", "success");
+}
+
+function adicionarCategoriaPersonalizada() {
+    const input = document.getElementById('nova-cat-nome');
+    const nome = input.value.trim();
+
+    if (!nome) return showToast("Digite um nome para a categoria.", "warning");
+
+    const atuais = obterCategorias();
+    // Verifica duplicidade ignorando maiúsculas/minúsculas
+    if (atuais.some(c => c.toLowerCase() === nome.toLowerCase())) {
+        return showToast("Categoria já existe.", "error");
+    }
+
+    atuais.push(nome);
+    atuais.sort(); // Mantém alfabético
+    salvarCategorias(atuais);
+    input.value = "";
+}
+
+function removerCategoria(nome) {
+    if (confirm(`Remover categoria "${nome}"?`)) {
+        let atuais = obterCategorias();
+        atuais = atuais.filter(c => c !== nome);
+        salvarCategorias(atuais);
+    }
+}
+
+function resetarCategorias() {
+    if (confirm("Voltar para as categorias padrão?")) {
+        localStorage.removeItem('categorias_custom');
+        carregarCategoriasNosSelects();
+        renderizarCategoriasConfig();
+        showToast("Categorias resetadas.", "success");
+    }
+}
+
+// Renderiza as tags na tela de Configuração
+function renderizarCategoriasConfig() {
+    const div = document.getElementById('lista-categorias-config');
+    if (!div) return;
+
+    const lista = obterCategorias();
+    div.innerHTML = '';
+
+    lista.forEach(cat => {
+        const isPadrao = CATEGORIAS_PADRAO.includes(cat);
+        const tag = document.createElement('div');
+        tag.className = 'filter-tag';
+        tag.style.padding = '8px 12px';
+        tag.style.marginRight = '8px';
+        tag.style.marginBottom = '8px';
+
+        let html = `<span>${cat}</span>`;
+        if (!isPadrao) {
+            html += ` <span style="cursor:pointer; margin-left:8px; color:var(--danger); font-weight:bold;" onclick="removerCategoria('${cat}')" title="Remover">×</span>`;
+        }
+        tag.innerHTML = html;
+        div.appendChild(tag);
+    });
+}
+
+// Popula todos os <select> do sistema com as categorias atuais
+function carregarCategoriasNosSelects() {
+    const lista = obterCategorias();
+    // IDs dos selects que precisam de categorias
+    const selects = ['boleto-cat', 'filtro-cat', 'edit-cat'];
+
+    selects.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        // Guarda valor selecionado atual para não perder seleção ao recarregar
+        const valorAtual = el.value;
+
+        // Limpa opções
+        let html = '';
+        if (id === 'filtro-cat') {
+            html = '<option value="Todas">Categoria: Todas</option>';
+        } else {
+            html = '<option value="">Selecione...</option>';
+        }
+
+        lista.forEach(cat => {
+            html += `<option value="${cat}">${cat}</option>`;
+        });
+
+        el.innerHTML = html;
+
+        // Tenta restaurar valor se ainda existir na lista
+        if (valorAtual && (lista.includes(valorAtual) || valorAtual === 'Todas')) {
+            el.value = valorAtual;
+        }
+    });
+}
 
 /* ==========================================================================
    UTILITÁRIOS DE UI (Toast, Sidebar, Theme)
@@ -81,7 +207,7 @@ function validarFormulario() {
     const validar = (id, idErro) => {
         const el = document.getElementById(id);
         const err = document.getElementById(idErro);
-        if (!el || el.offsetParent === null) return null;
+        if (!el || el.offsetParent === null) return null; // Campo oculto
 
         if (!el.value || el.value === "") {
             el.classList.add('input-error');
@@ -114,6 +240,7 @@ function limparFormulario() {
         }
     });
     document.querySelectorAll('.error-msg').forEach(el => el.style.display = 'none');
+    document.getElementById('aviso-vencido').style.display = 'none';
 }
 
 /* ==========================================================================
@@ -225,14 +352,20 @@ function nav(viewId, elementoMenu, addToHistory = true) {
         toggleSidebar();
     }
 
-    // 5. Carregamento Específico
+    // 5. Carregamento Específico por Tela
     if (viewId === 'dashboard') {
         setTimeout(() => carregarDashboard(), 50);
         verificarPermissoesUI();
     }
-    if (viewId === 'lista') carregarLista(1);
+    if (viewId === 'lista') {
+        // Se já tiver filtros, mantém, senão carrega padrão
+        carregarLista(1);
+    }
     if (viewId === 'logs') carregarLogs();
-    if (viewId === 'config') carregarConfiguracoes();
+    if (viewId === 'config') {
+        carregarConfiguracoes();
+        renderizarCategoriasConfig(); // Atualiza a lista de categorias na tela de config
+    }
     if (viewId === 'fluxo') {
         const inputMes = document.getElementById('filtro-mes-fluxo');
         if (!inputMes.value) {
@@ -452,8 +585,10 @@ document.getElementById('modal-detalhes')?.addEventListener('click', function(e)
 function sugerirCategoria() {
     const desc = document.getElementById('boleto-desc').value.toLowerCase();
     const catEl = document.getElementById('boleto-cat');
+
+    // Mapa de sugestões por palavra-chave (pode ser expandido)
     const mapa = {
-        'medicamentos': 'Medicamentos (Estoque)', 'cimed': 'Medicamentos (Estoque)', 'ems': 'Medicamentos (Estoque)',
+        'medicamento': 'Medicamentos (Estoque)', 'cimed': 'Medicamentos (Estoque)', 'ems': 'Medicamentos (Estoque)',
         'nc': 'Medicamentos (Estoque)', 'profarma': 'Medicamentos (Estoque)', 'papel': 'Materiais de Consumo',
         'limpeza': 'Materiais de Consumo', 'enel': 'Água/Luz/Internet', 'luz': 'Água/Luz/Internet',
         'agua': 'Água/Luz/Internet', 'sabesp': 'Água/Luz/Internet', 'internet': 'Água/Luz/Internet',
@@ -551,8 +686,6 @@ async function salvarBoleto(manterAberto = true) {
 /* ==========================================================================
    LISTAGEM & CRUD
    ========================================================================== */
-let debounceTimer;
-
 function debounceCarregarLista() {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
@@ -580,6 +713,10 @@ async function carregarLista(pagina = 1) {
     const status = document.getElementById('filtro-status').value;
     const cat = document.getElementById('filtro-cat').value;
     const tbody = document.querySelector('#tabela-registros tbody');
+
+    // Previne erro se a tabela não existir na view atual
+    if (!tbody) return;
+
     tbody.innerHTML = LOADER_HTML;
     atualizarResumoFiltros(busca, status, cat);
 
@@ -593,8 +730,10 @@ async function carregarLista(pagina = 1) {
         const infoPag = document.getElementById('info-paginas');
         if (infoPag) infoPag.innerText = `Pág. ${data.pagina_atual} de ${data.total_paginas || 1}`;
 
-        document.getElementById('btn-ant').disabled = (paginaAtual <= 1);
-        document.getElementById('btn-prox').disabled = (paginaAtual >= totalPaginas);
+        const btnAnt = document.getElementById('btn-ant');
+        const btnProx = document.getElementById('btn-prox');
+        if (btnAnt) btnAnt.disabled = (paginaAtual <= 1);
+        if (btnProx) btnProx.disabled = (paginaAtual >= totalPaginas);
 
         tbody.innerHTML = '';
         if (!data.registros || data.registros.length === 0) {
@@ -602,13 +741,16 @@ async function carregarLista(pagina = 1) {
             return;
         }
 
+        const hoje = new Date();
+        hoje.setHours(0,0,0,0);
+
         data.registros.forEach(item => {
             let classeStatus = `status-${item.status}`;
             let textoStatus = item.status || 'Desconhecido';
             let valorFmt = item.valor ? parseFloat(item.valor).toFixed(2).replace('.', ',') : '0,00';
+            let classeLinha = '';
 
-            // Verifica vencimento visualmente
-            // Lógica de Cores da Linha (Highlight)
+            // Lógica de Cores da Linha (Highlight) e Status Automático
             if (item.status === 'Pendente' && item.vencimento) {
                 const parts = item.vencimento.split('/');
                 if (parts.length === 3) {
@@ -629,16 +771,18 @@ async function carregarLista(pagina = 1) {
             }
 
             const tr = document.createElement('tr');
+            if (classeLinha) tr.className = classeLinha;
+
             const itemSafe = JSON.stringify(item).replace(/"/g, '&quot;');
             const btnExcluir = data.perm_excluir ? `<button class="action-btn" title="Excluir" style="color:#ef4444" onclick="excluir(${item.id})">🗑️</button>` : '';
             const btnAcao = item.status === 'Pendente'
-                ? `<button class="action-btn" title="Pagar" style="color:#059669" onclick="mudarStatus(${item.id}, 'Pago')">✅</button>`
+                ? `<button class="action-btn" title="Pagar" style="color:#059669; font-weight:bold;" onclick="mudarStatus(${item.id}, 'Pago')">✔</button>`
                 : `<button class="action-btn" title="Reabrir" style="color:#d97706" onclick="mudarStatus(${item.id}, 'Pendente')">↺</button>`;
 
             tr.innerHTML = `
                 <td style="font-family:monospace;">${item.vencimento || '--'}</td>
                 <td style="font-weight:500;"></td>
-                <td><small style="background:#f1f5f9;padding:4px 8px;border-radius:4px;">${item.categoria || 'Geral'}</small></td>
+                <td><small style="background:var(--bg-body);padding:4px 8px;border-radius:4px;border:1px solid var(--border);">${item.categoria || 'Geral'}</small></td>
                 <td style="font-weight:700;">R$ ${valorFmt}</td>
                 <td><span class="${classeStatus} status-badge">${textoStatus}</span></td>
                 <td style="text-align:right;">
@@ -649,7 +793,7 @@ async function carregarLista(pagina = 1) {
             tbody.appendChild(tr);
         });
     } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="6" style="color:red; text-align:center;">Erro de conexão.</td></tr>';
+        if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="color:red; text-align:center;">Erro de conexão.</td></tr>';
     }
 }
 
@@ -766,7 +910,7 @@ async function carregarFluxo() {
                 try { const p = item.data.split('-'); dataFmt = `${p[2]}/${p[1]}`; } catch (e) { }
 
                 tr.innerHTML = `<td><small>${dataFmt}</small></td><td></td>
-                    <td><span style="font-size:0.75rem; background:var(--bg-body); padding:2px 6px; border-radius:4px;">${item.categoria}</span></td>
+                    <td><span style="font-size:0.75rem; background:var(--bg-body); padding:2px 6px; border-radius:4px; border:1px solid var(--border);">${item.categoria}</span></td>
                     <td style="color:${cor}; font-weight:bold;">${sinal} ${fmt(item.valor)}</td>
                     <td style="text-align:right;">${btnExcluir}</td>`;
                 tr.children[1].textContent = item.descricao;
@@ -902,19 +1046,27 @@ async function carregarLogs() {
    INICIALIZAÇÃO & EVENTOS GLOBAIS
    ========================================================================== */
 document.addEventListener("DOMContentLoaded", () => {
+    // 1. Tenta restaurar sessão e estado da página (Persistence)
     verificarSessao();
+
+    // 2. Carrega Tema
     if (localStorage.getItem('theme') === 'dark') {
         document.body.setAttribute('data-theme', 'dark');
         document.getElementById('text-theme').innerText = "Modo Claro";
     }
 
+    // 3. Inicializa Categorias (Carrega nos selects e config)
+    carregarCategoriasNosSelects();
+    renderizarCategoriasConfig();
+
+    // 4. Define datas padrão (Hoje)
     const hoje = new Date().toISOString().split('T')[0];
     const i1 = document.getElementById('ent-data');
     const i2 = document.getElementById('sai-data');
     if (i1) i1.value = hoje;
     if (i2) i2.value = hoje;
 
-    // Atalhos do Formulário Boleto (Enter para navegar)
+    // 5. Listener Enter para Formulário
     const campos = ['boleto-cod', 'boleto-desc', 'boleto-valor', 'boleto-venc', 'boleto-cat', 'boleto-status'];
     campos.forEach((id, idx) => {
         const el = document.getElementById(id);
@@ -923,7 +1075,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     if (idx === campos.length - 1) salvarBoleto();
-                    else document.getElementById(campos[idx + 1])?.focus();
+                    else {
+                        const prox = document.getElementById(campos[idx + 1]);
+                        if (prox) prox.focus();
+                    }
                 }
             });
         }
