@@ -4,6 +4,7 @@ from flask import Flask, render_template
 from flask_migrate import Migrate
 from models import db
 import database_manager as db_manager
+from flask_wtf.csrf import CSRFProtect
 from routes import auth, dashboard, financeiro
 
 # --- CONFIGURAÇÃO DE LOGGING ---
@@ -44,6 +45,7 @@ app.secret_key = os.getenv('SECRET_KEY', 'chave_dev_padrao_insira_uma_chave_fort
 # --- INICIALIZAÇÃO EXTENSÕES ---
 db.init_app(app)
 migrate = Migrate(app, db)
+csrf = CSRFProtect(app)
 
 # --- INICIALIZAÇÃO DO BANCO ---
 # Garante que as tabelas existem antes de o servidor aceitar requisições

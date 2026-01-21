@@ -6,3 +6,4 @@ werkzeug
 flask-sqlalchemy
 flask-migrate
 psycopg2-binary
+flask-wtf

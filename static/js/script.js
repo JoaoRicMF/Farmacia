@@ -265,7 +265,7 @@ async function fazerLogin() {
     try {
         const res = await fetch('/api/login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ usuario: userEl.value, senha: passEl.value })
         });
         const data = await res.json();
@@ -557,7 +557,7 @@ async function verDetalhes(tipo, titulo) {
 
     try {
         const res = await fetch('/api/detalhes_card', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ tipo: tipo })
         });
         const lista = await res.json();
@@ -634,7 +634,7 @@ async function lerCodigoBarras() {
     codInput.style.opacity = "0.5";
     try {
         const res = await fetch('/api/ler_codigo', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ codigo: cod })
         });
         const data = await res.json();
@@ -673,7 +673,7 @@ async function salvarBoleto(manterAberto = true) {
 
     try {
         const res = await fetch('/api/novo_boleto', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify(dados)
         });
         const resp = await res.json();
@@ -830,7 +830,7 @@ function mudarPagina(delta) {
 
 async function mudarStatus(id, novoStatus) {
     await fetch('/api/atualizar_status', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({ id: id, status: novoStatus })
     });
     showToast(`Status alterado: ${novoStatus}`, "success");
@@ -841,7 +841,7 @@ async function excluir(id) {
     if (!confirm("Excluir registro?")) return;
     try {
         const res = await fetch('/api/excluir', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ id: id })
         });
         const d = await res.json();
@@ -879,7 +879,7 @@ async function salvarEdicao() {
     };
     try {
         const res = await fetch('/api/editar', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify(dados)
         });
         if ((await res.json()).success) {
@@ -963,7 +963,7 @@ async function salvarEntradaCaixa() {
 
     try {
         const res = await fetch('/api/nova_entrada', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ valor: valor, forma: forma, data: dataEnt })
         });
         if ((await res.json()).success) {
@@ -983,7 +983,7 @@ async function salvarSaidaCaixa() {
 
     try {
         const res = await fetch('/api/nova_saida_caixa', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ descricao: desc, valor: formatarValorParaBanco(valorStr), forma: forma, data: dataSai })
         });
         if ((await res.json()).success) {
@@ -1000,7 +1000,7 @@ async function excluirItemFluxo(id, tipo) {
     let url = (tipo === 'entrada') ? '/api/excluir_entrada' : '/api/excluir_saida_caixa';
     try {
         const res = await fetch(url, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ id: id })
         });
         if ((await res.json()).success) { showToast("Removido.", "success"); carregarFluxo(); }
@@ -1039,7 +1039,7 @@ async function salvarConfiguracoes() {
     };
     try {
         const res = await fetch('/api/alterar_perfil', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify(dados)
         });
         if ((await res.json()).success) {
@@ -1157,7 +1157,7 @@ async function criarNovoUsuario() {
     try {
         const res = await fetch('/api/criar_usuario', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ nome: nome, usuario: login, senha: senha, funcao: funcao })
         });
         const data = await res.json();
@@ -1280,7 +1280,7 @@ async function cadastrarFornecedor() {
     try {
         const res = await fetch('/api/novo_fornecedor', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ nome: nome, categoria: cat })
         });
         const data = await res.json();
@@ -1302,7 +1302,7 @@ async function removerFornecedor(id) {
 
     await fetch('/api/excluir_fornecedor', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({ id: id })
     });
     carregarFornecedores();
@@ -1369,7 +1369,7 @@ async function confirmarResetSenha() {
     try {
         const res = await fetch('/api/admin_reset_senha', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json','X-CSRFToken': getCsrfToken() },
             body: JSON.stringify({ id: usuarioIdReset, nova_senha: novaSenha })
         });
         const data = await res.json();
@@ -1383,4 +1383,7 @@ async function confirmarResetSenha() {
     } catch (e) {
         showToast("Erro de conexão.", "error");
     }
+}
+function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 }
