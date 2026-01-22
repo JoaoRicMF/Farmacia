@@ -17,7 +17,6 @@
 /home/jrmf/Codigo/POO/Farmacia/routes/src/main/java/com/farmacia/model/EntradaCaixa.java
 /home/jrmf/Codigo/POO/Farmacia/routes/src/main/java/com/farmacia/repository/UsuarioRepository.java
 /home/jrmf/Codigo/POO/Farmacia/routes/src/main/java/com/farmacia/service/BoletoUtils.java
-/home/jrmf/Codigo/POO/Farmacia/routes/src/main/java/com/farmacia/controller/DashboardController.java
 /home/jrmf/Codigo/POO/Farmacia/routes/src/main/java/com/farmacia/controller/HomeController.java
 /home/jrmf/Codigo/POO/Farmacia/routes/src/main/java/com/farmacia/model/Financeiro.java
 /home/jrmf/Codigo/POO/Farmacia/routes/src/main/java/com/farmacia/config/SecurityConfig.java

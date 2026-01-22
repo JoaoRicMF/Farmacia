@@ -16,20 +16,31 @@ public class UsuarioService {
 
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private LogRepository logRepository;
-    @Autowired private PasswordEncoder passwordEncoder; // BCrypt configurado no SecurityConfig
+    @Autowired private PasswordEncoder passwordEncoder;
 
+    // --- INICIALIZAÇÃO (Chamado pelo FarmaciaApplication) ---
     public void criarUsuarioInicial() {
         if (usuarioRepository.count() == 0) {
             Usuario admin = new Usuario();
             admin.setUsuario("admin");
             admin.setNome("Administrador");
             admin.setFuncao("Admin");
-            admin.setSenha(passwordEncoder.encode("admin123")); // Senha inicial
+            admin.setSenha(passwordEncoder.encode("admin123")); // Senha padrão
             usuarioRepository.save(admin);
-            System.out.println("⚠️ Usuário 'admin' criado.");
+            System.out.println("⚠️ Usuário 'admin' criado com a senha 'admin123'.");
         }
     }
 
+    // --- LISTAGEM (Chamado pelo AuthController) ---
+    public List<Usuario> listarTodos() {
+        return usuarioRepository.findAll();
+    }
+
+    public List<Log> listarLogs() {
+        return logRepository.findTop100ByOrderByIdDesc();
+    }
+
+    // --- LOGIN ---
     public Usuario verificarLogin(String login, String senhaRaw) {
         Optional<Usuario> userOpt = usuarioRepository.findByUsuario(login);
         if (userOpt.isPresent() && passwordEncoder.matches(senhaRaw, userOpt.get().getSenha())) {
@@ -38,46 +49,62 @@ public class UsuarioService {
         return null;
     }
 
+    // --- CRIAÇÃO ---
     @Transactional
-    public String criarNovoUsuario(String adminLog, String login, String senha, String nome, String funcao) {
+    public void criarUsuario(String adminLog, String nome, String login, String senha, String funcao) {
         if (usuarioRepository.findByUsuario(login).isPresent()) {
-            return "Erro: Usuário já existe.";
+            throw new RuntimeException("Usuário já existe.");
         }
         Usuario u = new Usuario();
+        u.setNome(nome);
         u.setUsuario(login);
         u.setSenha(passwordEncoder.encode(senha));
-        u.setNome(nome);
         u.setFuncao(funcao);
         usuarioRepository.save(u);
+
         registrarLog(adminLog, "Gestão Usuários", "Criou usuário: " + login);
-        return "Sucesso";
     }
 
+    // --- ALTERAÇÃO DE SENHA (ADMIN) ---
     @Transactional
-    public void alterarSenha(String nomeUsuario, String novaSenha) {
-        Optional<Usuario> userOpt = usuarioRepository.findByNome(nomeUsuario);
-        if (userOpt.isPresent()) {
-            Usuario u = userOpt.get();
+    public void alterarSenhaPorId(String adminLog, Integer id, String novaSenha) {
+        usuarioRepository.findById(id).ifPresent(u -> {
             u.setSenha(passwordEncoder.encode(novaSenha));
             usuarioRepository.save(u);
-            registrarLog(nomeUsuario, "Segurança", "Alterou a senha");
-        }
+            registrarLog(adminLog, "Segurança", "Resetou senha do usuário ID: " + id);
+        });
     }
 
+    // --- PERFIL DO USUÁRIO ---
+    @Transactional
+    public boolean atualizarPerfil(String usuarioAtual, String novoNome, String novoLogin, String novaSenha) {
+        Optional<Usuario> opt = usuarioRepository.findByUsuario(usuarioAtual);
+
+        if (opt.isPresent()) {
+            Usuario u = opt.get();
+            u.setNome(novoNome);
+            u.setUsuario(novoLogin);
+            if (novaSenha != null && !novaSenha.isEmpty()) {
+                u.setSenha(passwordEncoder.encode(novaSenha));
+            }
+            usuarioRepository.save(u);
+            registrarLog(usuarioAtual, "Perfil", "Atualizou os próprios dados");
+            return true;
+        }
+        return false;
+    }
+
+    // --- LOGS ---
     public void registrarLog(String usuario, String acao, String detalhes) {
         try {
             Log log = new Log();
-            log.setUsuario(usuario);
+            log.setUsuario(usuario != null ? usuario : "Sistema");
             log.setAcao(acao);
             log.setDetalhes(detalhes);
             log.setDataHora(LocalDateTime.now());
             logRepository.save(log);
         } catch (Exception e) {
-            System.err.println("Erro ao salvar log: " + e.getMessage());
+            e.printStackTrace(); // Apenas loga no console se falhar
         }
-    }
-
-    public List<Log> listarLogs() {
-        return logRepository.findTop100ByOrderByIdDesc();
     }
 }

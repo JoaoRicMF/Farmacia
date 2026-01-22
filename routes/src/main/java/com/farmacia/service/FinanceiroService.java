@@ -23,16 +23,14 @@ public class FinanceiroService {
     @Autowired private EntradaCaixaRepository entradaRepo;
     @Autowired private SaidaCaixaRepository saidaRepo;
     @Autowired private FornecedorRepository fornecedorRepo;
-    @Autowired private UsuarioService usuarioService; // Para logs
+    @Autowired private UsuarioService usuarioService;
 
-    // --- REGISTROS FINANCEIROS (Boletos) ---
+    // --- REGISTROS FINANCEIROS ---
 
     public Page<Financeiro> listarRegistros(String busca, String status, String categoria, Pageable pageable) {
-        // Tratamento de nulos igual ao Python
         status = (status == null || status.isEmpty()) ? "Todos" : status;
         categoria = (categoria == null || categoria.isEmpty()) ? "Todas" : categoria;
         busca = (busca == null) ? "" : busca;
-
         return financeiroRepo.buscarComFiltros(busca, status, categoria, pageable);
     }
 
@@ -44,16 +42,24 @@ public class FinanceiroService {
     }
 
     @Transactional
-    public void editarRegistro(String userLog, Integer id, Financeiro dadosNovos) {
+    public void editarRegistro(String userLog, Integer id, Financeiro dados) {
         financeiroRepo.findById(id).ifPresent(reg -> {
-            String detalhe = "De: " + reg.getValor() + " Para: " + dadosNovos.getValor();
-            reg.setDescricao(dadosNovos.getDescricao());
-            reg.setValor(dadosNovos.getValor());
-            reg.setVencimento(dadosNovos.getVencimento());
-            reg.setCategoria(dadosNovos.getCategoria());
-            reg.setStatus(dadosNovos.getStatus());
+            reg.setDescricao(dados.getDescricao());
+            reg.setValor(dados.getValor());
+            reg.setVencimento(dados.getVencimento());
+            reg.setCategoria(dados.getCategoria());
+            reg.setStatus(dados.getStatus());
             financeiroRepo.save(reg);
-            usuarioService.registrarLog(userLog, "Edição", detalhe);
+            usuarioService.registrarLog(userLog, "Edição", "Editou registro ID: " + id);
+        });
+    }
+
+    @Transactional
+    public void atualizarStatus(String userLog, Integer id, String novoStatus) {
+        financeiroRepo.findById(id).ifPresent(reg -> {
+            reg.setStatus(novoStatus);
+            financeiroRepo.save(reg);
+            usuarioService.registrarLog(userLog, "Status", "Mudou ID " + id + " para " + novoStatus);
         });
     }
 
@@ -65,121 +71,160 @@ public class FinanceiroService {
         });
     }
 
-    // --- FLUXO DE CAIXA COMPLEXO (O antigo obter_resumo_fluxo) ---
+    // --- DASHBOARD ---
+
+    public Map<String, Object> obterDadosDashboard(String periodo) {
+        // Exemplo simplificado. Em produção usar queries JPQL específicas para performance.
+        LocalDate hoje = LocalDate.now();
+        LocalDate inicioMes = hoje.withDayOfMonth(1);
+
+        List<Financeiro> todos = financeiroRepo.findAll(); // Idealmente filtrar por data no banco
+
+        BigDecimal pagarMes = todos.stream()
+                .filter(f -> !f.getStatus().equals("Pago") && f.getVencimento().getMonth() == hoje.getMonth() && f.getVencimento().getYear() == hoje.getYear())
+                .map(Financeiro::getValor).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal pagoMes = todos.stream()
+                .filter(f -> f.getStatus().equals("Pago") && f.getVencimento().getMonth() == hoje.getMonth() && f.getVencimento().getYear() == hoje.getYear())
+                .map(Financeiro::getValor).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<Financeiro> vencidos = todos.stream()
+                .filter(f -> !f.getStatus().equals("Pago") && f.getVencimento().isBefore(hoje))
+                .collect(Collectors.toList());
+
+        List<Financeiro> proximos = todos.stream()
+                .filter(f -> !f.getStatus().equals("Pago") && !f.getVencimento().isBefore(hoje) && f.getVencimento().isBefore(hoje.plusDays(5)))
+                .collect(Collectors.toList());
+
+        // Mapas para Gráficos
+        Map<String, BigDecimal> porCategoria = todos.stream()
+                .filter(f -> f.getVencimento().getMonth() == hoje.getMonth())
+                .collect(Collectors.groupingBy(Financeiro::getCategoria,
+                        Collectors.reducing(BigDecimal.ZERO, Financeiro::getValor, BigDecimal::add)));
+
+        List<Map<String, Object>> graficoCat = new ArrayList<>();
+        porCategoria.forEach((k, v) -> graficoCat.add(Map.of("categoria", k, "total", v)));
+
+        // Estrutura de Resposta
+        Map<String, Object> cards = new HashMap<>();
+        cards.put("pagar_mes", pagarMes);
+        cards.put("pago_mes", pagoMes);
+        cards.put("vencidos_val", vencidos.stream().map(Financeiro::getValor).reduce(BigDecimal.ZERO, BigDecimal::add));
+        cards.put("vencidos_qtd", vencidos.size());
+        cards.put("proximos_val", proximos.stream().map(Financeiro::getValor).reduce(BigDecimal.ZERO, BigDecimal::add));
+        cards.put("proximos_qtd", proximos.size());
+
+        Map<String, Object> graficos = new HashMap<>();
+        graficos.put("por_categoria", graficoCat);
+        // Gráfico por mês (Dummy data ou cálculo real de 6 meses)
+        graficos.put("por_mes", List.of(Map.of("mes", "Atual", "total", pagarMes.add(pagoMes))));
+
+        return Map.of("cards", cards, "graficos", graficos);
+    }
+
+    public List<Map<String, Object>> obterEventosCalendario() {
+        return financeiroRepo.findAll().stream().map(f -> {
+            Map<String, Object> evento = new HashMap<>();
+            evento.put("title", f.getDescricao() + " (" + f.getValor() + ")");
+            evento.put("start", f.getVencimento().toString());
+            evento.put("color", f.getStatus().equals("Pago") ? "#10b981" : (f.getVencimento().isBefore(LocalDate.now()) ? "#ef4444" : "#3b82f6"));
+            return evento;
+        }).collect(Collectors.toList());
+    }
+
+    public List<Financeiro> listarDetalhesCard(String tipo) {
+        LocalDate hoje = LocalDate.now();
+        List<Financeiro> todos = financeiroRepo.findAll();
+
+        if ("vencidos".equals(tipo)) {
+            return todos.stream().filter(f -> !f.getStatus().equals("Pago") && f.getVencimento().isBefore(hoje)).collect(Collectors.toList());
+        } else if ("proximos".equals(tipo)) {
+            return todos.stream().filter(f -> !f.getStatus().equals("Pago") && !f.getVencimento().isBefore(hoje) && f.getVencimento().isBefore(hoje.plusDays(7))).collect(Collectors.toList());
+        }
+        return new ArrayList<>();
+    }
+
+    // --- FLUXO DE CAIXA ---
 
     public Map<String, Object> obterResumoFluxo(int mes, int ano) {
-        Map<String, Object> resumo = new HashMap<>();
+        BigDecimal entradasTotal = Optional.ofNullable(entradaRepo.somarPorMes(ano, mes)).orElse(BigDecimal.ZERO);
+        BigDecimal saidasTotal = Optional.ofNullable(saidaRepo.somarPorMes(ano, mes)).orElse(BigDecimal.ZERO);
+        BigDecimal boletosPagos = Optional.ofNullable(financeiroRepo.somarPagosPorMes(ano, mes)).orElse(BigDecimal.ZERO);
 
-        // 1. Cálculos de Totais (BigDecimal lida melhor com Null do que double primitivo)
-        BigDecimal entradasTotal = entradaRepo.somarPorMes(ano, mes);
-        BigDecimal entradasDin = entradaRepo.somarPorMesEForma(ano, mes, "Dinheiro");
-        BigDecimal entradasPix = entradaRepo.somarPorMesEForma(ano, mes, "PIX");
-        BigDecimal entradasCart = entradaRepo.somarPorMesEForma(ano, mes, "Cartão");
+        BigDecimal saldo = entradasTotal.subtract(saidasTotal.add(boletosPagos));
 
-        BigDecimal saidasTotal = saidaRepo.somarPorMes(ano, mes);
-        BigDecimal boletosPagos = financeiroRepo.somarPagosPorMes(ano, mes);
-
-        // Trata nulls vindos do banco
-        entradasTotal = (entradasTotal == null) ? BigDecimal.ZERO : entradasTotal;
-        saidasTotal = (saidasTotal == null) ? BigDecimal.ZERO : saidasTotal;
-        boletosPagos = (boletosPagos == null) ? BigDecimal.ZERO : boletosPagos;
-
-        BigDecimal totalSaidasGeral = saidasTotal.add(boletosPagos);
-        BigDecimal saldo = entradasTotal.subtract(totalSaidasGeral);
-
-        resumo.put("entradas_total", entradasTotal);
-        resumo.put("entradas_dinheiro", entradasDin != null ? entradasDin : BigDecimal.ZERO);
-        resumo.put("entradas_pix", entradasPix != null ? entradasPix : BigDecimal.ZERO);
-        resumo.put("entradas_cartao", entradasCart != null ? entradasCart : BigDecimal.ZERO);
-        resumo.put("saidas_total", totalSaidasGeral);
-        resumo.put("saldo", saldo);
-
-        // 2. Construção do Extrato Unificado
         List<ExtratoItemDTO> extrato = new ArrayList<>();
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-        // Adiciona Entradas
-        List<EntradaCaixa> listEnt = entradaRepo.listarPorMes(ano, mes);
-        for (EntradaCaixa e : listEnt) {
-            extrato.add(ExtratoItemDTO.builder()
-                    .id(e.getId())
-                    .dataOrdenacao(e.getDataRegistro())
-                    .data(e.getDataRegistro().format(dtf))
-                    .descricao("Entrada Avulsa")
-                    .valor(e.getValor())
-                    .tipo("entrada")
-                    .categoria(e.getFormaPagamento())
-                    .build());
-        }
+        entradaRepo.listarPorMes(ano, mes).forEach(e -> extrato.add(ExtratoItemDTO.builder()
+                .id(e.getId()).dataOrdenacao(e.getDataRegistro()).data(e.getDataRegistro().format(dtf))
+                .descricao("Entrada Avulsa").valor(e.getValor()).tipo("entrada").categoria(e.getFormaPagamento()).build()));
 
-        // Adiciona Saídas de Caixa
-        List<SaidaCaixa> listSai = saidaRepo.listarPorMes(ano, mes);
-        for (SaidaCaixa s : listSai) {
-            extrato.add(ExtratoItemDTO.builder()
-                    .id(s.getId())
-                    .dataOrdenacao(s.getDataRegistro())
-                    .data(s.getDataRegistro().format(dtf))
-                    .descricao(s.getDescricao())
-                    .valor(s.getValor())
-                    .tipo("saida_caixa")
-                    .categoria(s.getFormaPagamento())
-                    .build());
-        }
+        saidaRepo.listarPorMes(ano, mes).forEach(s -> extrato.add(ExtratoItemDTO.builder()
+                .id(s.getId()).dataOrdenacao(s.getDataRegistro()).data(s.getDataRegistro().format(dtf))
+                .descricao(s.getDescricao()).valor(s.getValor()).tipo("saida_caixa").categoria(s.getFormaPagamento()).build()));
 
-        // Adiciona Boletos Pagos
-        List<Financeiro> listFin = financeiroRepo.listarPagosPorMes(ano, mes);
-        for (Financeiro f : listFin) {
-            extrato.add(ExtratoItemDTO.builder()
-                    .id(f.getId()) // ID 0 no python, mas aqui podemos manter o ID real
-                    .dataOrdenacao(f.getVencimento())
-                    .data(f.getVencimento().format(dtf))
-                    .descricao(f.getDescricao())
-                    .valor(f.getValor())
-                    .tipo("saida_boleto")
-                    .categoria("Conta Paga")
-                    .build());
-        }
+        financeiroRepo.listarPagosPorMes(ano, mes).forEach(f -> extrato.add(ExtratoItemDTO.builder()
+                .id(f.getId()).dataOrdenacao(f.getVencimento()).data(f.getVencimento().format(dtf))
+                .descricao(f.getDescricao()).valor(f.getValor()).tipo("saida_boleto").categoria("Boleto Pago").build()));
 
-        // Ordenação por data (descendente)
         extrato.sort((a, b) -> b.getDataOrdenacao().compareTo(a.getDataOrdenacao()));
 
+        Map<String, Object> resumo = new HashMap<>();
+        resumo.put("entradas_total", entradasTotal);
+        resumo.put("entradas_dinheiro", Optional.ofNullable(entradaRepo.somarPorMesEForma(ano, mes, "Dinheiro")).orElse(BigDecimal.ZERO));
+        resumo.put("entradas_pix", Optional.ofNullable(entradaRepo.somarPorMesEForma(ano, mes, "PIX")).orElse(BigDecimal.ZERO));
+        resumo.put("entradas_cartao", Optional.ofNullable(entradaRepo.somarPorMesEForma(ano, mes, "Cartão")).orElse(BigDecimal.ZERO));
+        resumo.put("saidas_total", saidasTotal.add(boletosPagos));
+        resumo.put("saldo", saldo);
         resumo.put("extrato", extrato);
         return resumo;
     }
-
-    // --- MÉTODOS DE CAIXA (Escrita) ---
 
     @Transactional
     public void adicionarEntrada(String user, EntradaCaixa entrada) {
         entrada.setUsuario(user);
         entradaRepo.save(entrada);
-        usuarioService.registrarLog(user, "Entrada Caixa", "R$ " + entrada.getValor());
+        usuarioService.registrarLog(user, "Fluxo Entrada", "R$ " + entrada.getValor());
     }
 
     @Transactional
     public void adicionarSaidaCaixa(String user, SaidaCaixa saida) {
         saida.setUsuario(user);
         saidaRepo.save(saida);
-        usuarioService.registrarLog(user, "Saída Caixa", "R$ " + saida.getValor());
+        usuarioService.registrarLog(user, "Fluxo Saída", "R$ " + saida.getValor() + " - " + saida.getDescricao());
+    }
+
+    @Transactional
+    public void excluirEntrada(String user, Integer id) {
+        entradaRepo.deleteById(id);
+        usuarioService.registrarLog(user, "Exclusão Fluxo", "Entrada ID: " + id);
+    }
+
+    @Transactional
+    public void excluirSaidaCaixa(String user, Integer id) {
+        saidaRepo.deleteById(id);
+        usuarioService.registrarLog(user, "Exclusão Fluxo", "Saída ID: " + id);
     }
 
     // --- FORNECEDORES ---
 
-    public List<Fornecedor> listarFornecedores() {
-        return fornecedorRepo.findAllByOrderByNomeAsc();
-    }
+    public List<Fornecedor> listarFornecedores() { return fornecedorRepo.findAllByOrderByNomeAsc(); }
 
     @Transactional
     public String adicionarFornecedor(String user, String nome, String categoria) {
-        if (fornecedorRepo.existsByNome(nome)) {
-            return "Fornecedor já cadastrado.";
-        }
+        if (fornecedorRepo.existsByNome(nome)) return "Fornecedor já cadastrado.";
         Fornecedor f = new Fornecedor();
         f.setNome(nome);
         f.setCategoriaPadrao(categoria);
         f.setUsuarioCriacao(user);
         fornecedorRepo.save(f);
-        usuarioService.registrarLog(user, "Configuração", "Cadastrou fornecedor: " + nome);
         return "Sucesso";
+    }
+
+    @Transactional
+    public void excluirFornecedor(String user, Integer id) {
+        fornecedorRepo.deleteById(id);
+        usuarioService.registrarLog(user, "Configuração", "Excluiu fornecedor ID: " + id);
     }
 }
