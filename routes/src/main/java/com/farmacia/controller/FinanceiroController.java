@@ -5,18 +5,17 @@ import com.farmacia.repository.FinanceiroRepository;
 import com.farmacia.service.BoletoUtils;
 import com.farmacia.service.FinanceiroService;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -26,6 +25,17 @@ public class FinanceiroController {
     @Autowired private FinanceiroRepository financeiroRepository;
     @Autowired private BoletoUtils boletoUtils;
 
+    // Método auxiliar para pegar o usuário logado de forma segura
+    private String getUsuarioLogado() {
+        return SecurityContextHolder.getContext().getAuthentication().getName();
+    }
+
+    // Método auxiliar para verificar se é Admin
+    private boolean isAdmin() {
+        return SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_Admin") || a.getAuthority().equals("Admin"));
+    }
+
     // --- CRUD ---
 
     @GetMapping("/api/registros")
@@ -33,9 +43,9 @@ public class FinanceiroController {
             @RequestParam(defaultValue = "1") int pagina,
             @RequestParam(required = false) String busca,
             @RequestParam(defaultValue = "Todos") String status,
-            @RequestParam(defaultValue = "Todas") String categoria,
-            HttpSession session) {
-        if (session.getAttribute("usuario") == null) return ResponseEntity.status(403).build();
+            @RequestParam(defaultValue = "Todas") String categoria) {
+
+        // Não precisa verificar sessão manual, o Spring Security já garante que está logado
 
         Page<Financeiro> page = financeiroService.listarRegistros(
                 busca, status, categoria,
@@ -46,16 +56,14 @@ public class FinanceiroController {
         response.put("registros", page.getContent());
         response.put("total_paginas", page.getTotalPages());
         response.put("pagina_atual", pagina);
-        response.put("perm_excluir", "Admin".equals(session.getAttribute("funcao")));
+        response.put("perm_excluir", isAdmin());
 
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/api/novo_boleto")
-    public ResponseEntity<?> novoBoleto(@RequestBody Financeiro financeiro, HttpSession session) {
-        String user = (String) session.getAttribute("usuario");
-        if (user == null) return ResponseEntity.status(403).build();
-        financeiroService.adicionarRegistro(user, financeiro);
+    public ResponseEntity<?> novoBoleto(@RequestBody Financeiro financeiro) {
+        financeiroService.adicionarRegistro(getUsuarioLogado(), financeiro);
         return ResponseEntity.ok(Map.of("success", true));
     }
 
@@ -65,86 +73,74 @@ public class FinanceiroController {
     }
 
     @PostMapping("/api/editar")
-    public ResponseEntity<?> editarRegistro(@RequestBody Financeiro financeiro, HttpSession session) {
-        String user = (String) session.getAttribute("usuario");
-        if (user == null) return ResponseEntity.status(403).build();
-        financeiroService.editarRegistro(user, financeiro.getId(), financeiro);
+    public ResponseEntity<?> editarRegistro(@RequestBody Financeiro financeiro) {
+        financeiroService.editarRegistro(getUsuarioLogado(), financeiro.getId(), financeiro);
         return ResponseEntity.ok(Map.of("success", true));
     }
 
     @PostMapping("/api/excluir")
-    public ResponseEntity<?> excluirRegistro(@RequestBody Map<String, Integer> payload, HttpSession session) {
-        String user = (String) session.getAttribute("usuario");
-        if (user == null || !"Admin".equals(session.getAttribute("funcao"))) return ResponseEntity.status(403).build();
-        financeiroService.excluirRegistro(user, payload.get("id"));
+    public ResponseEntity<?> excluirRegistro(@RequestBody Map<String, Integer> payload) {
+        if (!isAdmin()) return ResponseEntity.status(403).build();
+
+        financeiroService.excluirRegistro(getUsuarioLogado(), payload.get("id"));
         return ResponseEntity.ok(Map.of("success", true));
     }
 
     @PostMapping("/api/atualizar_status")
-    public ResponseEntity<?> atualizarStatus(@RequestBody Map<String, Object> payload, HttpSession session) {
-        String user = (String) session.getAttribute("usuario");
-        if (user == null) return ResponseEntity.status(403).build();
-        financeiroService.atualizarStatus(user, (Integer) payload.get("id"), (String) payload.get("status"));
+    public ResponseEntity<?> atualizarStatus(@RequestBody Map<String, Object> payload) {
+        financeiroService.atualizarStatus(getUsuarioLogado(), (Integer) payload.get("id"), (String) payload.get("status"));
         return ResponseEntity.ok(Map.of("success", true));
     }
 
     // --- DASHBOARD & CALENDÁRIO ---
 
     @GetMapping("/api/dashboard")
-    public ResponseEntity<?> getDashboard(@RequestParam(defaultValue = "30d") String periodo, HttpSession session) {
-        if (session.getAttribute("usuario") == null) return ResponseEntity.status(403).build();
+    public ResponseEntity<?> getDashboard(@RequestParam(defaultValue = "30d") String periodo) {
         return ResponseEntity.ok(financeiroService.obterDadosDashboard(periodo));
     }
 
     @GetMapping("/api/calendario")
-    public ResponseEntity<?> getCalendario(HttpSession session) {
-        if (session.getAttribute("usuario") == null) return ResponseEntity.status(403).build();
+    public ResponseEntity<?> getCalendario() {
         return ResponseEntity.ok(financeiroService.obterEventosCalendario());
     }
 
     @PostMapping("/api/detalhes_card")
-    public ResponseEntity<?> getDetalhesCard(@RequestBody Map<String, String> payload, HttpSession session) {
-        if (session.getAttribute("usuario") == null) return ResponseEntity.status(403).build();
+    public ResponseEntity<?> getDetalhesCard(@RequestBody Map<String, String> payload) {
         return ResponseEntity.ok(financeiroService.listarDetalhesCard(payload.get("tipo")));
     }
 
     // --- FLUXO DE CAIXA ---
 
     @GetMapping("/api/fluxo_resumo")
-    public ResponseEntity<?> fluxoResumo(@RequestParam int mes, @RequestParam int ano, HttpSession session) {
-        if (session.getAttribute("usuario") == null) return ResponseEntity.status(403).build();
+    public ResponseEntity<?> fluxoResumo(@RequestParam int mes, @RequestParam int ano) {
         return ResponseEntity.ok(financeiroService.obterResumoFluxo(mes, ano));
     }
 
     @PostMapping("/api/nova_entrada")
-    public ResponseEntity<?> novaEntrada(@RequestBody EntradaCaixa entrada, HttpSession session) {
-        String user = (String) session.getAttribute("usuario");
-        if (user == null) return ResponseEntity.status(403).build();
-        financeiroService.adicionarEntrada(user, entrada);
+    public ResponseEntity<?> novaEntrada(@RequestBody EntradaCaixa entrada) {
+        financeiroService.adicionarEntrada(getUsuarioLogado(), entrada);
         return ResponseEntity.ok(Map.of("success", true));
     }
 
     @PostMapping("/api/nova_saida_caixa")
-    public ResponseEntity<?> novaSaidaCaixa(@RequestBody SaidaCaixa saida, HttpSession session) {
-        String user = (String) session.getAttribute("usuario");
-        if (user == null) return ResponseEntity.status(403).build();
-        financeiroService.adicionarSaidaCaixa(user, saida);
+    public ResponseEntity<?> novaSaidaCaixa(@RequestBody SaidaCaixa saida) {
+        financeiroService.adicionarSaidaCaixa(getUsuarioLogado(), saida);
         return ResponseEntity.ok(Map.of("success", true));
     }
 
     @PostMapping("/api/excluir_entrada")
-    public ResponseEntity<?> excluirEntrada(@RequestBody Map<String, Integer> payload, HttpSession session) {
-        String user = (String) session.getAttribute("usuario");
-        if (user == null || !"Admin".equals(session.getAttribute("funcao"))) return ResponseEntity.status(403).build();
-        financeiroService.excluirEntrada(user, payload.get("id"));
+    public ResponseEntity<?> excluirEntrada(@RequestBody Map<String, Integer> payload) {
+        if (!isAdmin()) return ResponseEntity.status(403).build();
+
+        financeiroService.excluirEntrada(getUsuarioLogado(), payload.get("id"));
         return ResponseEntity.ok(Map.of("success", true));
     }
 
     @PostMapping("/api/excluir_saida_caixa")
-    public ResponseEntity<?> excluirSaidaCaixa(@RequestBody Map<String, Integer> payload, HttpSession session) {
-        String user = (String) session.getAttribute("usuario");
-        if (user == null || !"Admin".equals(session.getAttribute("funcao"))) return ResponseEntity.status(403).build();
-        financeiroService.excluirSaidaCaixa(user, payload.get("id"));
+    public ResponseEntity<?> excluirSaidaCaixa(@RequestBody Map<String, Integer> payload) {
+        if (!isAdmin()) return ResponseEntity.status(403).build();
+
+        financeiroService.excluirSaidaCaixa(getUsuarioLogado(), payload.get("id"));
         return ResponseEntity.ok(Map.of("success", true));
     }
 
@@ -156,27 +152,28 @@ public class FinanceiroController {
     }
 
     @PostMapping("/api/novo_fornecedor")
-    public ResponseEntity<?> novoFornecedor(@RequestBody Fornecedor fornecedor, HttpSession session) {
-        String user = (String) session.getAttribute("usuario");
-        if (user == null) return ResponseEntity.status(403).build();
-        String result = financeiroService.adicionarFornecedor(user, fornecedor.getNome(), fornecedor.getCategoriaPadrao());
+    public ResponseEntity<?> novoFornecedor(@RequestBody Fornecedor fornecedor) {
+        String result = financeiroService.adicionarFornecedor(getUsuarioLogado(), fornecedor.getNome(), fornecedor.getCategoriaPadrao());
         if ("Sucesso".equals(result)) return ResponseEntity.ok(Map.of("success", true));
         return ResponseEntity.badRequest().body(Map.of("success", false, "message", result));
     }
 
     @PostMapping("/api/excluir_fornecedor")
-    public ResponseEntity<?> excluirFornecedor(@RequestBody Map<String, Integer> payload, HttpSession session) {
-        String user = (String) session.getAttribute("usuario");
-        if (user == null) return ResponseEntity.status(403).build();
-        financeiroService.excluirFornecedor(user, payload.get("id"));
+    public ResponseEntity<?> excluirFornecedor(@RequestBody Map<String, Integer> payload) {
+        financeiroService.excluirFornecedor(getUsuarioLogado(), payload.get("id"));
         return ResponseEntity.ok(Map.of("success", true));
     }
 
     // --- EXPORTAÇÃO ---
 
     @GetMapping("/api/exportar")
-    public void exportarCsv(HttpServletResponse response, HttpSession session) throws IOException {
-        if (session.getAttribute("usuario") == null) { response.sendError(403); return; }
+    public void exportarCsv(HttpServletResponse response) throws IOException {
+        // Verifica autenticação
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            response.sendError(403);
+            return;
+        }
+
         response.setContentType("text/csv");
         response.setHeader("Content-Disposition", "attachment; filename=\"dados.csv\"");
         try (PrintWriter writer = response.getWriter()) {

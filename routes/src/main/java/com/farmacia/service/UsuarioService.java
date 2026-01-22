@@ -3,6 +3,10 @@ package com.farmacia.service;
 import com.farmacia.model.*;
 import com.farmacia.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,41 +16,45 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-public class UsuarioService {
+public class UsuarioService implements UserDetailsService {
 
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private LogRepository logRepository;
     @Autowired private PasswordEncoder passwordEncoder;
 
-    // --- INICIALIZAÇÃO (Chamado pelo FarmaciaApplication) ---
+    // --- NOVO: Integração com Spring Security ---
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        Usuario usuario = usuarioRepository.findByUsuario(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
+
+        return User.builder()
+                .username(usuario.getUsuario())
+                .password(usuario.getSenha())
+                .roles(usuario.getFuncao()) // Ex: "Admin" vira "ROLE_Admin"
+                .build();
+    }
+
+    // --- INICIALIZAÇÃO ---
     public void criarUsuarioInicial() {
         if (usuarioRepository.count() == 0) {
             Usuario admin = new Usuario();
             admin.setUsuario("admin");
             admin.setNome("Administrador");
             admin.setFuncao("Admin");
-            admin.setSenha(passwordEncoder.encode("admin123")); // Senha padrão
+            admin.setSenha(passwordEncoder.encode("admin123"));
             usuarioRepository.save(admin);
             System.out.println("⚠️ Usuário 'admin' criado com a senha 'admin123'.");
         }
     }
 
-    // --- LISTAGEM (Chamado pelo AuthController) ---
+    // --- LISTAGEM ---
     public List<Usuario> listarTodos() {
         return usuarioRepository.findAll();
     }
 
     public List<Log> listarLogs() {
         return logRepository.findTop100ByOrderByIdDesc();
-    }
-
-    // --- LOGIN ---
-    public Usuario verificarLogin(String login, String senhaRaw) {
-        Optional<Usuario> userOpt = usuarioRepository.findByUsuario(login);
-        if (userOpt.isPresent() && passwordEncoder.matches(senhaRaw, userOpt.get().getSenha())) {
-            return userOpt.get();
-        }
-        return null;
     }
 
     // --- CRIAÇÃO ---
@@ -104,7 +112,7 @@ public class UsuarioService {
             log.setDataHora(LocalDateTime.now());
             logRepository.save(log);
         } catch (Exception e) {
-            e.printStackTrace(); // Apenas loga no console se falhar
+            e.printStackTrace();
         }
     }
 }

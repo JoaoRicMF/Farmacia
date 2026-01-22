@@ -34,6 +34,52 @@ let listaFornecedoresCache = [];
 /* ==========================================================================
    GERENCIAMENTO DE CATEGORIAS (LOCAL STORAGE)
    ========================================================================== */
+   function getCookie(name) {
+       if (!document.cookie) {
+           return null;
+       }
+       const xsrfCookies = document.cookie.split(';')
+           .map(c => c.trim())
+           .filter(c => c.startsWith(name + '='));
+
+       if (xsrfCookies.length === 0) {
+           return null;
+       }
+       return decodeURIComponent(xsrfCookies[0].split('=')[1]);
+   }
+   // Função central para fazer requisições seguras
+   async function request(url, method = 'GET', body = null) {
+       const headers = {
+           'Content-Type': 'application/json'
+       };
+
+       // Se não for GET, adiciona o token CSRF
+       if (method !== 'GET') {
+           const csrfToken = getCookie('XSRF-TOKEN');
+           if (csrfToken) {
+               headers['X-XSRF-TOKEN'] = csrfToken;
+           }
+       }
+
+       const options = {
+           method: method,
+           headers: headers
+       };
+
+       if (body) {
+           options.body = JSON.stringify(body);
+       }
+
+       const response = await fetch(url, options);
+
+       if (response.status === 401 || response.status === 403) {
+           console.warn("Erro de autenticação/CSRF");
+           // Opcional: Redirecionar para login
+           // window.location.href = "/";
+       }
+
+       return response;
+   }
 function obterCategorias() {
     const custom = localStorage.getItem('categorias_custom');
     if (custom) {
@@ -1385,5 +1431,13 @@ async function confirmarResetSenha() {
     }
 }
 function getCsrfToken() {
-    return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    // Procura o cookie XSRF-TOKEN enviado pelo Spring
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.startsWith('XSRF-TOKEN=')) {
+            return decodeURIComponent(cookie.substring('XSRF-TOKEN='.length));
+        }
+    }
+    return null;
 }
