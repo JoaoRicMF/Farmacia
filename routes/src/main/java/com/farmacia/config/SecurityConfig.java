@@ -13,18 +13,13 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
+                .csrf(csrf -> csrf.disable()) // Desabilita CSRF (necessário para suas chamadas fetch funcionarem)
                 .authorizeHttpRequests(auth -> auth
-                        // Libera estáticos e login
-                        .requestMatchers("/", "/index.html", "/static/**", "/css/**", "/js/**", "/api/login").permitAll()
-                        // Exige autenticação para TODO o resto
-                        .anyRequest().authenticated()
-                )
-                // Se a pessoa não tiver logada, retorna 401
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, authException) ->
-                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Não autorizado"))
+                        // PERMITIR TUDO: Deixa seus Controllers (AuthController, etc) decidirem quem entra
+                        // verificando 'session.getAttribute("usuario")' manualmente, igual ao Python.
+                        .anyRequest().permitAll()
                 );
+
         return http.build();
     }
 

@@ -1,35 +1,51 @@
-# --- Python ---
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
+# --- Java & Maven (Essencial) ---
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
 
-# --- Banco de Dados Local (SQLite) ---
-# Ignora o arquivo do banco para não vazar dados reais
-database/*.db
-*.sqlite
-*.sqlite3
+# Wrapper do Maven (Opcional - deixe se quiser versionar o wrapper)
+!.mvn/wrapper/maven-wrapper.jar
 
-# --- Backups ---
-backups/
+# --- Logs & Arquivos Temporários ---
+*.log
+logs/
+temp/
+/routes/app.log
+hs_err_pid*
 
-# --- Variáveis de Ambiente (Segurança) ---
-.env
-
-# --- IDEs (Configurações do PyCharm/VSCode) ---
+# --- IDEs (IntelliJ, Eclipse, VS Code) ---
 .idea/
+*.iml
+*.iws
+*.ipr
 .vscode/
-*.swp
+.classpath
+.project
+.settings/
+.springBeans
+bin/
 
 # --- Sistema Operacional ---
 .DS_Store
 Thumbs.db
+ehthumbs.db
 
-# --- Logs de Erro ---
-*.log
+# --- Segurança & Ambiente Local (CRÍTICO) ---
+.env
+application-local.properties
+/routes/src/main/resources/application-local.properties
+
+# --- Docker (Se não quiser versionar builds locais) ---
+# Se gerar imagens localmente ou usar volumes temporários
+.docker/
+
+# --- Legado Python (Caso ainda tenha arquivos antigos) ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/

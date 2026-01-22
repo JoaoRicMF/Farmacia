@@ -1,31 +1,36 @@
-# 🏥 Farmácia - Sistema Financeiro
+# 🏥 Farmácia - Sistema Financeiro (Spring Boot Edition)
 
-Sistema de gestão financeira completo desenvolvido em Python com Flask, focado no controle de contas a pagar, fluxo de caixa e auditoria para farmácias.
+Sistema de gestão financeira completo, originalmente concebido em Python e **migrado para Java com Spring Boot**, focado no controlo de contas a pagar, fluxo de caixa e auditoria para farmácias.
 
-O sistema foi projetado para ser **híbrido**: roda leve localmente com **SQLite** e escala automaticamente para **PostgreSQL** em produção.
+O sistema foi modernizado para arquitetura **MVC** com **Spring Data JPA** e **MySQL**, pronto para execução em containers Docker.
 
 ## 🚀 Funcionalidades
 
-- **Dashboard Interativo**: Gráficos de despesas mensais (Chart.js), divisão por categorias e indicadores de vencimento.
-- **Fluxo de Caixa Otimizado**: Entradas e saídas com cálculo de saldo em tempo real (Agregações via SQL).
-- **Leitura de Boletos**: Decodificação inteligente de linha digitável e código de barras (Bancário e Concessionárias).
-- **Calendário Visual**: Visualização de vencimentos integrada (FullCalendar).
-- **Auditoria (Logs)**: Rastreamento completo de ações dos usuários (quem fez o quê e quando).
-- **Relatórios**: Exportação de dados para Excel (.xlsx) e CSV.
-- **Segurança**: Login criptografado (SHA-256) e controle de permissões (Admin vs Operador).
+- **Dashboard Interativo**: Gráficos de despesas mensais, divisão por categorias e indicadores de vencimento.
+- **Fluxo de Caixa Otimizado**: Entradas e saídas com cálculo de saldo em tempo real.
+- **Leitura de Boletos**: Decodificação de linha digitável e código de barras.
+- **Calendário Visual**: Visualização de vencimentos (integração FullCalendar).
+- **Auditoria (Logs)**: Rastreio completo de ações dos utilizadores (quem fez o quê e quando).
+- **Relatórios**: Exportação de dados para Excel (.xlsx) usando Apache POI.
+- **Segurança**: Autenticação customizada com BCrypt e Sessão HTTP.
 
 ## 🛠️ Tecnologias Utilizadas
 
-- **Backend**: Python 3.14, Flask, SQLAlchemy.
-- **Banco de Dados**:
-   - *Desenvolvimento*: SQLite (Automático).
-   - *Produção*: PostgreSQL (Via variável de ambiente).
-- **Frontend**: HTML5, CSS3 (Responsivo + Dark Mode), JavaScript Puro.
-- **Servidor**: Gunicorn (Para deploy em produção).
+- **Backend**: Java 17, Spring Boot 3.2.2.
+- **Base de Dados**: MySQL 8.0 (JPA / Hibernate).
+- **Build Tool**: Maven.
+- **Frontend**: HTML5, CSS3, JavaScript Vanilla (servidos via recursos estáticos do Spring).
+- **Infraestrutura**: Docker (Dockerfile incluído).
 
-## 📦 Como Rodar Localmente
+## 📦 Como Rodar Localmente (Via Maven)
 
-1. **Clone o repositório**
+Pré-requisitos: Java JDK 17, Maven e MySQL instalado.
+
+1. **Configurar a Base de Dados**
+   Crie um esquema no MySQL chamado `farmacia_db` e ajuste as credenciais no ficheiro `routes/src/main/resources/application.properties` (ou use variáveis de ambiente).
+
+2. **Compilar e Executar**
+   Navegue até à pasta do projeto Java:
    ```bash
-   git clone [https://github.com/seu-usuario/farmacia-financeiro.git](https://github.com/seu-usuario/farmacia-financeiro.git)
-   cd farmacia-financeiro
+   cd routes
+   mvn spring-boot:run
