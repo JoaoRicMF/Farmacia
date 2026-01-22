@@ -69,6 +69,7 @@ public class AuthController {
             ));
 
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Credenciais inválidas"));
         }
     }
