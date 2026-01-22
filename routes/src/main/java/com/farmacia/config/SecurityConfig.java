@@ -1,4 +1,3 @@
-// src/main/java/com/farmacia/config/SecurityConfig.java
 package com.farmacia.config;
 
 import org.springframework.context.annotation.Bean;
@@ -14,13 +13,18 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // Desabilita CSRF para simplificar APIs
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/index.html", "/static/**", "/css/**", "/js/**").permitAll() // Frontend estático
-                        .requestMatchers("/api/login").permitAll() // Endpoint de login público
-                        .anyRequest().permitAll() // Deixamos as checagens de sessão manuais nos Controllers para igualar ao Python
+                        // Libera estáticos e login
+                        .requestMatchers("/", "/index.html", "/static/**", "/css/**", "/js/**", "/api/login").permitAll()
+                        // Exige autenticação para TODO o resto
+                        .anyRequest().authenticated()
+                )
+                // Se a pessoa não tiver logada, retorna 401
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) ->
+                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Não autorizado"))
                 );
-
         return http.build();
     }
 
