@@ -49,7 +49,7 @@ if ($method === 'GET') {
 
     // Buscar Boletos Pagos (Saídas Financeiras)
     // Correção: Garantir que não haja ambiguidade ou erro de sintaxe SQL
-    $stmt = $db->prepare("SELECT id, COALESCE(dataProcessamento, vencimento) as data, descricao, valor, 'SAIDA' as tipo, categoria FROM Financeiro WHERE status = 'Pago' AND MONTH(COALESCE(dataProcessamento, vencimento)) = :m AND YEAR(COALESCE(dataProcessamento, vencimento)) = :a");
+    $stmt = $db->prepare("SELECT id, COALESCE(data_processamento, vencimento) as data, descricao, valor, 'SAIDA' as tipo, categoria FROM Financeiro WHERE status = 'Pago' AND MONTH(COALESCE(data_processamento, vencimento)) = :m AND YEAR(COALESCE(data_processamento, vencimento)) = :a");
     $stmt->execute([':m' => $mesNum, ':a' => $ano]);
     $pagos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

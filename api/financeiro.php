@@ -12,7 +12,7 @@ $action = $_GET['action'] ?? '';
 
 // BAIXAR (PAGAR)
 if ($method === 'POST' && $id && $action === 'baixar') {
-    $stmt = $db->prepare("UPDATE Financeiro SET status='Pago', dataProcessamento=NOW() WHERE id=:id");
+    $stmt = $db->prepare("UPDATE Financeiro SET status='Pago', data_processamento=NOW() WHERE id=:id");
     if ($stmt->execute([':id' => $id])) echo json_encode(["success" => true]);
     else echo json_encode(["success" => false]);
     exit;
@@ -85,10 +85,10 @@ if (($method === 'POST' || $method === 'PUT') && !$action) {
     // (Opcional: Inserir na tabela Log aqui)
 
     if (isset($data->id) || $id) {
-        $sql = "UPDATE Financeiro SET descricao=:d, valor=:v, vencimento=:ve, categoria=:c, status=:s, codigoBarras=:cb WHERE id=:id";
+        $sql = "UPDATE Financeiro SET descricao=:d, valor=:v, vencimento=:ve, categoria=:c, status=:s, codigo_barras=:cb WHERE id=:id";
         $execId = $data->id ?? $id;
     } else {
-        $sql = "INSERT INTO Financeiro (descricao, valor, vencimento, categoria, status, codigoBarras) VALUES (:d, :v, :ve, :c, :s, :cb)";
+        $sql = "INSERT INTO Financeiro (descricao, valor, vencimento, categoria, status, codigo_barras) VALUES (:d, :v, :ve, :c, :s, :cb)";
         $execId = null;
     }
 

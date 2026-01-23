@@ -56,7 +56,7 @@ if ($method === 'POST') {
     }
 
     // Busca usuário
-    $query = "SELECT id, nome, senha, funcao FROM usuario WHERE usuario = :usuario LIMIT 1";
+    $query = "SELECT id, nome, senha, funcao FROM Usuario WHERE usuario = :usuario LIMIT 1";
     $stmt = $db->prepare($query);
     $stmt->bindParam(":usuario", $data->usuario);
     $stmt->execute();
