@@ -1,0 +1,12 @@
+RewriteEngine On
+RewriteBase /api/
+
+# Rotas de Autenticação
+RewriteRule ^login$ auth.php?action=login [L,QSA]
+RewriteRule ^logout$ auth.php?action=logout [L,QSA]
+RewriteRule ^dados_usuario$ auth.php?action=check [L,QSA]
+
+# Rotas Financeiras
+RewriteRule ^registros$ financeiro.php [L,QSA]
+RewriteRule ^novo_boleto$ financeiro.php [L,QSA]
+RewriteRule ^dashboard$ dashboard.php [L,QSA]
