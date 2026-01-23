@@ -719,3 +719,38 @@ function mudarPagina(delta) {
         carregarFinanceiro(novaPagina);
     }
 }
+
+// 1. Conecta o 'nav' do HTML à função 'navegar' do JS
+function nav(tela, elemento) {
+    navegar(tela);
+}
+
+// 2. Conecta o filtro do dashboard
+function filtrarDashboard(periodo, elemento) {
+    carregarDashboard(periodo);
+}
+
+// 3. Função para abrir o modal de logout
+function confirmarLogout() {
+    const modal = document.getElementById('modal-logout');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function fecharModalLogout() {
+    const modal = document.getElementById('modal-logout');
+    if (modal) modal.classList.add('hidden');
+}
+
+function fazerLogoutReal() {
+    logout();
+}
+
+// 4. Função para pré-filtrar a lista (ex: clicar no card "A Pagar")
+function preFiltrarLista(status) {
+    const select = document.getElementById('filtro-status');
+    if (select) {
+        select.value = status;
+        // Pequeno delay para garantir que a tela carregou
+        setTimeout(() => carregarLista(1), 100);
+    }
+}
