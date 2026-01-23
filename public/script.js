@@ -744,8 +744,11 @@ async function salvarMovimentoRapido(tipo) {
 
 async function carregarFornecedores() {
     const res = await apiRequest('/fornecedores.php');
-    if (res) {
+
+    // VERIFICAÇÃO DE SEGURANÇA: Só prossegue se for uma lista (Array)
+    if (res && Array.isArray(res)) {
         estadoApp.fornecedoresCache = res;
+
         const dl = document.getElementById('lista-fornecedores');
         if (dl) {
             dl.innerHTML = '';
@@ -755,28 +758,63 @@ async function carregarFornecedores() {
                 dl.appendChild(opt);
             });
         }
+    } else {
+        console.warn("API de fornecedores não retornou uma lista válida:", res);
+        estadoApp.fornecedoresCache = []; // Evita erro no forEach depois
     }
 }
 
 async function carregarConfiguracoes() {
+    // Carrega tabela de fornecedores
     const tbody = document.getElementById('tbody-fornecedores');
+
     if (tbody) {
         tbody.innerHTML = '';
-        if (estadoApp.fornecedoresCache.length === 0) await carregarFornecedores();
 
-        estadoApp.fornecedoresCache.forEach(f => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${f.nome}</td>
-                <td>${f.cnpj || '-'}</td>
-                <td>${f.telefone || '-'}</td>
-                <td class="text-right">
-                    <button class="btn-icon btn-trash" onclick="excluirFornecedor(${f.id})">🗑</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
+        // Se o cache estiver vazio, tenta carregar de novo
+        if (!estadoApp.fornecedoresCache || estadoApp.fornecedoresCache.length === 0) {
+            await carregarFornecedores();
+        }
+
+        // Se após tentar carregar, continuar vazio ou não for array, avisa
+        if (Array.isArray(estadoApp.fornecedoresCache) && estadoApp.fornecedoresCache.length > 0) {
+            estadoApp.fornecedoresCache.forEach(f => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${f.nome}</td>
+                    <td>${f.cnpj || '-'}</td>
+                    <td>${f.telefone || '-'}</td>
+                    <td class="text-right">
+                        <button class="btn-icon btn-trash" onclick="excluirFornecedor(${f.id})">🗑</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum fornecedor cadastrado.</td></tr>';
+        }
+    } else {
+        console.error("ERRO HTML: Não encontrei o elemento <tbody id='tbody-fornecedores'>.");
     }
+
+    // Carrega Usuários (Apenas se for Admin e a tabela existir)
+    if (estadoApp.usuario?.funcao === 'Admin') {
+        const tbodyUsers = document.querySelector('#tabela-usuarios tbody');
+        // Só chama a API se o elemento HTML existir
+        if (tbodyUsers) {
+            const resUsers = await apiRequest('/admin.php?resource=usuarios');
+            tbodyUsers.innerHTML = '';
+
+            if (resUsers && Array.isArray(resUsers)) {
+                resUsers.forEach(u => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${u.nome}</td><td>${u.login}</td><td>${u.funcao}</td>`;
+                    tbodyUsers.appendChild(tr);
+                });
+            }
+        }
+    }
+
 
     if (estadoApp.usuario?.funcao === 'Admin') {
         const tbodyUsers = document.querySelector('#tabela-usuarios tbody');
@@ -791,6 +829,7 @@ async function carregarConfiguracoes() {
         }
     }
 }
+
 
 async function salvarNovoFornecedor() {
     const nome = document.getElementById('novo-forn-nome').value;
