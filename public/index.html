@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-br">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,13 +11,14 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
 </head>
+
 <body>
 
 <div id="mobile-overlay" onclick="toggleSidebar()"></div>
+
 <div id="toast-container"></div>
 
 <div id="login-screen" class="view-section">
-
     <div class="login-box">
         <h2>🏥 Farmácia</h2>
         <p>Gestão Financeira & Auditoria</p>
@@ -34,7 +36,6 @@
             <button type="submit" class="btn-login" id="btn-entrar">Acessar Painel</button>
         </form>
     </div>
-
 </div>
 
 <div id="app-screen" class="hidden">
@@ -344,14 +345,7 @@
                 <div class="form-row">
                     <div class="full-width">
                         <label for="boleto-desc">Descrição / Fornecedor <span class="required">*</span></label>
-                        <input
-                                type="text"
-                                id="boleto-desc"
-                                list="lista-fornecedores"
-                                oninput="verificarFornecedorPreenchido()"
-                                autocomplete="off"
-                                placeholder="Digite ou selecione o fornecedor..."
-                        >
+                        <input type="text" id="boleto-desc" list="lista-fornecedores" oninput="verificarFornecedorPreenchido()" autocomplete="off" placeholder="Digite ou selecione o fornecedor...">
                         <datalist id="lista-fornecedores"></datalist>
                         <span class="error-msg" id="err-desc">Campo obrigatório</span>
                     </div>
@@ -402,7 +396,6 @@
                     <button type="button" class="btn btn-primary" onclick="salvarBoleto(true)" title="Enter">💾 Salvar + Novo</button>
                 </div>
             </form>
-            </div>
         </div>
 
         <div id="view-lista" class="view-section hidden">
@@ -430,7 +423,8 @@
                         <select id="filtro-status" onchange="carregarLista(1)" aria-label="Filtrar por Status">
                             <option value="Todos">Status: Todos</option>
                             <option value="Pendente">Pendente</option>
-                            <option value="Vencido">Vencido</option> <option value="Pago">Pago</option>
+                            <option value="Vencido">Vencido</option>
+                            <option value="Pago">Pago</option>
                         </select>
                         <select id="filtro-cat" onchange="carregarLista(1)" aria-label="Filtrar por Categoria">
                             <option value="Todas">Categoria: Todas</option>
@@ -498,7 +492,7 @@
             </div>
         </div>
 
-        <div id="view-config">
+        <div id="view-config" class="view-section hidden">
             <div class="card" style="margin-top: 20px;">
                 <h3>🚚 Cadastro de Fornecedores</h3>
                 <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 15px;">
@@ -621,9 +615,7 @@
                 </div>
                 <button class="btn btn-primary" onclick="salvarConfiguracoes()">💾 Salvar Perfil</button>
             </div>
-        </div>
-
-    </div> </div> <div id="modal-detalhes" class="modal-overlay hidden">
+        </div> </div> </div> <div id="modal-detalhes" class="modal-overlay hidden">
     <div class="modal-content">
         <div class="modal-header">
             <h2 id="modal-titulo">Detalhes</h2>
@@ -633,7 +625,12 @@
             <div style="overflow-x: auto;">
                 <table id="tabela-modal">
                     <thead>
-                    <tr><th>Vencimento</th><th>Descrição</th><th>Valor</th><th>Status</th></tr>
+                    <tr>
+                        <th>Vencimento</th>
+                        <th>Descrição</th>
+                        <th>Valor</th>
+                        <th>Status</th>
+                    </tr>
                     </thead>
                     <tbody></tbody>
                 </table>
@@ -711,15 +708,6 @@
     </div>
 </div>
 
-<script src="../routes/src/main/resources/static/script.js"></script>
-<script>
-    // Inicializa ícones Lucide após o carregamento do DOM
-    document.addEventListener("DOMContentLoaded", () => {
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
-    });
-</script>
 <div id="modal-qrcode" class="modal-overlay hidden">
     <div class="modal-content" style="max-width: 350px; text-align: center;">
         <div class="modal-header" style="justify-content: center;">
@@ -735,6 +723,7 @@
         </div>
     </div>
 </div>
+
 <div id="modal-reset-senha" class="modal-overlay hidden">
     <div class="modal-content" style="max-width: 400px;">
         <div class="modal-header">
@@ -757,5 +746,16 @@
         </div>
     </div>
 </div>
+
+<script src="../routes/src/main/resources/static/script.js"></script>
+<script>
+    // Inicializa ícones Lucide após o carregamento do DOM
+    document.addEventListener("DOMContentLoaded", () => {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    });
+</script>
 </body>
+
 </html>
