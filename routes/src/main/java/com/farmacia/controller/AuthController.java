@@ -4,6 +4,7 @@ import com.farmacia.model.Usuario;
 import com.farmacia.repository.UsuarioRepository;
 import com.farmacia.service.UsuarioService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse; // Importante
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository; // Importante
+import org.springframework.security.web.csrf.CsrfToken; // Importante
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -24,13 +27,16 @@ public class AuthController {
     @Autowired private UsuarioService usuarioService;
     @Autowired private UsuarioRepository usuarioRepository;
 
-    // --- DTOs (Estes estavam faltando!) ---
+    // Injetamos o repositório configurado no SecurityConfig
+    @Autowired private CookieCsrfTokenRepository csrfTokenRepository;
+
+    // DTOs
     record LoginRequest(String usuario, String senha) {}
     record UserRequest(String nome, String usuario, String senha, String funcao) {}
     record PasswordResetRequest(Integer id, String nova_senha) {}
     record ProfileRequest(String novo_nome, String novo_login, String nova_senha) {}
 
-    // --- MÉTODOS AUXILIARES ---
+    // ... (métodos getUsuarioLogado e isAdmin mantidos iguais) ...
     private String getUsuarioLogado() {
         return SecurityContextHolder.getContext().getAuthentication().getName();
     }
@@ -40,26 +46,28 @@ public class AuthController {
                 .anyMatch(a -> a.getAuthority().equals("ROLE_Admin") || a.getAuthority().equals("Admin"));
     }
 
-    // --- LOGIN ---
     @PostMapping("/api/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest req, HttpServletRequest request) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest req, HttpServletRequest request, HttpServletResponse response) {
         try {
-            // 1. Tenta autenticar via Spring Security
+            // 1. Autenticação padrão
             UsernamePasswordAuthenticationToken token =
                     new UsernamePasswordAuthenticationToken(req.usuario, req.senha);
-
             Authentication authentication = authenticationManager.authenticate(token);
 
-            // 2. Salva no contexto de segurança
             SecurityContext context = SecurityContextHolder.createEmptyContext();
             context.setAuthentication(authentication);
             SecurityContextHolder.setContext(context);
 
-            // 3. Persiste na sessão HTTP
             HttpSession session = request.getSession(true);
             session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
 
-            // 4. Busca dados extras para retornar ao front
+            // --- CORREÇÃO DEFERIDA (A MÁGICA) ---
+            // Forçamos a geração de um token CSRF e salvamos no cookie AGORA.
+            // Isso garante que o front receba o cookie XSRF-TOKEN na resposta do login.
+            CsrfToken csrf = csrfTokenRepository.generateToken(request);
+            csrfTokenRepository.saveToken(csrf, request, response);
+            // ------------------------------------
+
             Usuario userDB = usuarioRepository.findByUsuario(req.usuario).orElse(new Usuario());
 
             return ResponseEntity.ok(Map.of(
@@ -69,29 +77,26 @@ public class AuthController {
             ));
 
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(); // Ajuda a ver erro no console do servidor
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Credenciais inválidas"));
         }
     }
 
-    // O Logout é tratado automaticamente pelo SecurityConfig, mas se quiser um endpoint explícito:
+    // ... (restante do arquivo mantido igual: dados_usuario, logs, criarUsuario, etc.) ...
+    // Copie os outros métodos do arquivo original se necessário, ou mantenha os que já tem.
+
     @GetMapping("/api/dados_usuario")
     public ResponseEntity<?> dadosUsuario() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
             return ResponseEntity.ok(Map.of());
         }
-        // Tenta buscar o nome real no banco, ou usa o login
         String login = auth.getName();
-        String nome = usuarioRepository.findByUsuario(login)
-                .map(Usuario::getNome)
-                .orElse(login);
-
+        String nome = usuarioRepository.findByUsuario(login).map(Usuario::getNome).orElse(login);
         return ResponseEntity.ok(Map.of("login", login, "nome", nome));
     }
 
-    // --- ADMINISTRAÇÃO ---
-
+    // (Mantenha os endpoints de admin/perfil que você já tinha)
     @GetMapping("/api/logs")
     public ResponseEntity<?> logs() {
         if (!isAdmin()) return ResponseEntity.status(403).build();
@@ -107,7 +112,6 @@ public class AuthController {
     @PostMapping("/api/criar_usuario")
     public ResponseEntity<?> criarUsuario(@RequestBody UserRequest req) {
         if (!isAdmin()) return ResponseEntity.status(403).build();
-
         try {
             usuarioService.criarUsuario(getUsuarioLogado(), req.nome, req.usuario, req.senha, req.funcao);
             return ResponseEntity.ok(Map.of("success", true, "message", "Usuário criado!"));
@@ -119,24 +123,15 @@ public class AuthController {
     @PostMapping("/api/admin_reset_senha")
     public ResponseEntity<?> resetSenha(@RequestBody PasswordResetRequest req) {
         if (!isAdmin()) return ResponseEntity.status(403).build();
-
         usuarioService.alterarSenhaPorId(getUsuarioLogado(), req.id, req.nova_senha);
         return ResponseEntity.ok(Map.of("success", true, "message", "Senha alterada."));
     }
 
-    // --- PERFIL ---
-
     @PostMapping("/api/alterar_perfil")
     public ResponseEntity<?> alterarPerfil(@RequestBody ProfileRequest req) {
         String usuarioAtual = getUsuarioLogado();
-
         boolean sucesso = usuarioService.atualizarPerfil(usuarioAtual, req.novo_nome, req.novo_login, req.nova_senha);
-
-        if (sucesso) {
-            // Nota: Se mudar o login, o usuário precisará logar de novo na próxima requisição,
-            // pois o token de autenticação antigo ainda terá o nome antigo.
-            return ResponseEntity.ok(Map.of("success", true));
-        }
+        if (sucesso) return ResponseEntity.ok(Map.of("success", true));
         return ResponseEntity.badRequest().body(Map.of("success", false));
     }
 }

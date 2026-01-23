@@ -32,54 +32,65 @@ let listaFornecedoresCache = [];
 
 
 /* ==========================================================================
-   GERENCIAMENTO DE CATEGORIAS (LOCAL STORAGE)
+   UTILITÁRIOS DE REQUISIÇÃO & COOKIES (CORRIGIDO)
    ========================================================================== */
-   function getCookie(name) {
-       if (!document.cookie) {
-           return null;
-       }
-       const xsrfCookies = document.cookie.split(';')
-           .map(c => c.trim())
-           .filter(c => c.startsWith(name + '='));
-
-       if (xsrfCookies.length === 0) {
-           return null;
-       }
-       return decodeURIComponent(xsrfCookies[0].split('=')[1]);
+function getCookie(name) {
+   if (!document.cookie) {
+       return null;
    }
-   // Função central para fazer requisições seguras
-   async function request(url, method = 'GET', body = null) {
-       const headers = {
-           'Content-Type': 'application/json'
-       };
+   const xsrfCookies = document.cookie.split(';')
+       .map(c => c.trim())
+       .filter(c => c.startsWith(name + '='));
 
-       // Se não for GET, adiciona o token CSRF
-       if (method !== 'GET') {
-           const csrfToken = getCookie('XSRF-TOKEN');
-           if (csrfToken) {
-               headers['X-XSRF-TOKEN'] = csrfToken;
-           }
+   if (xsrfCookies.length === 0) {
+       return null;
+   }
+   return decodeURIComponent(xsrfCookies[0].split('=')[1]);
+}
+
+// Função central para fazer requisições seguras
+async function request(url, method = 'GET', body = null) {
+   const headers = {
+       'Content-Type': 'application/json'
+   };
+
+   // Se não for GET, tenta adicionar o token CSRF
+   if (method !== 'GET') {
+       const csrfToken = getCookie('XSRF-TOKEN');
+       if (csrfToken) {
+           headers['X-XSRF-TOKEN'] = csrfToken;
        }
+   }
 
-       const options = {
-           method: method,
-           headers: headers
-       };
+   const options = {
+       method: method,
+       headers: headers
+   };
 
-       if (body) {
-           options.body = JSON.stringify(body);
-       }
+   if (body) {
+       options.body = JSON.stringify(body);
+   }
 
+   try {
        const response = await fetch(url, options);
 
        if (response.status === 401 || response.status === 403) {
-           console.warn("Erro de autenticação/CSRF");
-           // Opcional: Redirecionar para login
-           // window.location.href = "/";
+           console.warn("Sessão expirada ou erro de permissão (CSRF).");
+           showToast("Sessão expirada. Faça login novamente.", "error");
+           setTimeout(() => window.location.href = "/", 2000);
+           throw new Error("Acesso negado");
        }
 
        return response;
+   } catch (error) {
+       console.error("Erro na requisição:", error);
+       throw error;
    }
+}
+
+/* ==========================================================================
+   GERENCIAMENTO DE CATEGORIAS (LOCAL STORAGE)
+   ========================================================================== */
 function obterCategorias() {
     const custom = localStorage.getItem('categorias_custom');
     if (custom) {
@@ -309,20 +320,13 @@ async function fazerLogin() {
     btn.innerHTML = 'Verificando...';
 
     try {
-            const csrfToken = getCookie('XSRF-TOKEN');
+        // CORREÇÃO: Usar request() para enviar CSRF automaticamente se necessário
+        const res = await request('/api/login', 'POST', {
+            usuario: userEl.value,
+            senha: passEl.value
+        });
 
-            const res = await fetch('/api/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    // 2. Usamos o nome de cabeçalho padrão do Spring Security
-                    'X-XSRF-TOKEN': csrfToken
-                },
-                body: JSON.stringify({ usuario: userEl.value, senha: passEl.value })
-            });
-            // -----------------------
-
-            const data = await res.json();
+        const data = await res.json();
 
         if (data.success) {
             document.getElementById('user-display').innerText = data.nome;
@@ -347,7 +351,7 @@ async function fazerLogin() {
 
 async function verificarSessao() {
     try {
-        const res = await fetch('/api/dados_usuario');
+        const res = await request('/api/dados_usuario');
         const data = await res.json();
 
         if (data.login) {
@@ -363,12 +367,7 @@ async function verificarSessao() {
 }
 
 async function fazerLogout() {
-    await fetch('/api/logout', { method: 'POST' });
-    window.location.href = '/';
-}
-
-async function fazerLogoutReal() {
-    await fetch('/api/logout', { method: 'POST' });
+    await request('/api/logout', 'POST');
     window.location.href = '/';
 }
 
@@ -414,7 +413,6 @@ function nav(viewId, elementoMenu, addToHistory = true) {
         verificarPermissoesUI();
     }
     if (viewId === 'lista') {
-        // Se já tiver filtros, mantém, senão carrega padrão
         carregarLista(1);
     }
     if (viewId === 'logs') carregarLogs();
@@ -492,7 +490,7 @@ async function carregarDashboard(periodo = null) {
     if (containerCharts) containerCharts.style.opacity = '0.5';
 
     try {
-        const res = await fetch(`/api/dashboard?periodo=${periodo}`);
+        const res = await request(`/api/dashboard?periodo=${periodo}`);
         const data = await res.json();
 
         // Cards
@@ -610,10 +608,8 @@ async function verDetalhes(tipo, titulo) {
     modal.classList.remove('hidden');
 
     try {
-        const res = await fetch('/api/detalhes_card', {
-            method: 'POST', headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify({ tipo: tipo })
-        });
+        // CORREÇÃO: request()
+        const res = await request('/api/detalhes_card', 'POST', { tipo: tipo });
         const lista = await res.json();
         tbody.innerHTML = '';
 
@@ -646,7 +642,6 @@ function sugerirCategoria() {
     const desc = document.getElementById('boleto-desc').value.toLowerCase();
     const catEl = document.getElementById('boleto-cat');
 
-    // Mapa de sugestões por palavra-chave (pode ser expandido)
     const mapa = {
         'medicamento': 'Medicamentos (Estoque)', 'cimed': 'Medicamentos (Estoque)', 'ems': 'Medicamentos (Estoque)',
         'nc': 'Medicamentos (Estoque)', 'profarma': 'Medicamentos (Estoque)', 'papel': 'Materiais de Consumo',
@@ -687,10 +682,8 @@ async function lerCodigoBarras() {
 
     codInput.style.opacity = "0.5";
     try {
-        const res = await fetch('/api/ler_codigo', {
-            method: 'POST', headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify({ codigo: cod })
-        });
+        // CORREÇÃO: request()
+        const res = await request('/api/ler_codigo', 'POST', { codigo: cod });
         const data = await res.json();
         codInput.style.opacity = "1";
 
@@ -703,7 +696,6 @@ async function lerCodigoBarras() {
         }
         if (data.vencimento) document.getElementById('boleto-venc').value = data.vencimento;
 
-        // Automações pós-leitura
         verificarVencimento();
         setTimeout(() => document.getElementById('boleto-desc').focus(), 100);
 
@@ -726,10 +718,8 @@ async function salvarBoleto(manterAberto = true) {
     };
 
     try {
-        const res = await fetch('/api/novo_boleto', {
-            method: 'POST', headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify(dados)
-        });
+        // CORREÇÃO: Usando request() para enviar o token CSRF corretamente
+        const res = await request('/api/novo_boleto', 'POST', dados);
         const resp = await res.json();
 
         if (resp.success) {
@@ -740,7 +730,7 @@ async function salvarBoleto(manterAberto = true) {
         } else {
             showToast("Erro: " + resp.message, "error");
         }
-    } catch (e) { showToast("Erro conexão.", "error"); }
+    } catch (e) { showToast("Erro conexão ou permissão.", "error"); }
 }
 
 /* ==========================================================================
@@ -750,10 +740,9 @@ function debounceCarregarLista() {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
         carregarLista(1);
-    }, 400); // Aguarda 400ms após parar de digitar
+    }, 400);
 }
 
-// Atualiza o texto de resumo (Ex: "Mostrando: Pendentes • Energia")
 function atualizarResumoFiltros(busca, status, cat) {
     const div = document.getElementById('filtro-resumo');
     if (!div) return;
@@ -774,7 +763,6 @@ async function carregarLista(pagina = 1) {
     const cat = document.getElementById('filtro-cat').value;
     const tbody = document.querySelector('#tabela-registros tbody');
 
-    // Previne erro se a tabela não existir na view atual
     if (!tbody) return;
 
     tbody.innerHTML = LOADER_HTML;
@@ -783,7 +771,7 @@ async function carregarLista(pagina = 1) {
     const params = new URLSearchParams({ pagina: paginaAtual, busca: busca, status: status, categoria: cat });
 
     try {
-        const res = await fetch(`/api/registros?${params}`);
+        const res = await request(`/api/registros?${params}`);
         const data = await res.json();
         totalPaginas = data.total_paginas;
 
@@ -810,22 +798,19 @@ async function carregarLista(pagina = 1) {
             let valorFmt = item.valor ? parseFloat(item.valor).toFixed(2).replace('.', ',') : '0,00';
             let classeLinha = '';
 
-            // Lógica de Cores da Linha (Highlight) e Status Automático
             if (item.status === 'Pendente' && item.vencimento) {
                 const parts = item.vencimento.split('/');
                 if (parts.length === 3) {
                     const dtVenc = new Date(parts[2], parts[1] - 1, parts[0]);
-
-                    // Cálculo de diferença em dias
                     const diffTempo = dtVenc - hoje;
                     const diffDias = Math.ceil(diffTempo / (1000 * 60 * 60 * 24));
 
                     if (dtVenc < hoje) {
                         classeStatus = 'status-Vencido';
                         textoStatus = 'Vencido';
-                        classeLinha = 'row-vencido'; // Vermelho
+                        classeLinha = 'row-vencido';
                     } else if (diffDias >= 0 && diffDias <= 5) {
-                        classeLinha = 'row-proximo'; // Amarelo (Vence em até 5 dias)
+                        classeLinha = 'row-proximo';
                     }
                 }
             }
@@ -835,24 +820,19 @@ async function carregarLista(pagina = 1) {
                 btnCopiar = `<button class="action-btn" title="Copiar Código de Barras" onclick="copiarCodigo('${item.codigo_barras}')">📋</button>`;
             }
 
-            // 2. Botão Site Caixa (Sempre visível)
             const btnCaixa = `<button class="action-btn" title="Acessar Site da Caixa (Internet Banking)" style="color:#005ca9; font-weight:bold;" onclick="abrirSiteCaixa()">🏦</button>`;
 
-            // 3. Botão Excluir (Só se tiver permissão)
             const btnExcluir = data.perm_excluir
                 ? `<button class="action-btn" title="Excluir Registro Permanentemente" style="color:#ef4444" onclick="excluir(${item.id})">🗑️</button>`
                 : '';
 
-            // 4. Botão de Ação Principal (Pagar ou Reabrir)
             const btnAcao = item.status === 'Pendente'
                 ? `<button class="action-btn" title="Marcar como Pago (Baixar)" style="color:#059669; font-weight:bold;" onclick="mudarStatus(${item.id}, 'Pago')">✔</button>`
                 : `<button class="action-btn" title="Reabrir (Marcar como Pendente)" style="color:#d97706" onclick="mudarStatus(${item.id}, 'Pendente')">↺</button>`;
 
-            // --- MONTAGEM DA LINHA ---
             const tr = document.createElement('tr');
             if (classeLinha) tr.className = classeLinha;
 
-            // Prepara o objeto para passar na função de edição
             const itemSafe = JSON.stringify(item).replace(/"/g, '&quot;');
 
             tr.innerHTML = `
@@ -883,10 +863,8 @@ function mudarPagina(delta) {
 }
 
 async function mudarStatus(id, novoStatus) {
-    await fetch('/api/atualizar_status', {
-        method: 'POST', headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-        body: JSON.stringify({ id: id, status: novoStatus })
-    });
+    // CORREÇÃO: request()
+    await request('/api/atualizar_status', 'POST', { id: id, status: novoStatus });
     showToast(`Status alterado: ${novoStatus}`, "success");
     carregarLista(paginaAtual);
 }
@@ -894,10 +872,8 @@ async function mudarStatus(id, novoStatus) {
 async function excluir(id) {
     if (!confirm("Excluir registro?")) return;
     try {
-        const res = await fetch('/api/excluir', {
-            method: 'POST', headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify({ id: id })
-        });
+        // CORREÇÃO: request()
+        const res = await request('/api/excluir', 'POST', { id: id });
         const d = await res.json();
         if (d.success) { showToast("Registro excluído.", "warning"); carregarLista(paginaAtual); }
         else showToast(d.message, "error");
@@ -932,10 +908,8 @@ async function salvarEdicao() {
         status: document.getElementById('edit-status').value
     };
     try {
-        const res = await fetch('/api/editar', {
-            method: 'POST', headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify(dados)
-        });
+        // CORREÇÃO: request()
+        const res = await request('/api/editar', 'POST', dados);
         if ((await res.json()).success) {
             showToast("Atualizado!", "success");
             fecharModalEdicao();
@@ -955,7 +929,7 @@ async function carregarFluxo() {
     tbody.innerHTML = LOADER_HTML;
 
     try {
-        const res = await fetch(`/api/fluxo_resumo?mes=${mes}&ano=${ano}`);
+        const res = await request(`/api/fluxo_resumo?mes=${mes}&ano=${ano}`);
         const data = await res.json();
         const fmt = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -1016,10 +990,8 @@ async function salvarEntradaCaixa() {
     const valor = formatarValorParaBanco(valorStr);
 
     try {
-        const res = await fetch('/api/nova_entrada', {
-            method: 'POST', headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify({ valor: valor, forma: forma, data: dataEnt })
-        });
+        // CORREÇÃO: request()
+        const res = await request('/api/nova_entrada', 'POST', { valor: valor, forma: forma, data: dataEnt });
         if ((await res.json()).success) {
             showToast("Entrada registrada!", "success");
             document.getElementById('ent-valor').value = '';
@@ -1036,10 +1008,8 @@ async function salvarSaidaCaixa() {
     if (!valorStr || !dataSai || !desc) { showToast("Preencha descrição, valor e data.", "warning"); return; }
 
     try {
-        const res = await fetch('/api/nova_saida_caixa', {
-            method: 'POST', headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify({ descricao: desc, valor: formatarValorParaBanco(valorStr), forma: forma, data: dataSai })
-        });
+        // CORREÇÃO: request()
+        const res = await request('/api/nova_saida_caixa', 'POST', { descricao: desc, valor: formatarValorParaBanco(valorStr), forma: forma, data: dataSai });
         if ((await res.json()).success) {
             showToast("Saída registrada!", "success");
             document.getElementById('sai-valor').value = '';
@@ -1053,10 +1023,8 @@ async function excluirItemFluxo(id, tipo) {
     if (!confirm("Excluir este lançamento?")) return;
     let url = (tipo === 'entrada') ? '/api/excluir_entrada' : '/api/excluir_saida_caixa';
     try {
-        const res = await fetch(url, {
-            method: 'POST', headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify({ id: id })
-        });
+        // CORREÇÃO: request()
+        const res = await request(url, 'POST', { id: id });
         if ((await res.json()).success) { showToast("Removido.", "success"); carregarFluxo(); }
         else showToast("Erro ao excluir.", "error");
     } catch (e) { showToast("Erro.", "error"); }
@@ -1076,7 +1044,7 @@ function baixarExcelFluxo() {
    ========================================================================== */
 async function carregarConfiguracoes() {
     try {
-        const res = await fetch('/api/dados_usuario');
+        const res = await request('/api/dados_usuario');
         const data = await res.json();
         if (data.login) {
             document.getElementById('conf-login').value = data.login;
@@ -1092,10 +1060,8 @@ async function salvarConfiguracoes() {
         nova_senha: document.getElementById('conf-senha').value
     };
     try {
-        const res = await fetch('/api/alterar_perfil', {
-            method: 'POST', headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify(dados)
-        });
+        // CORREÇÃO: request()
+        const res = await request('/api/alterar_perfil', 'POST', dados);
         if ((await res.json()).success) {
             showToast("Perfil salvo.", "success");
             document.getElementById('user-display').innerText = dados.novo_nome;
@@ -1108,7 +1074,7 @@ async function carregarLogs() {
     const tbody = document.querySelector('#tabela-logs tbody');
     if (tbody) tbody.innerHTML = LOADER_HTML;
     try {
-        const res = await fetch('/api/logs');
+        const res = await request('/api/logs');
         const logs = await res.json();
         if (tbody) {
             tbody.innerHTML = '';
@@ -1147,22 +1113,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (i1) i1.value = hoje;
     if (i2) i2.value = hoje;
 
-    // --- CORREÇÃO AQUI: ADICIONE ESTE BLOCO PARA O LOGIN FUNCIONAR COM ENTER ---
+    // Login com ENTER
     const inputUser = document.getElementById('login-user');
     const inputPass = document.getElementById('login-pass');
 
     function checkLoginEnter(e) {
         if (e.key === 'Enter') {
-            e.preventDefault(); // Evita qualquer comportamento estranho do navegador
-            fazerLogin();       // Chama a função de login diretamente
+            e.preventDefault();
+            fazerLogin();
         }
     }
 
     if (inputUser) inputUser.addEventListener('keydown', checkLoginEnter);
     if (inputPass) inputPass.addEventListener('keydown', checkLoginEnter);
-    // --------------------------------------------------------------------------
 
-    // 5. Listener Enter para Formulário (Código existente...)
+    // 5. Listener Enter para Formulário
     const campos = ['boleto-cod', 'boleto-desc', 'boleto-valor', 'boleto-venc', 'boleto-cat', 'boleto-status'];
     campos.forEach((id, idx) => {
         const el = document.getElementById(id);
@@ -1181,7 +1146,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
-// Atalhos Globais (Teclado)
 document.addEventListener('keydown', function(e) {
     const viewNovo = document.getElementById('view-novo');
     if (!viewNovo || viewNovo.classList.contains('hidden')) return;
@@ -1209,16 +1173,12 @@ async function criarNovoUsuario() {
     if(!nome || !login || !senha) return showToast("Preencha todos os campos.", "warning");
 
     try {
-        const res = await fetch('/api/criar_usuario', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify({ nome: nome, usuario: login, senha: senha, funcao: funcao })
-        });
+        // CORREÇÃO: request()
+        const res = await request('/api/criar_usuario', 'POST', { nome: nome, usuario: login, senha: senha, funcao: funcao });
         const data = await res.json();
 
         if (data.success) {
             showToast(data.message, "success");
-            // Limpa os campos após sucesso
             document.getElementById('novo-user-nome').value = "";
             document.getElementById('novo-user-login').value = "";
             document.getElementById('novo-user-senha').value = "";
@@ -1239,39 +1199,33 @@ function copiarCodigo(codigo) {
     }
 
     navigator.clipboard.writeText(codigo).then(() => {
-        showToast("Código copiado para a área de transferência!", "success");
+        showToast("Código copiado!", "success");
     }).catch(err => {
-        console.error(err);
-        showToast("Erro ao copiar código.", "error");
+        showToast("Erro ao copiar.", "error");
     });
 }
 
 function abrirSiteCaixa() {
-    // Abre o site da Caixa em nova aba
     window.open('https://www.caixa.gov.br', '_blank');
 }
 
 /*FORNECEDORES*/
 async function carregarFornecedores() {
     try {
-        const res = await fetch('/api/fornecedores');
+        const res = await request('/api/fornecedores');
         const lista = await res.json();
-        listaFornecedoresCache = lista; // Guarda na memória: [{nome: 'Cimed', categoria_padrao: 'Medicamentos'}, ...]
+        listaFornecedoresCache = lista;
 
-        // 1. Preenche o DataList (Autocomplete do Novo Lançamento)
         const datalist = document.getElementById('lista-fornecedores');
         if (datalist) {
             datalist.innerHTML = '';
             lista.forEach(f => {
                 const opt = document.createElement('option');
                 opt.value = f.nome;
-                // Dica: Adicione a categoria como label visual (alguns browsers mostram)
                 if(f.categoria_padrao) opt.label = f.categoria_padrao;
                 datalist.appendChild(opt);
             });
         }
-
-        // 2. Preenche a tabela na Configuração (se estiver na tela)
         renderizarTabelaFornecedores();
 
     } catch (e) {
@@ -1287,25 +1241,20 @@ function verificarFornecedorPreenchido() {
 
     const valorDigitado = inputDesc.value.trim();
 
-    // Procura na memória se existe um fornecedor com esse nome (case insensitive)
     const fornecedorEncontrado = listaFornecedoresCache.find(f =>
         f.nome.toLowerCase() === valorDigitado.toLowerCase()
     );
 
     if (fornecedorEncontrado && fornecedorEncontrado.categoria_padrao) {
         selectCat.value = fornecedorEncontrado.categoria_padrao;
-
-        // Efeito visual
         selectCat.style.backgroundColor = "#dcfce7";
         selectCat.style.transition = "background-color 0.5s";
         setTimeout(() => selectCat.style.backgroundColor = "", 1000);
     } else {
-        // Se não achou, usa a lógica antiga de palavras-chave
         sugerirCategoria();
     }
 }
 
-// Renderiza a lista na tela de Configurações
 function renderizarTabelaFornecedores() {
     const tbody = document.getElementById('tabela-fornecedores-config');
     if (!tbody) return;
@@ -1324,25 +1273,21 @@ function renderizarTabelaFornecedores() {
     });
 }
 
-// Função para cadastrar via tela de Configuração
 async function cadastrarFornecedor() {
     const nome = document.getElementById('novo-forn-nome').value;
-    const cat = document.getElementById('novo-forn-cat').value; // Opcional
+    const cat = document.getElementById('novo-forn-cat').value;
 
     if (!nome) return showToast("Digite o nome do fornecedor.", "warning");
 
     try {
-        const res = await fetch('/api/novo_fornecedor', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify({ nome: nome, categoria: cat })
-        });
+        // CORREÇÃO: request()
+        const res = await request('/api/novo_fornecedor', 'POST', { nome: nome, categoria: cat });
         const data = await res.json();
 
         if (data.success) {
             showToast("Fornecedor cadastrado!", "success");
             document.getElementById('novo-forn-nome').value = '';
-            carregarFornecedores(); // Atualiza tudo
+            carregarFornecedores();
         } else {
             showToast(data.message, "error");
         }
@@ -1354,11 +1299,8 @@ async function cadastrarFornecedor() {
 async function removerFornecedor(id) {
     if(!confirm("Remover este fornecedor da lista de sugestões?")) return;
 
-    await fetch('/api/excluir_fornecedor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-        body: JSON.stringify({ id: id })
-    });
+    // CORREÇÃO: request()
+    await request('/api/excluir_fornecedor', 'POST', { id: id });
     carregarFornecedores();
 }
 
@@ -1372,7 +1314,7 @@ async function carregarListaUsuarios() {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:10px;">Carregando...</td></tr>';
 
     try {
-        const res = await fetch('/api/lista_usuarios');
+        const res = await request('/api/lista_usuarios');
         const lista = await res.json();
 
         tbody.innerHTML = '';
@@ -1399,7 +1341,6 @@ async function carregarListaUsuarios() {
     }
 }
 
-// Variável global para armazenar quem está sendo editado
 let usuarioIdReset = null;
 
 function abrirModalReset(id, nome) {
@@ -1421,11 +1362,8 @@ async function confirmarResetSenha() {
     if (!usuarioIdReset) return;
 
     try {
-        const res = await fetch('/api/admin_reset_senha', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json','X-XSRF-TOKEN': getCsrfToken() },
-            body: JSON.stringify({ id: usuarioIdReset, nova_senha: novaSenha })
-        });
+        // CORREÇÃO: request()
+        const res = await request('/api/admin_reset_senha', 'POST', { id: usuarioIdReset, nova_senha: novaSenha });
         const data = await res.json();
 
         if (data.success) {
@@ -1437,15 +1375,4 @@ async function confirmarResetSenha() {
     } catch (e) {
         showToast("Erro de conexão.", "error");
     }
-}
-function getCsrfToken() {
-    // Procura o cookie XSRF-TOKEN enviado pelo Spring
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.startsWith('XSRF-TOKEN=')) {
-            return decodeURIComponent(cookie.substring('XSRF-TOKEN='.length));
-        }
-    }
-    return null;
 }

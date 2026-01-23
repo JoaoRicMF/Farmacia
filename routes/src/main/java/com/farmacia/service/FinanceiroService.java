@@ -74,55 +74,49 @@ public class FinanceiroService {
     // --- DASHBOARD ---
 
     public Map<String, Object> obterDadosDashboard(String periodo) {
-        // Exemplo simplificado. Em produção usar queries JPQL específicas para performance.
         LocalDate hoje = LocalDate.now();
-        LocalDate inicioMes = hoje.withDayOfMonth(1);
+        int mesAtual = hoje.getMonthValue();
+        int anoAtual = hoje.getYear();
 
-        List<Financeiro> todos = financeiroRepo.findAll(); // Idealmente filtrar por data no banco
+        // Buscas otimizadas no banco
+        BigDecimal pagarMes = financeiroRepo.somarAPagarMes(anoAtual, mesAtual);
+        BigDecimal pagoMes = financeiroRepo.somarPagosPorMes(anoAtual, mesAtual);
 
-        BigDecimal pagarMes = todos.stream()
-                .filter(f -> !f.getStatus().equals("Pago") && f.getVencimento().getMonth() == hoje.getMonth() && f.getVencimento().getYear() == hoje.getYear())
-                .map(Financeiro::getValor).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal vencidosVal = financeiroRepo.somarVencidos(hoje);
+        // Contagem pode ser feita com .size() ou COUNT no banco, .size() na lista retornada é aceitável se a lista não for gigante
+        List<Financeiro> listaVencidos = financeiroRepo.findVencidos(hoje);
 
-        BigDecimal pagoMes = todos.stream()
-                .filter(f -> f.getStatus().equals("Pago") && f.getVencimento().getMonth() == hoje.getMonth() && f.getVencimento().getYear() == hoje.getYear())
-                .map(Financeiro::getValor).reduce(BigDecimal.ZERO, BigDecimal::add);
+        LocalDate limiteProximos = hoje.plusDays(5);
+        BigDecimal proximosVal = financeiroRepo.somarProximos(hoje, limiteProximos);
+        List<Financeiro> listaProximos = financeiroRepo.findProximos(hoje, limiteProximos);
 
-        List<Financeiro> vencidos = todos.stream()
-                .filter(f -> !f.getStatus().equals("Pago") && f.getVencimento().isBefore(hoje))
-                .collect(Collectors.toList());
-
-        List<Financeiro> proximos = todos.stream()
-                .filter(f -> !f.getStatus().equals("Pago") && !f.getVencimento().isBefore(hoje) && f.getVencimento().isBefore(hoje.plusDays(5)))
-                .collect(Collectors.toList());
-
-        // Mapas para Gráficos
-        Map<String, BigDecimal> porCategoria = todos.stream()
-                .filter(f -> f.getVencimento().getMonth() == hoje.getMonth())
-                .collect(Collectors.groupingBy(Financeiro::getCategoria,
-                        Collectors.reducing(BigDecimal.ZERO, Financeiro::getValor, BigDecimal::add)));
-
+        // Gráficos por Categoria (via Banco)
+        List<Object[]> dadosCategoria = financeiroRepo.agruparPorCategoria(anoAtual, mesAtual);
         List<Map<String, Object>> graficoCat = new ArrayList<>();
-        porCategoria.forEach((k, v) -> graficoCat.add(Map.of("categoria", k, "total", v)));
+
+        for (Object[] row : dadosCategoria) {
+            graficoCat.add(Map.of("categoria", row[0], "total", row[1]));
+        }
 
         // Estrutura de Resposta
         Map<String, Object> cards = new HashMap<>();
         cards.put("pagar_mes", pagarMes);
         cards.put("pago_mes", pagoMes);
-        cards.put("vencidos_val", vencidos.stream().map(Financeiro::getValor).reduce(BigDecimal.ZERO, BigDecimal::add));
-        cards.put("vencidos_qtd", vencidos.size());
-        cards.put("proximos_val", proximos.stream().map(Financeiro::getValor).reduce(BigDecimal.ZERO, BigDecimal::add));
-        cards.put("proximos_qtd", proximos.size());
+        cards.put("vencidos_val", vencidosVal);
+        cards.put("vencidos_qtd", listaVencidos.size());
+        cards.put("proximos_val", proximosVal);
+        cards.put("proximos_qtd", listaProximos.size());
 
         Map<String, Object> graficos = new HashMap<>();
         graficos.put("por_categoria", graficoCat);
-        // Gráfico por mês (Dummy data ou cálculo real de 6 meses)
         graficos.put("por_mes", List.of(Map.of("mes", "Atual", "total", pagarMes.add(pagoMes))));
 
         return Map.of("cards", cards, "graficos", graficos);
     }
 
     public List<Map<String, Object>> obterEventosCalendario() {
+        // Para calendário, ainda precisamos de muitos dados, mas idealmente filtraríamos por intervalo de datas.
+        // Mantido findAll() apenas se a base for pequena, senão criar findByVencimentoBetween.
         return financeiroRepo.findAll().stream().map(f -> {
             Map<String, Object> evento = new HashMap<>();
             evento.put("title", f.getDescricao() + " (" + f.getValor() + ")");
@@ -134,12 +128,10 @@ public class FinanceiroService {
 
     public List<Financeiro> listarDetalhesCard(String tipo) {
         LocalDate hoje = LocalDate.now();
-        List<Financeiro> todos = financeiroRepo.findAll();
-
         if ("vencidos".equals(tipo)) {
-            return todos.stream().filter(f -> !f.getStatus().equals("Pago") && f.getVencimento().isBefore(hoje)).collect(Collectors.toList());
+            return financeiroRepo.findVencidos(hoje);
         } else if ("proximos".equals(tipo)) {
-            return todos.stream().filter(f -> !f.getStatus().equals("Pago") && !f.getVencimento().isBefore(hoje) && f.getVencimento().isBefore(hoje.plusDays(7))).collect(Collectors.toList());
+            return financeiroRepo.findProximos(hoje, hoje.plusDays(7));
         }
         return new ArrayList<>();
     }
