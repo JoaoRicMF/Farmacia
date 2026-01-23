@@ -1,18 +1,22 @@
 package com.farmacia.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
 @Builder
+@NoArgsConstructor // Obrigatório
+@AllArgsConstructor // Obrigatório para o @Builder funcionar
 public class ExtratoItemDTO {
     private Integer id;
-    private String data; // String formatada dd/MM/yyyy para o front
-    private LocalDate dataOrdenacao; // Para ordenar no backend
+    private String data;
+    private LocalDate dataOrdenacao;
     private String descricao;
     private BigDecimal valor;
-    private String tipo; // "entrada", "saida_caixa", "saida_boleto"
+    private String tipo;
     private String categoria;
 }

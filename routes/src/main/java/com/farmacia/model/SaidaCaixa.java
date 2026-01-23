@@ -1,11 +1,15 @@
 package com.farmacia.model;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor; // Adicionado
 import lombok.Data;
+import lombok.NoArgsConstructor; // Adicionado
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
+@NoArgsConstructor // Obrigatório
+@AllArgsConstructor // Obrigatório
 @Entity
 public class SaidaCaixa {
     @Id
