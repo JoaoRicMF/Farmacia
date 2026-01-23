@@ -12,15 +12,13 @@ import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder; // Alterado para interface genérica
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -29,7 +27,7 @@ import java.io.IOException;
 @Configuration
 public class SecurityConfig {
 
-    // 1. Expomos o repositório CSRF como Bean
+    // 1. Ferramenta para gerenciar o Token CSRF (Segurança do navegador)
     @Bean
     public CookieCsrfTokenRepository csrfTokenRepository() {
         CookieCsrfTokenRepository repo = CookieCsrfTokenRepository.withHttpOnlyFalse();
@@ -37,7 +35,7 @@ public class SecurityConfig {
         return repo;
     }
 
-    // 2. NOVO: Expomos o repositório de Contexto de Segurança (Essencial para Spring Boot 3 manter o login)
+    // 2. Ferramenta para gerenciar a SESSÃO (Essencial para o login não cair)
     @Bean
     public SecurityContextRepository securityContextRepository() {
         return new HttpSessionSecurityContextRepository();
@@ -52,14 +50,12 @@ public class SecurityConfig {
                         .csrfTokenRepository(csrfTokenRepository)
                         .ignoringRequestMatchers("/api/login")
                 )
-                // Garante que o cookie CSRF seja enviado
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
 
-                // CORREÇÃO DA SESSÃO: Força o uso do repositório de sessão explícito
+                // CONEXÃO COM O REPOSITÓRIO DE SESSÃO
                 .securityContext(context -> context
                         .securityContextRepository(securityContextRepository)
                 )
-
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/index.html", "/script.js", "/style.css", "/api/login").permitAll()
                         .anyRequest().authenticated()
@@ -84,14 +80,14 @@ public class SecurityConfig {
         return new ProviderManager(authProvider);
     }
 
+    // 3. CONFIGURAÇÃO DE SENHA (Modo Dev: Aceita senha em texto puro)
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // Retorna um encoder que NÃO faz criptografia (ideal para testes rápidos)
+        // Isso permite que a senha '123456' no banco funcione sem precisar de hash
         return org.springframework.security.crypto.password.NoOpPasswordEncoder.getInstance();
     }
 }
 
-// Filtro auxiliar para carregar o token CSRF
 class CsrfCookieFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)

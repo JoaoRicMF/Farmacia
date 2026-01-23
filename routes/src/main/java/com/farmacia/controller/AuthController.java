@@ -18,6 +18,7 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository; // Impor
 import org.springframework.security.web.csrf.CsrfToken; // Importante
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 
 import java.util.Map;
 
@@ -27,6 +28,7 @@ public class AuthController {
     @Autowired private AuthenticationManager authenticationManager;
     @Autowired private UsuarioService usuarioService;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private SecurityContextRepository securityContextRepository;
     @Autowired private SecurityContextRepository securityContextRepository;
 
     // Injetamos o repositório configurado no SecurityConfig
@@ -51,18 +53,20 @@ public class AuthController {
     @PostMapping("/api/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest req, HttpServletRequest request, HttpServletResponse response) {
         try {
-            // 1. Autenticação padrão
+            // 1. Tenta autenticar (vai usar o NoOpPasswordEncoder agora)
             UsernamePasswordAuthenticationToken token =
                     new UsernamePasswordAuthenticationToken(req.usuario, req.senha);
             Authentication authentication = authenticationManager.authenticate(token);
 
+            // 2. Cria o contexto de segurança
             SecurityContext context = SecurityContextHolder.createEmptyContext();
             context.setAuthentication(authentication);
             SecurityContextHolder.setContext(context);
 
+            // 3. SALVA A SESSÃO EXPLICITAMENTE (A correção principal)
             securityContextRepository.saveContext(context, request, response);
 
-
+            // 4. Gera o token CSRF para o frontend
             CsrfToken csrf = csrfTokenRepository.generateToken(request);
             csrfTokenRepository.saveToken(csrf, request, response);
 
@@ -75,13 +79,10 @@ public class AuthController {
             ));
 
         } catch (Exception e) {
-            e.printStackTrace(); // Ajuda a ver erro no console do servidor
+            e.printStackTrace();
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Credenciais inválidas"));
         }
     }
-
-    // ... (restante do arquivo mantido igual: dados_usuario, logs, criarUsuario, etc.) ...
-    // Copie os outros métodos do arquivo original se necessário, ou mantenha os que já tem.
 
     @GetMapping("/api/dados_usuario")
     public ResponseEntity<?> dadosUsuario() {
