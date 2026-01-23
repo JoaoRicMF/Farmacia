@@ -5,7 +5,7 @@ class Database {
     private $host = "localhost";
     private $db_name = "farmacia_db";
     private $username = "root";
-    private $password = "sua_senha"; // Lembre-se de configurar a senha correta do seu MySQL
+    private $password = "150406";
     public $conn;
 
     public function getConnection() {
