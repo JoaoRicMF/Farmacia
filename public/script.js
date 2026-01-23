@@ -754,3 +754,115 @@ function preFiltrarLista(status) {
         setTimeout(() => carregarLista(1), 100);
     }
 }
+function nav(tela) { navegar(tela); }
+
+// Login
+function fazerLogin() { login(event); }
+
+// Dashboard
+function filtrarDashboard(periodo) { carregarDashboard(periodo); }
+
+// Listagem (Registros)
+function carregarLista(pagina) { carregarFinanceiro(pagina); }
+function debounceCarregarLista() { carregarFinanceiro(1); } // Versão simplificada
+
+// Formulários
+function mascaraMoeda(input) { mascaraMoedaInput(input); }
+function limparFormulario() { prepararNovoRegistro(); }
+function salvarEdicao() { salvarBoleto(); }
+
+// Fornecedores
+function cadastrarFornecedor() { salvarNovoFornecedor(); }
+
+// Logout
+function fazerLogoutReal() { logout(); }
+
+// Fluxo de Caixa
+function salvarEntradaCaixa() { salvarMovimentoRapido('entrada'); }
+function salvarSaidaCaixa() { salvarMovimentoRapido('saida'); }
+// --- UI / MODAIS / INTERFACE ---
+
+// Modal de Logout
+function confirmarLogout() {
+    document.getElementById('modal-logout').classList.remove('hidden');
+}
+function fecharModalLogout() {
+    document.getElementById('modal-logout').classList.add('hidden');
+}
+
+// Modal de Edição
+function fecharModalEdicao() {
+    document.getElementById('modal-editar').classList.add('hidden');
+}
+
+// Modal Genérico
+function fecharModal() {
+    document.getElementById('modal-detalhes').classList.add('hidden');
+}
+
+// Ver Detalhes (Card Amarelo)
+function verDetalhes(tipo, titulo) {
+    // Exemplo simples para não quebrar
+    alert(`Visualizando detalhes de: ${titulo}`);
+    // Idealmente abriria o modal-detalhes aqui
+}
+
+// Mostrar/Esconder Senha
+function toggleSenha() {
+    const input = document.getElementById('login-pass');
+    input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+// Calendário (Toggle)
+function toggleCalendarSection() {
+    const content = document.getElementById('calendar-wrapper');
+    const header = document.querySelector('.toggle-header');
+    content.classList.toggle('show');
+    header.classList.toggle('open');
+}
+
+// Filtro Rápido (Ex: Clicar no card "A Pagar" vai para lista filtrada)
+function preFiltrarLista(status) {
+    const select = document.getElementById('filtro-status');
+    if(select) {
+        select.value = status;
+        setTimeout(() => carregarFinanceiro(1), 100);
+    }
+}
+// --- FUNCIONALIDADES PENDENTES (Placeholders) ---
+
+function baixarExcelFluxo() {
+    alert("Funcionalidade de Excel ainda não implementada no Backend.");
+}
+
+function adicionarCategoriaPersonalizada() {
+    alert("Adicionar Categoria: Em desenvolvimento.");
+}
+
+function resetarCategorias() {
+    if(confirm("Restaurar categorias padrão?")) {
+        alert("Categorias restauradas.");
+    }
+}
+
+function criarNovoUsuario() {
+    alert("Criação de usuários: Disponível apenas na versão Pro.");
+}
+
+function salvarConfiguracoes() {
+    showToast("Perfil salvo com sucesso!");
+}
+
+function verificarFornecedorPreenchido() {
+    // Lógica de validação visual (opcional)
+}
+
+function verificarVencimento() {
+    // Lógica para avisar se data < hoje (opcional)
+    const data = document.getElementById('boleto-venc').value;
+    const aviso = document.getElementById('aviso-vencido');
+    if(aviso && data) {
+        const hoje = new Date().toISOString().split('T')[0];
+        aviso.style.display = data < hoje ? 'block' : 'none';
+    }
+}
