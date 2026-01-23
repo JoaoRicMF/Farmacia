@@ -516,41 +516,39 @@ function prepararNovoRegistro() {
     setTimeout(() => document.getElementById('boleto-cod').focus(), 100);
 }
 
-async function salvarBoleto() {
+async function salvarBoleto(manterNaTela = false) {
     const id = document.getElementById('boleto-id-hidden').value;
-    const desc = document.getElementById('boleto-desc').value;
-    const valorStr = document.getElementById('boleto-valor').value;
-    const venc = document.getElementById('boleto-venc').value;
-    const cat = document.getElementById('boleto-cat').value;
-    const status = document.getElementById('boleto-status').value;
-    const codBarras = document.getElementById('boleto-cod').value;
 
-    if (!desc || !valorStr || !venc) {
+    const payload = {
+        id: id || null, // Importante para o backend saber se é UPDATE ou INSERT
+        descricao: document.getElementById('boleto-desc').value,
+        valor: converterMoedaParaFloat(document.getElementById('boleto-valor').value),
+        vencimento: document.getElementById('boleto-venc').value,
+        categoria: document.getElementById('boleto-cat').value,
+        status: document.getElementById('boleto-status').value,
+        codigo_barras: document.getElementById('boleto-cod').value
+    };
+
+    if (!payload.descricao || payload.valor <= 0 || !payload.vencimento) {
         return showToast("Preencha Descrição, Valor e Vencimento.", "error");
     }
 
-    const payload = {
-        descricao: desc,
-        valor: converterMoedaParaFloat(valorStr),
-        vencimento: venc,
-        categoria: cat,
-        status: status,
-        codigo_barras: codBarras // Snake_case para o PHP
-    };
-
+    // Define se é Edição ou Novo
     let url = '/financeiro.php?action=salvar';
-    if (id) {
-        url = `/financeiro.php?action=atualizar&id=${id}`;
-    }
+    if (id) url = `/financeiro.php?action=atualizar&id=${id}`; // Caso sua API use update via URL
 
-    const res = await apiRequest(url, 'POST', payload);
+    // Envia para o Backend
+    const res = await apiRequest('/financeiro.php', 'POST', payload); // Usando POST padrão para ambos
 
     if (res && res.success) {
         showToast("Registro salvo com sucesso!");
-        if (id) {
-            navegar('lista'); // Se era edição, volta pra lista
+
+        if (manterNaTela) {
+            // Modo "Salvar + Novo": Limpa e mantém na tela
+            prepararNovoRegistro();
         } else {
-            prepararNovoRegistro(); // Se era novo, limpa para o próximo
+            // Modo "Salvar e Sair": Volta para lista
+            navegar('lista');
         }
     } else {
         showToast(res.message || "Erro ao salvar.", "error");
@@ -593,23 +591,39 @@ async function baixarRegistro(id) {
 }
 
 // Leitor de Código de Barras (Mock/Real)
+// --- LEITOR DE CÓDIGO DE BARRAS (Inteligente) ---
 async function lerCodigoBarras() {
     const input = document.getElementById('boleto-cod');
-    const codigo = input.value;
-    if (!codigo) return showToast("Digite o código para ler.", "warning");
+    // Remove tudo que não for número
+    const codigo = input.value.replace(/[^0-9]/g, '');
 
-    input.disabled = true;
-    const res = await apiRequest('/boleto.php', 'POST', { codigo });
-    input.disabled = false;
+    if (codigo.length < 44) return; // Código incompleto
 
-    if (res && res.valor) {
-        document.getElementById('boleto-valor').value = formatarMoedaBRL(res.valor);
-        mascaraMoedaInput(document.getElementById('boleto-valor'));
+    // Tenta extrair dados de boleto bancário (47 dígitos)
+    if (codigo.length === 47) {
+        // Valor: Últimos 10 dígitos (ex: 0000015000 = R$ 150,00)
+        const valorStr = codigo.substring(37);
+        const valor = parseFloat(valorStr) / 100;
+
+        // Fator Vencimento: Dígitos 33 a 37
+        const fator = parseInt(codigo.substring(33, 37));
+
+        // Preenche Valor
+        if (!isNaN(valor) && valor > 0) {
+            document.getElementById('boleto-valor').value = formatarMoedaBRL(valor);
+        }
+
+        // Preenche Data (Base: 07/10/1997)
+        if (fator >= 1000) {
+            const dataBase = new Date('1997-10-07');
+            dataBase.setDate(dataBase.getDate() + fator);
+            document.getElementById('boleto-venc').value = dataBase.toISOString().split('T')[0];
+        }
+
+        showToast("Código lido! Valor e Data preenchidos.", "success");
+        // Pula para o campo de descrição
+        document.getElementById('boleto-desc').focus();
     }
-    if (res && res.vencimento) {
-        document.getElementById('boleto-venc').value = res.vencimento;
-    }
-    showToast("Código lido!", "success");
 }
 
 /* ==========================================================================
@@ -826,17 +840,41 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // 4. Listeners de Teclado
-    document.addEventListener('keydown', (e) => {
-        // Atalho Salvar (Ctrl + Enter)
-        if (e.ctrlKey && e.key === 'Enter') {
-            if (!document.getElementById('view-novo').classList.contains('hidden')) {
-                salvarBoleto();
+    document.addEventListener('keydown', function(event) {
+        const telaNovo = document.getElementById('view-novo');
+        const telaLogin = document.getElementById('login-screen');
+
+        // 1. Se estiver na tela de LOGIN
+        if (telaLogin && !telaLogin.classList.contains('hidden')) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                fazerLogin();
             }
+            return; // Não executa o resto
         }
-        // Atalho Login (Enter)
-        if (e.key === 'Enter') {
-            if (!document.getElementById('login-screen').classList.contains('hidden')) {
-                login();
+
+        // 2. Se estiver na tela de NOVO LANÇAMENTO
+        // (Verifica se ela existe e se está visível na tela)
+        if (telaNovo && !telaNovo.classList.contains('hidden') && telaNovo.offsetParent !== null) {
+
+            // TECLA ENTER
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Impede qualquer envio de formulário
+                // Salva o boleto (passa true se segurar Ctrl para "Salvar e Continuar")
+                salvarBoleto(event.ctrlKey);
+            }
+
+            // TECLA ESC
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                const desc = document.getElementById('boleto-desc').value;
+
+                // Se já escreveu algo, limpa. Se estiver vazio, fecha.
+                if (desc.trim() !== '') {
+                    prepararNovoRegistro(); // Limpa
+                } else {
+                    navegar('lista'); // Fecha
+                }
             }
         }
     });
@@ -994,10 +1032,31 @@ function salvarConfiguracoes() {
     showToast("Perfil salvo com sucesso!");
 }
 
+// --- AUTO-CATEGORIA ---
 function verificarFornecedorPreenchido() {
-    // Lógica de validação visual (opcional)
-}
+    const desc = document.getElementById('boleto-desc').value.toLowerCase();
+    const catSelect = document.getElementById('boleto-cat');
 
+    // Mapa de palavras-chave -> Categorias
+    const mapa = {
+        'cemig': 'Água/Luz/Internet', 'energia': 'Água/Luz/Internet', 'luz': 'Água/Luz/Internet',
+        'agua': 'Água/Luz/Internet', 'saneago': 'Água/Luz/Internet', 'embasa': 'Água/Luz/Internet',
+        'internet': 'Água/Luz/Internet', 'vivo': 'Água/Luz/Internet', 'claro': 'Água/Luz/Internet', 'oi': 'Água/Luz/Internet',
+        'aluguel': 'Aluguel & Condomínio', 'condominio': 'Aluguel & Condomínio', 'imobiliaria': 'Aluguel & Condomínio',
+        'salario': 'Folha de Pagamento', 'pagamento': 'Folha de Pagamento', 'adiantamento': 'Folha de Pagamento',
+        'drogasil': 'Medicamentos (Estoque)', 'farma': 'Medicamentos (Estoque)', 'eurofarma': 'Medicamentos (Estoque)', 'cimed': 'Medicamentos (Estoque)',
+        'papelaria': 'Materiais de Consumo', 'limpeza': 'Materiais de Consumo', 'embalagens': 'Materiais de Consumo',
+        'simples': 'Impostos & Taxas', 'das': 'Impostos & Taxas', 'inss': 'Impostos & Taxas', 'fgts': 'Impostos & Taxas', 'prefeitura': 'Impostos & Taxas'
+    };
+
+    // Verifica se alguma palavra chave está na descrição
+    for (const chave in mapa) {
+        if (desc.includes(chave)) {
+            catSelect.value = mapa[chave];
+            break; // Para na primeira correspondência
+        }
+    }
+}
 function verificarVencimento() {
     // Lógica para avisar se data < hoje (opcional)
     const data = document.getElementById('boleto-venc').value;
@@ -1007,3 +1066,15 @@ function verificarVencimento() {
         aviso.style.display = data < hoje ? 'block' : 'none';
     }
 }
+
+// --- CORREÇÃO DE FORMULÁRIO (Impede Recarregamento) ---
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("form-boleto");
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault(); // Bloqueia o recarregamento padrão
+            // Opcional: Chama o salvar aqui se quiser que o Enter funcione nativamente
+            // salvarBoleto();
+        });
+    }
+});
