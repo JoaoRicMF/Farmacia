@@ -53,7 +53,7 @@ async function request(url, method = 'GET', body = null, silent = false) {
 
            // Evita loop se já estiver no login
            const loginScreen = document.getElementById('login-screen');
-           if (loginScreen && !loginScreen.classList.contains('hidden')) {
+           if (loginScreen && !loginScreen.classList.contains('hidden') && !url.includes('/api/login')) {
                throw new Error("Acesso negado");
            }
 
