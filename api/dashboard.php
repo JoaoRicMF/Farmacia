@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id'])) { http_response_code(401); exit; }
 $db = (new Database())->getConnection();
 $periodo = $_GET['periodo'] ?? '7d';
 
-// Definição da data de corte para os gráficos
+// Definição da data de corte
 $dataInicio = date('Y-m-d');
 if ($periodo == '7d') $dataInicio = date('Y-m-d', strtotime('-7 days'));
 elseif ($periodo == '30d') $dataInicio = date('Y-m-d', strtotime('-30 days'));
@@ -16,10 +16,10 @@ elseif ($periodo == '3m') $dataInicio = date('Y-m-d', strtotime('-90 days'));
 elseif ($periodo == '1y') $dataInicio = date('Y-m-d', strtotime('-365 days'));
 elseif ($periodo == 'all') $dataInicio = '1900-01-01';
 
-// --- CARDS (Totais) ---
+// --- CARDS ---
 $cards = [];
 
-// A Pagar (Mês atual)
+// A Pagar (Total Pendente Geral)
 $stmt = $db->prepare("SELECT SUM(valor) as total FROM Financeiro WHERE status != 'Pago' AND status != 'Cancelado'");
 $stmt->execute();
 $cards['pagar_mes'] = (float)$stmt->fetch()['total'];
@@ -66,11 +66,25 @@ $stmt->bindParam(":inicio", $dataInicio);
 $stmt->execute();
 $graficoCat = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// --- CALENDÁRIO (Eventos: Este mês + Próximo) ---
+$calInicio = date('Y-m-01'); // Início deste mês
+$calFim = date('Y-m-d', strtotime('+60 days')); // +2 meses
+$sqlCal = "SELECT id, descricao, valor, vencimento, status 
+           FROM Financeiro 
+           WHERE vencimento >= :inicio AND vencimento <= :fim
+           ORDER BY vencimento ASC";
+$stmt = $db->prepare($sqlCal);
+$stmt->bindParam(":inicio", $calInicio);
+$stmt->bindParam(":fim", $calFim);
+$stmt->execute();
+$calendario = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 echo json_encode([
     "cards" => $cards,
     "graficos" => [
         "por_mes" => $graficoMes,
         "por_categoria" => $graficoCat
-    ]
+    ],
+    "calendario" => $calendario
 ]);
 ?>

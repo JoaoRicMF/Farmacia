@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <title>Financeiro Farmácia Nova Farma</title>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
 </head>
 <body>
@@ -421,10 +422,13 @@
                         <input type="text" id="filtro-busca" placeholder="🔍 Buscar por descrição..." oninput="debounceCarregarLista()" aria-label="Buscar Registros">
                     </div>
                     <div class="filters">
+                        <input type="date" id="filtro-data-inicio" onchange="carregarLista(1)" aria-label="Data Início" title="De">
+                        <input type="date" id="filtro-data-fim" onchange="carregarLista(1)" aria-label="Data Fim" title="Até">
+
                         <select id="filtro-status" onchange="carregarLista(1)" aria-label="Filtrar por Status">
                             <option value="Todos">Status: Todos</option>
                             <option value="Pendente">Pendente</option>
-                            <option value="Pago">Pago</option>
+                            <option value="Vencido">Vencido</option> <option value="Pago">Pago</option>
                         </select>
                         <select id="filtro-cat" onchange="carregarLista(1)" aria-label="Filtrar por Categoria">
                             <option value="Todas">Categoria: Todas</option>

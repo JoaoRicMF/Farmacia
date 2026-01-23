@@ -15,6 +15,8 @@ let estadoApp = {
     totalPaginasFinanceiro: 1,
     chartMes: null,
     chartCat: null,
+    chartMes: null,
+    chartCat: null,
     fornecedoresCache: []
 };
 
@@ -234,31 +236,167 @@ function toggleSidebar() {
    ========================================================================== */
 
 async function carregarDashboard(periodo = '7d') {
-    // Atualiza botões de filtro
+    // Atualiza visualmente o botão do filtro selecionado
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    const btnAtivo = document.querySelector(`.filter-btn[onclick*="'${periodo}'"]`);
-    if (btnAtivo) btnAtivo.classList.add('active');
+    const btn = document.querySelector(`.filter-btn[onclick*="'${periodo}'"]`);
+    if (btn) btn.classList.add('active');
 
     const dados = await apiRequest(`/dashboard.php?periodo=${periodo}`);
     if (!dados) return;
 
-    // Atualiza Cards
-    const atualizarCard = (id, valor) => {
-        const el = document.getElementById(id);
-        if (el) el.innerText = valor;
-    };
-
+    // Atualiza os Cards (Texto e Valores)
     if (dados.cards) {
-        atualizarCard('card-pagar-mes', formatarMoedaBRL(dados.cards.pagar_mes));
-        atualizarCard('card-pago-mes', formatarMoedaBRL(dados.cards.pago_mes));
-        atualizarCard('card-vencidos-val', formatarMoedaBRL(dados.cards.vencidos_val));
-        atualizarCard('card-vencidos-qtd', `${dados.cards.vencidos_qtd} un.`);
-        atualizarCard('card-proximos-val', formatarMoedaBRL(dados.cards.proximos_val));
-        atualizarCard('card-proximos-qtd', `${dados.cards.proximos_qtd} un.`);
+        document.getElementById('card-pagar-mes').innerText = formatarMoedaBRL(dados.cards.pagar_mes);
+        document.getElementById('card-pago-mes').innerText = formatarMoedaBRL(dados.cards.pago_mes);
+
+        document.getElementById('card-vencidos-val').innerText = formatarMoedaBRL(dados.cards.vencidos_val);
+        document.getElementById('card-vencidos-qtd').innerText = dados.cards.vencidos_qtd;
+
+        document.getElementById('card-proximos-val').innerText = formatarMoedaBRL(dados.cards.proximos_val);
+        document.getElementById('card-proximos-qtd').innerText = dados.cards.proximos_qtd;
     }
 
-    // Renderiza Gráficos (Chart.js)
+    // Chama as funções que desenham Gráficos e Calendário
     renderizarGraficos(dados.graficos);
+    renderizarCalendario(dados.calendario);
+}
+function renderizarGraficos(dados) {
+    if (typeof Chart === 'undefined') return; // Evita erro se o Chart.js não carregar
+
+    // Gráfico de Linha (Fluxo por Mês)
+    const ctxMes = document.getElementById('chartMes');
+    if (estadoApp.chartMes) estadoApp.chartMes.destroy(); // Limpa gráfico anterior
+
+    estadoApp.chartMes = new Chart(ctxMes, {
+        type: 'line',
+        data: {
+            labels: dados.por_mes.map(d => d.mes),
+            datasets: [{
+                label: 'Total (R$)',
+                data: dados.por_mes.map(d => d.total),
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    // Gráfico de Rosca (Categorias)
+    const ctxCat = document.getElementById('chartCat');
+    if (estadoApp.chartCat) estadoApp.chartCat.destroy();
+
+    estadoApp.chartCat = new Chart(ctxCat, {
+        type: 'doughnut',
+        data: {
+            labels: dados.por_categoria.map(d => d.categoria),
+            datasets: [{
+                data: dados.por_categoria.map(d => d.total),
+                backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#6366f1']
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+}
+
+function renderizarCalendario(eventos) {
+    const el = document.getElementById('calendar');
+    if (!el) return;
+
+    if (!eventos || eventos.length === 0) {
+        el.innerHTML = '<p class="text-center text-muted" style="padding:20px;">Nenhum vencimento previsto.</p>';
+        return;
+    }
+
+    // Agrupa eventos por data
+    const dias = {};
+    eventos.forEach(ev => {
+        if(!dias[ev.vencimento]) dias[ev.vencimento] = [];
+        dias[ev.vencimento].push(ev);
+    });
+
+    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;">';
+
+    Object.keys(dias).sort().forEach(data => {
+        const lista = dias[data];
+        const total = lista.reduce((acc, i) => acc + parseFloat(i.valor), 0);
+
+        // Cor da borda baseada no status
+        let corBorda = '#f59e0b'; // Amarelo (Padrão)
+        if (lista.some(i => i.status === 'Vencido')) corBorda = '#ef4444'; // Vermelho
+        else if (lista.every(i => i.status === 'Pago')) corBorda = '#10b981'; // Verde
+
+        html += `
+        <div style="background: var(--bg-card); padding: 10px; border-radius: 8px; border-left: 4px solid ${corBorda}; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">${formatarDataBR(data).substring(0,5)}</div>
+            <div style="font-size:0.75rem; color:#666;">${lista.length} conta(s)</div>
+            <div style="font-weight:bold; color:var(--text-main); font-size:0.9rem;">${formatarMoedaBRL(total)}</div>
+        </div>`;
+    });
+
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+// --- INTERATIVIDADE DOS CARDS ---
+
+function verDetalhes(tipo) {
+    navegar('lista');
+
+    // Pequeno delay para a tela carregar antes de filtrar
+    setTimeout(() => {
+        if (tipo === 'vencidos') preFiltrarLista('Vencido');
+        if (tipo === 'proximos') preFiltrarLista('Pendente', 7); // Próximos 7 dias
+    }, 100);
+}
+
+function preFiltrarLista(status, diasFuturos = null) {
+    const selStatus = document.getElementById('filtro-status');
+    const inpInicio = document.getElementById('filtro-data-inicio');
+    const inpFim = document.getElementById('filtro-data-fim');
+
+    // Limpa filtros anteriores
+    if(inpInicio) inpInicio.value = '';
+    if(inpFim) inpFim.value = '';
+
+    if (selStatus) {
+        if(status === 'Vencido') {
+            selStatus.value = 'Todos'; // O filtro de data fará o trabalho
+            // Define data fim como "ontem"
+            let ontem = new Date();
+            ontem.setDate(ontem.getDate() - 1);
+            inpFim.value = ontem.toISOString().split('T')[0];
+        } else {
+            selStatus.value = status;
+        }
+    }
+
+    if (diasFuturos) {
+        // Define intervalo: Hoje até Hoje + X dias
+        const hoje = new Date();
+        inpInicio.value = hoje.toISOString().split('T')[0];
+
+        let futuro = new Date();
+        futuro.setDate(futuro.getDate() + diasFuturos);
+        inpFim.value = futuro.toISOString().split('T')[0];
+    }
+
+    carregarFinanceiro(1);
+}
+
+function toggleCalendarSection() {
+    const wrap = document.getElementById('calendar-wrapper');
+    const header = document.querySelector('.toggle-header');
+
+    if (wrap.style.display === 'none' || wrap.classList.contains('hidden-content')) {
+        wrap.style.display = 'block';
+        wrap.classList.remove('hidden-content');
+        header.classList.add('open');
+    } else {
+        wrap.style.display = 'none';
+        header.classList.remove('open');
+    }
 }
 
 function renderizarGraficos(dadosGraficos) {
@@ -310,50 +448,53 @@ function renderizarGraficos(dadosGraficos) {
 async function carregarFinanceiro(pagina = 1) {
     estadoApp.paginaAtualFinanceiro = pagina;
     const tbody = document.querySelector('#tabela-registros tbody');
-    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Carregando...</td></tr>';
 
-    tbody.innerHTML = LOADER_HTML;
+    // Captura os valores dos filtros
+    const busca = document.getElementById('filtro-busca').value;
+    const status = document.getElementById('filtro-status') ? document.getElementById('filtro-status').value : 'Todos';
+    const cat = document.getElementById('filtro-cat') ? document.getElementById('filtro-cat').value : 'Todas';
 
-    // Captura filtros
-    const busca = document.getElementById('filtro-busca')?.value || '';
-    const status = document.getElementById('filtro-status')?.value || '';
-    const categoria = document.getElementById('filtro-cat')?.value || 'Todas';
+    // NOVOS CAMPOS DE DATA
+    const dIni = document.getElementById('filtro-data-inicio') ? document.getElementById('filtro-data-inicio').value : '';
+    const dFim = document.getElementById('filtro-data-fim') ? document.getElementById('filtro-data-fim').value : '';
 
-    const url = `/financeiro.php?pagina=${pagina}&busca=${encodeURIComponent(busca)}&status=${status}&categoria=${encodeURIComponent(categoria)}`;
+    // Monta a URL com os novos parâmetros
+    let url = `/financeiro.php?pagina=${pagina}&busca=${encodeURIComponent(busca)}&status=${status}&categoria=${encodeURIComponent(cat)}`;
+    if(dIni) url += `&data_inicio=${dIni}`;
+    if(dFim) url += `&data_fim=${dFim}`;
+
     const res = await apiRequest(url);
 
     tbody.innerHTML = '';
-
     if (!res || !res.registros || res.registros.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="100%" class="text-center py-4 text-muted">Nenhum registro encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
         return;
     }
 
-    estadoApp.totalPaginasFinanceiro = res.total_paginas || 1;
-    document.getElementById('info-paginas').innerText = `Página ${pagina} de ${estadoApp.totalPaginasFinanceiro}`;
+    document.getElementById('info-paginas').innerText = `Página ${pagina} de ${res.total_paginas}`;
 
-    // Popula tabela
-    res.registros.forEach(reg => {
-        const tr = document.createElement('tr');
+    res.registros.forEach(r => {
+        let badge = r.status === 'Pago' ? 'bg-success' : 'bg-warning text-dark';
 
-        let badgeClass = 'bg-secondary';
-        if (reg.status === 'Pago') badgeClass = 'bg-success';
-        else if (reg.status === 'Vencido') badgeClass = 'bg-danger';
-        else if (reg.status === 'Pendente') badgeClass = 'bg-warning text-dark';
-
-        tr.innerHTML = `
-            <td>${formatarDataBR(reg.vencimento)}</td>
-            <td class="font-weight-bold">${reg.descricao}</td>
-            <td><span class="badge badge-light border">${reg.categoria}</span></td>
-            <td class="text-right">${formatarMoedaBRL(reg.valor)}</td>
-            <td><span class="badge ${badgeClass}">${reg.status}</span></td>
-            <td class="text-center">
-                ${reg.status !== 'Pago' ?
-            `<button class="btn-icon btn-check" onclick="baixarRegistro(${reg.id})" title="Pagar">✓</button>` :
-            `<span class="text-muted">✓</span>`
+        // Lógica visual para Vencido
+        const hoje = new Date().toISOString().split('T')[0];
+        if(r.status !== 'Pago' && r.vencimento < hoje) {
+            badge = 'bg-danger';
+            r.status = 'Vencido'; // Força visualização como vencido
         }
-                <button class="btn-icon btn-edit" onclick="editarRegistro(${reg.id})" title="Editar">✎</button>
-                <button class="btn-icon btn-trash" onclick="excluirRegistro(${reg.id})" title="Excluir">🗑</button>
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${formatarDataBR(r.vencimento)}</td>
+            <td>${r.descricao}</td>
+            <td><small class="badge badge-light border">${r.categoria}</small></td>
+            <td>${formatarMoedaBRL(r.valor)}</td>
+            <td><span class="badge ${badge}">${r.status}</span></td>
+            <td class="text-right">
+                ${r.status !== 'Pago' ? `<button class="btn-icon btn-check" onclick="baixarRegistro(${r.id})" title="Pagar">✓</button>` : ''}
+                <button class="btn-icon btn-edit" onclick="editarRegistro(${r.id})" title="Editar">✎</button>
+                <button class="btn-icon btn-trash" onclick="excluirRegistro(${r.id})" title="Excluir">🗑</button>
             </td>
         `;
         tbody.appendChild(tr);
