@@ -17,6 +17,7 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository; // Importante
 import org.springframework.security.web.csrf.CsrfToken; // Importante
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.web.context.SecurityContextRepository;
 
 import java.util.Map;
 
@@ -26,6 +27,7 @@ public class AuthController {
     @Autowired private AuthenticationManager authenticationManager;
     @Autowired private UsuarioService usuarioService;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private SecurityContextRepository securityContextRepository;
 
     // Injetamos o repositório configurado no SecurityConfig
     @Autowired private CookieCsrfTokenRepository csrfTokenRepository;
@@ -58,15 +60,11 @@ public class AuthController {
             context.setAuthentication(authentication);
             SecurityContextHolder.setContext(context);
 
-            HttpSession session = request.getSession(true);
-            session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+            securityContextRepository.saveContext(context, request, response);
 
-            // --- CORREÇÃO DEFERIDA (A MÁGICA) ---
-            // Forçamos a geração de um token CSRF e salvamos no cookie AGORA.
-            // Isso garante que o front receba o cookie XSRF-TOKEN na resposta do login.
+
             CsrfToken csrf = csrfTokenRepository.generateToken(request);
             csrfTokenRepository.saveToken(csrf, request, response);
-            // ------------------------------------
 
             Usuario userDB = usuarioRepository.findByUsuario(req.usuario).orElse(new Usuario());
 

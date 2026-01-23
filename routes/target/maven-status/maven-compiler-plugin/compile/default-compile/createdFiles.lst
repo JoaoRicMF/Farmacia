@@ -9,6 +9,7 @@ com/farmacia/config/SecurityConfig.class
 com/farmacia/repository/SaidaCaixaRepository.class
 com/farmacia/controller/AuthController$LoginRequest.class
 com/farmacia/repository/FinanceiroRepository.class
+com/farmacia/config/CsrfCookieFilter.class
 com/farmacia/FarmaciaApplication.class
 com/farmacia/service/UsuarioService.class
 com/farmacia/controller/AuthController$PasswordResetRequest.class

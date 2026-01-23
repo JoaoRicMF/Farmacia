@@ -2,7 +2,35 @@ version: '3'
 services:
   app:
     image: farmacia-app
+    container_name: farmacia-backend
+    build: .  # Assume que o Dockerfile está na mesma pasta, ou use 'image' se já buildou
     environment:
-      - DB_PASSWORD=${SENHA_DO_BANCO}
+      - DB_URL=jdbc:mysql://db:3306/farmacia_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - DB_USER=root
+      - DB_PASSWORD=root  # Senha definida no serviço db abaixo
     ports:
       - "8080:8080"
+    depends_on:
+      - db
+    networks:
+      - farmacia-network
+
+  db:
+    image: mysql:8.0
+    container_name: farmacia-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: farmacia_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - farmacia-network
+
+networks:
+  farmacia-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
