@@ -47,13 +47,21 @@ async function request(url, method = 'GET', body = null, silent = false) {
        const response = await fetch(url, options);
 
        if (response.status === 401 || response.status === 403) {
+
+           // --- ADICIONE ESTAS 3 LINHAS AQUI ---
+           // Se o erro acontecer na tentativa de login, retorna para mostrar "Senha Inválida"
+           if (url.includes('/api/login')) {
+               return response;
+           }
+           // ------------------------------------
+
            if (silent) throw new Error("Sessão inválida (silencioso)");
 
            console.warn(`Erro de Segurança: Status ${response.status}`);
 
            // Evita loop se já estiver no login
            const loginScreen = document.getElementById('login-screen');
-           if (loginScreen && !loginScreen.classList.contains('hidden')) {
+           if (loginScreen && !loginScreen.classList.contains('hidden') && !url.includes('/api/login')) {
                throw new Error("Acesso negado");
            }
 

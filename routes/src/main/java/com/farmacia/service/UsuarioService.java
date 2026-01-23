@@ -37,16 +37,18 @@ public class UsuarioService implements UserDetailsService {
 
     // --- INICIALIZAÇÃO ---
     public void criarUsuarioInicial() {
-        if (usuarioRepository.count() == 0) {
-            Usuario admin = new Usuario();
-            admin.setUsuario("admin");
-            admin.setNome("Administrador");
-            admin.setFuncao("Admin");
-            // ALTERADO: Senha direta, sem encode
-            admin.setSenha("admin123");
-            usuarioRepository.save(admin);
-            System.out.println("⚠️ Usuário 'admin' criado (SEM CRIPTOGRAFIA).");
-        }
+        // Tenta buscar o admin existente ou cria um novo objeto se não achar
+        Usuario admin = usuarioRepository.findByUsuario("admin").orElse(new Usuario());
+
+        admin.setUsuario("admin");
+        admin.setNome("Administrador");
+        admin.setFuncao("Admin");
+
+        // AQUI ESTÁ A CORREÇÃO: Força a senha ser "admin123" em texto puro novamente
+        admin.setSenha("admin123");
+
+        usuarioRepository.save(admin);
+        System.out.println("⚠️ Usuário 'admin' verificado/atualizado (SENHA PLANA: admin123).");
     }
 
     public List<Usuario> listarTodos() {
