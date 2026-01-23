@@ -86,7 +86,8 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        // Retorna um encoder que NÃO faz criptografia (ideal para testes rápidos)
+        return org.springframework.security.crypto.password.NoOpPasswordEncoder.getInstance();
     }
 }
 
