@@ -29,7 +29,6 @@ public class AuthController {
     @Autowired private UsuarioService usuarioService;
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private SecurityContextRepository securityContextRepository;
-    @Autowired private SecurityContextRepository securityContextRepository;
 
     // Injetamos o repositório configurado no SecurityConfig
     @Autowired private CookieCsrfTokenRepository csrfTokenRepository;
