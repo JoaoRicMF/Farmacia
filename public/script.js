@@ -15,8 +15,6 @@ let estadoApp = {
     totalPaginasFinanceiro: 1,
     chartMes: null,
     chartCat: null,
-    chartMes: null,
-    chartCat: null,
     fornecedoresCache: []
 };
 
@@ -78,7 +76,8 @@ function converterMoedaParaFloat(valorString) {
 // Formatação de Data (YYYY-MM-DD -> DD/MM/YYYY)
 function formatarDataBR(dataISO) {
     if (!dataISO) return '-';
-    const [ano, mes, dia] = dataISO.split('-');
+    const dataPura = dataISO.split(' ')[0];
+    const [ano, mes, dia] = dataPura.split('-');
     return `${dia}/${mes}/${ano}`;
 }
 
@@ -452,15 +451,12 @@ async function carregarFinanceiro(pagina = 1) {
 
     // Captura os valores dos filtros
     const busca = document.getElementById('filtro-busca').value;
-    const status = document.getElementById('filtro-status') ? document.getElementById('filtro-status').value : 'Todos';
+    const statusFiltro = document.getElementById('filtro-status') ? document.getElementById('filtro-status').value : 'Todos';
     const cat = document.getElementById('filtro-cat') ? document.getElementById('filtro-cat').value : 'Todas';
-
-    // NOVOS CAMPOS DE DATA
     const dIni = document.getElementById('filtro-data-inicio') ? document.getElementById('filtro-data-inicio').value : '';
     const dFim = document.getElementById('filtro-data-fim') ? document.getElementById('filtro-data-fim').value : '';
 
-    // Monta a URL com os novos parâmetros
-    let url = `/financeiro.php?pagina=${pagina}&busca=${encodeURIComponent(busca)}&status=${status}&categoria=${encodeURIComponent(cat)}`;
+    let url = `/financeiro.php?pagina=${pagina}&busca=${encodeURIComponent(busca)}&status=${statusFiltro}&categoria=${encodeURIComponent(cat)}`;
     if(dIni) url += `&data_inicio=${dIni}`;
     if(dFim) url += `&data_fim=${dFim}`;
 
@@ -474,23 +470,36 @@ async function carregarFinanceiro(pagina = 1) {
 
     document.getElementById('info-paginas').innerText = `Página ${pagina} de ${res.total_paginas}`;
 
-    res.registros.forEach(r => {
-        let badge = r.status === 'Pago' ? 'bg-success' : 'bg-warning text-dark';
+    // Data de hoje para comparação (YYYY-MM-DD)
+    const hojeStr = new Date().toLocaleDateString('en-CA'); // Formato ISO local
 
-        // Lógica visual para Vencido
-        const hoje = new Date().toISOString().split('T')[0];
-        if(r.status !== 'Pago' && r.vencimento < hoje) {
-            badge = 'bg-danger';
-            r.status = 'Vencido'; // Força visualização como vencido
+    res.registros.forEach(r => {
+        // --- Lógica de Status Corrigida ---
+        let statusClass = 'status-Pendente';
+        let statusTexto = r.status;
+
+        if (r.status === 'Pago') {
+            statusClass = 'status-Pago';
+        } else if (r.status !== 'Pago') {
+            // Se não está pago e a data de vencimento é MENOR que hoje
+            if (r.vencimento < hojeStr) {
+                statusClass = 'status-Vencido';
+                statusTexto = 'Vencido'; // Força o texto visual
+            } else {
+                statusClass = 'status-Pendente';
+            }
         }
 
         const tr = document.createElement('tr');
+        // Adiciona classe na linha se estiver vencido para destaque extra
+        if (statusTexto === 'Vencido') tr.classList.add('row-vencido');
+
         tr.innerHTML = `
             <td>${formatarDataBR(r.vencimento)}</td>
             <td>${r.descricao}</td>
-            <td><small class="badge badge-light border">${r.categoria}</small></td>
-            <td>${formatarMoedaBRL(r.valor)}</td>
-            <td><span class="badge ${badge}">${r.status}</span></td>
+            <td><span class="category-badge">${r.categoria}</span></td>
+            <td style="font-weight: 500;">${formatarMoedaBRL(r.valor)}</td>
+            <td><span class="status-badge ${statusClass}">${statusTexto}</span></td>
             <td class="text-right">
                 ${r.status !== 'Pago' ? `<button class="btn-icon btn-check" onclick="baixarRegistro(${r.id})" title="Pagar">✓</button>` : ''}
                 <button class="btn-icon btn-edit" onclick="editarRegistro(${r.id})" title="Editar">✎</button>

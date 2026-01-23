@@ -574,3 +574,50 @@ tr.loading-row td { text-align: center; background-color: var(--bg-body); pointe
     background-color: rgba(239, 68, 68, 0.15) !important;
     color: #f87171 !important;
 }
+/* --- NOVOS ESTILOS PARA CATEGORIAS E TABELA --- */
+
+/* Badge de Categoria */
+.category-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background-color: var(--bg-body);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 0.75rem;
+    color: var(--text-light);
+    font-weight: 600;
+}
+
+/* Botões de Ação na Tabela */
+.btn-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-check { color: var(--success); background: rgba(16, 185, 129, 0.1); }
+.btn-check:hover { background: var(--success); color: white; }
+
+.btn-edit { color: var(--primary); background: rgba(37, 99, 235, 0.1); }
+.btn-edit:hover { background: var(--primary); color: white; }
+
+.btn-trash { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+.btn-trash:hover { background: var(--danger); color: white; }
+
+/* Ajuste fino para os Badges de Status existirem (caso faltem) */
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    display: inline-block;
+}
