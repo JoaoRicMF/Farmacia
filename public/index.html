@@ -324,14 +324,14 @@
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
-                    <h1>Novo Lançamento</h1>
+                    <h1 id="form-titulo">Novo Lançamento</h1>
                 </div>
                 <small class="no-print" style="color: var(--text-light);">
                     Atalhos: <b>Enter</b> Salvar | <b>Esc</b> Limpar
                 </small>
             </div>
 
-            <div class="card" style="max-width: 800px;">
+            <form id="form-boleto" class="card" style="max-width: 800px;">
 
                 <div class="form-row">
                     <div class="full-width">
@@ -397,10 +397,11 @@
                 </div>
 
                 <div class="form-actions">
-                    <button class="btn btn-secondary" onclick="limparFormulario()" title="Esc">Limpar</button>
-                    <button class="btn btn-primary" onclick="salvarBoleto(false)" style="background-color: var(--text-light); border: none;">Salvar e Sair</button>
-                    <button class="btn btn-primary" onclick="salvarBoleto(true)" title="Enter">💾 Salvar + Novo</button>
+                    <button type="button" class="btn btn-secondary" onclick="limparFormulario()" title="Esc">Limpar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarBoleto(false)" style="background-color: var(--text-light); border: none;">Salvar e Sair</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarBoleto(true)" title="Enter">💾 Salvar + Novo</button>
                 </div>
+            </form>
             </div>
         </div>
 
