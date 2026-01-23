@@ -444,6 +444,21 @@ function renderizarGraficos(dadosGraficos) {
    6. FINANCEIRO (CRUD e Listagem)
    ========================================================================== */
 
+function copiarCodigo(codigo) {
+    if (!codigo) return showToast("Não há código de barras.", "error");
+
+    navigator.clipboard.writeText(codigo).then(() => {
+        showToast("Código copiado para a área de transferência!");
+    }).catch(() => {
+        showToast("Erro ao copiar.", "error");
+    });
+}
+
+function abrirBanco() {
+    // Abre o Internet Banking da Caixa em nova aba
+    window.open('https://internetbanking.caixa.gov.br/', '_blank');
+}
+
 async function carregarFinanceiro(pagina = 1) {
     estadoApp.paginaAtualFinanceiro = pagina;
     const tbody = document.querySelector('#tabela-registros tbody');
@@ -490,17 +505,29 @@ async function carregarFinanceiro(pagina = 1) {
             }
         }
 
+        const temCodigo = r.codigo_barras && r.codigo_barras.length > 5;
+        const btnCopy = temCodigo
+            ? `<button class="btn-icon btn-copy" onclick="copiarCodigo('${r.codigo_barras}')" title="Copiar Código">📋</button>`
+            : '';
+
+        // Botão da Caixa
+        const btnBank = `<button class="btn-icon btn-link" onclick="abrirBanco()" title="Acessar Caixa">🏦</button>`;
+
         const tr = document.createElement('tr');
-        // Adiciona classe na linha se estiver vencido para destaque extra
         if (statusTexto === 'Vencido') tr.classList.add('row-vencido');
 
         tr.innerHTML = `
             <td>${formatarDataBR(r.vencimento)}</td>
-            <td>${r.descricao}</td>
+            <td>
+                ${r.descricao}
+                ${temCodigo ? '<br><small style="color:#aaa; font-size:0.75rem;">'+r.codigo_barras+'</small>' : ''}
+            </td>
             <td><span class="category-badge">${r.categoria}</span></td>
             <td style="font-weight: 500;">${formatarMoedaBRL(r.valor)}</td>
             <td><span class="status-badge ${statusClass}">${statusTexto}</span></td>
             <td class="text-right">
+                ${btnCopy}
+                ${btnBank}
                 ${r.status !== 'Pago' ? `<button class="btn-icon btn-check" onclick="baixarRegistro(${r.id})" title="Pagar">✓</button>` : ''}
                 <button class="btn-icon btn-edit" onclick="editarRegistro(${r.id})" title="Editar">✎</button>
                 <button class="btn-icon btn-trash" onclick="excluirRegistro(${r.id})" title="Excluir">🗑</button>
@@ -567,17 +594,64 @@ async function salvarBoleto(manterNaTela = false) {
 async function editarRegistro(id) {
     const res = await apiRequest(`/financeiro.php?id=${id}`);
     if (res && res.id) {
-        navegar('novo');
-        document.getElementById('form-titulo').innerText = 'Editar Registro';
-        document.getElementById('boleto-id-hidden').value = res.id;
-        document.getElementById('boleto-desc').value = res.descricao;
-        document.getElementById('boleto-cod').value = res.codigo_barras || '';
-        document.getElementById('boleto-venc').value = res.vencimento;
-        document.getElementById('boleto-cat').value = res.categoria;
-        document.getElementById('boleto-status').value = res.status;
+        // Preenche o ID e o Código oculto
+        document.getElementById('edit-id').value = res.id;
 
-        const campoValor = document.getElementById('boleto-valor');
-        campoValor.value = formatarMoedaBRL(res.valor);
+        // Verifica se o elemento edit-cod existe antes de tentar preencher
+        const codInput = document.getElementById('edit-cod');
+        if(codInput) codInput.value = res.codigo_barras || '';
+
+        // Preenche os campos visuais
+        document.getElementById('edit-desc').value = res.descricao;
+        document.getElementById('edit-venc').value = res.vencimento;
+        document.getElementById('edit-cat').value = res.categoria;
+        document.getElementById('edit-status').value = res.status;
+        document.getElementById('edit-valor').value = formatarMoedaBRL(res.valor);
+
+        // Abre o modal
+        document.getElementById('modal-editar').classList.remove('hidden');
+    }
+}
+
+async function salvarEdicao() {
+    // Pega os dados dos campos do MODAL (edit-*)
+    const id = document.getElementById('edit-id').value;
+    const desc = document.getElementById('edit-desc').value;
+    const valorStr = document.getElementById('edit-valor').value;
+    const venc = document.getElementById('edit-venc').value;
+    const cat = document.getElementById('edit-cat').value;
+    const status = document.getElementById('edit-status').value;
+
+    // Tenta pegar o código de barras (se o input hidden existir)
+    const codInput = document.getElementById('edit-cod');
+    const codigoBarras = codInput ? codInput.value : '';
+
+    // Validação
+    const valorFloat = converterMoedaParaFloat(valorStr);
+
+    if (!desc || valorFloat <= 0 || !venc) {
+        return showToast("Preencha Descrição, Valor e Vencimento.", "error");
+    }
+
+    const payload = {
+        id: id,
+        descricao: desc,
+        valor: valorFloat,
+        vencimento: venc,
+        categoria: cat,
+        status: status,
+        codigo_barras: codigoBarras
+    };
+
+    // Envia para o Backend
+    const res = await apiRequest('/financeiro.php', 'POST', payload);
+
+    if (res && res.success) {
+        showToast("Registro atualizado com sucesso!");
+        fecharModalEdicao();
+        carregarFinanceiro(estadoApp.paginaAtualFinanceiro); // Atualiza a lista
+    } else {
+        showToast(res.message || "Erro ao atualizar.", "error");
     }
 }
 
@@ -840,7 +914,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // 2. Prepara datas nos inputs de "hoje"
     const hoje = new Date().toISOString().split('T')[0];
     document.querySelectorAll('input[type="date"]').forEach(inp => {
-        if (!inp.value) inp.value = hoje;
+        // Só preenche se não tiver valor e NÃO for um filtro
+        if (!inp.value && !inp.id.startsWith('filtro-')) {
+            inp.value = hoje;
+        }
     });
 
     // 3. Adiciona listeners para máscaras de moeda

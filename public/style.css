@@ -351,7 +351,10 @@ input:focus, select:focus { border-color: var(--primary); outline: none; box-sha
 }
 .search-box { flex: 2; min-width: 250px; }
 .filters { flex: 3; display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-.filters select, .filters button { flex: 1; min-width: 130px; }
+.filters input, .filters select, .filters button {
+    flex: 1;
+    min-width: 130px;
+}
 .periodo-select {
     padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border);
     background: var(--bg-card); color: var(--text-main); font-weight: 600;
@@ -621,3 +624,11 @@ tr.loading-row td { text-align: center; background-color: var(--bg-body); pointe
     text-transform: uppercase;
     display: inline-block;
 }
+
+/* Botão Copiar (Azul Ciano) */
+.btn-copy { color: #0891b2; background: rgba(8, 145, 178, 0.1); }
+.btn-copy:hover { background: #0891b2; color: white; }
+
+/* Botão Banco (Roxo) */
+.btn-link { color: #7c3aed; background: rgba(124, 58, 237, 0.1); }
+.btn-link:hover { background: #7c3aed; color: white; }
