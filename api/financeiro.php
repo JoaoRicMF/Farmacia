@@ -36,7 +36,7 @@ if ($method === 'GET' && $id) {
 
 // LISTAR COM FILTROS (Mantido da versão anterior, com ajustes)
 if ($method === 'GET' && !$id) {
-    $pagina = $_GET['pagina'] ?? 1;
+    $pagina = (int)($_GET['pagina'] ?? 1); // Forçar inteiro
     $limit = 20;
     $offset = ($pagina - 1) * $limit;
 

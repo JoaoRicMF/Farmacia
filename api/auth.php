@@ -8,6 +8,12 @@ include_once '../config/database.php';
 $database = new Database();
 $db = $database->getConnection();
 
+if (!$db) {
+    http_response_code(500);
+    echo json_encode(["success" => false, "message" => "Erro de conexão com o Banco de Dados"]);
+    exit;
+}
+
 // Lê o corpo da requisição JSON
 $data = json_decode(file_get_contents("php://input"));
 $method = $_SERVER['REQUEST_METHOD'];

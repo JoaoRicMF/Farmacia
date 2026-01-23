@@ -5,7 +5,7 @@ class Database {
     private $host = "localhost";
     private $db_name = "farmacia_db";
     private $username = "root";
-    private $password = "sua_senha"; // Coloque sua senha aqui
+    private $password = "sua_senha"; // Lembre-se de configurar a senha correta do seu MySQL
     public $conn;
 
     public function getConnection() {
@@ -15,7 +15,8 @@ class Database {
             $this->conn->exec("set names utf8");
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         } catch(PDOException $exception) {
-            echo "Erro de conexão: " . $exception->getMessage();
+            // Correção: Não dar echo aqui para não quebrar o JSON das APIs
+            error_log("Erro de conexão: " . $exception->getMessage());
         }
         return $this->conn;
     }
