@@ -1,8 +1,10 @@
 /* ==========================================================================
-   FARMÁCIA SYSTEM - JAVASCRIPT PRINCIPAL (V3.0 FIXED)
+   FARMÁCIA SYSTEM - JAVASCRIPT PRINCIPAL (V3.0 ORGANIZED)
    ========================================================================== */
 
-/* --- 1. CONFIGURAÇÕES GLOBAIS --- */
+/* ==========================================================================
+   1. CONFIGURAÇÕES E ESTADO GLOBAL
+   ========================================================================== */
 const CONFIG = {
     API_URL: '/api', // Caminho relativo para funcionar com php -S
     ANIMATION_SPEED: 300
@@ -25,14 +27,16 @@ const LOADER_HTML = `
     </td></tr>`;
 
 /* ==========================================================================
-   2. UTILITÁRIOS (Helpers)
+   2. UTILITÁRIOS (HELPERS)
    ========================================================================== */
 
 // Wrapper para Fetch (Trata Erros e JSON)
 async function apiRequest(endpoint, method = 'GET', body = null) {
     const options = {
         method,
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+            'Content-Type': 'application/json'
+        }
     };
 
     if (body) options.body = JSON.stringify(body);
@@ -52,13 +56,19 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
     } catch (error) {
         console.error(`Erro na requisição para ${endpoint}:`, error);
         showToast("Erro de conexão com o servidor.", "error");
-        return { success: false, message: "Erro de rede" };
+        return {
+            success: false,
+            message: "Erro de rede"
+        };
     }
 }
 
-// Formatação de Moeda (Input e Display)
+// Formatação de Moeda e Dados
 function formatarMoedaBRL(valor) {
-    return parseFloat(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    return parseFloat(valor).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    });
 }
 
 function mascaraMoedaInput(input) {
@@ -73,7 +83,6 @@ function converterMoedaParaFloat(valorString) {
     return parseFloat(valorString.replace(/[^\d,]/g, '').replace(',', '.'));
 }
 
-// Formatação de Data (YYYY-MM-DD -> DD/MM/YYYY)
 function formatarDataBR(dataISO) {
     if (!dataISO) return '-';
     const dataPura = dataISO.split(' ')[0];
@@ -87,7 +96,7 @@ function showToast(mensagem, tipo = 'success') {
     if (!container) return;
 
     const toast = document.createElement('div');
-    toast.className = `toast toast-${tipo}`; // CSS deve ter classes .toast-success e .toast-error
+    toast.className = `toast toast-${tipo}`;
     toast.innerHTML = `
         <span class="toast-icon">${tipo === 'success' ? '✅' : '⚠️'}</span>
         <span class="toast-msg">${mensagem}</span>
@@ -95,7 +104,6 @@ function showToast(mensagem, tipo = 'success') {
 
     container.appendChild(toast);
 
-    // Animação de entrada e saída
     setTimeout(() => toast.style.opacity = '1', 10);
     setTimeout(() => {
         toast.style.opacity = '0';
@@ -128,7 +136,10 @@ async function login(event) {
     btn.disabled = true;
     btn.innerText = "Entrando...";
 
-    const res = await apiRequest('/auth.php', 'POST', { usuario: user, senha: pass });
+    const res = await apiRequest('/auth.php', 'POST', {
+        usuario: user,
+        senha: pass
+    });
 
     btn.disabled = false;
     btn.innerText = "Entrar";
@@ -156,23 +167,19 @@ function iniciarApp(dadosUsuario) {
     estadoApp.usuario = dadosUsuario;
     sessionStorage.setItem('user_role', dadosUsuario.funcao);
 
-    // Atualiza UI com dados do usuário
     const userDisplay = document.getElementById('user-display');
     const userRole = document.getElementById('user-role');
     if (userDisplay) userDisplay.innerText = dadosUsuario.nome;
     if (userRole) userRole.innerText = dadosUsuario.funcao === 'Admin' ? 'Administrador' : 'Operador';
 
-    // Controle de Permissão (Admin Only)
     document.querySelectorAll('.admin-only').forEach(el => {
         el.style.display = dadosUsuario.funcao === 'Admin' ? 'block' : 'none';
     });
 
-    // Troca de telas
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('app-screen').classList.remove('hidden');
 
-    // Inicialização
-    carregarFornecedores(); // Cache para selects
+    carregarFornecedores();
     navegar('dashboard');
 }
 
@@ -186,31 +193,38 @@ function exibirTelaLogin() {
    ========================================================================== */
 
 function navegar(telaId) {
-    // Esconde todas as views
     document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
 
-    // Mostra a view desejada
     const viewAlvo = document.getElementById(`view-${telaId}`);
     if (viewAlvo) {
         viewAlvo.classList.remove('hidden');
 
-        // Lógica específica ao carregar cada tela
-        switch(telaId) {
-            case 'dashboard': carregarDashboard(); break;
-            case 'lista': carregarFinanceiro(1); break;
-            case 'fluxo': carregarFluxo(); break;
-            case 'logs': carregarLogs(); break;
-            case 'config': carregarConfiguracoes(); break;
-            case 'novo': prepararNovoRegistro(); break;
+        switch (telaId) {
+            case 'dashboard':
+                carregarDashboard();
+                break;
+            case 'lista':
+                carregarFinanceiro(1);
+                break;
+            case 'fluxo':
+                carregarFluxo();
+                break;
+            case 'logs':
+                carregarLogs();
+                break;
+            case 'config':
+                carregarConfiguracoes();
+                break;
+            case 'novo':
+                prepararNovoRegistro();
+                break;
         }
     }
 
-    // Atualiza Menu Sidebar
     document.querySelectorAll('.menu-item').forEach(btn => btn.classList.remove('active'));
     const btnAtivo = document.querySelector(`.menu-item[onclick*="'${telaId}'"]`);
     if (btnAtivo) btnAtivo.classList.add('active');
 
-    // Fecha sidebar no mobile se estiver aberta
     const sidebar = document.getElementById('sidebar');
     if (window.innerWidth < 768 && sidebar.classList.contains('active')) {
         toggleSidebar();
@@ -235,7 +249,6 @@ function toggleSidebar() {
    ========================================================================== */
 
 async function carregarDashboard(periodo = '7d') {
-    // Atualiza visualmente o botão do filtro selecionado
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     const btn = document.querySelector(`.filter-btn[onclick*="'${periodo}'"]`);
     if (btn) btn.classList.add('active');
@@ -243,163 +256,22 @@ async function carregarDashboard(periodo = '7d') {
     const dados = await apiRequest(`/dashboard.php?periodo=${periodo}`);
     if (!dados) return;
 
-    // Atualiza os Cards (Texto e Valores)
     if (dados.cards) {
         document.getElementById('card-pagar-mes').innerText = formatarMoedaBRL(dados.cards.pagar_mes);
         document.getElementById('card-pago-mes').innerText = formatarMoedaBRL(dados.cards.pago_mes);
-
         document.getElementById('card-vencidos-val').innerText = formatarMoedaBRL(dados.cards.vencidos_val);
         document.getElementById('card-vencidos-qtd').innerText = dados.cards.vencidos_qtd;
-
         document.getElementById('card-proximos-val').innerText = formatarMoedaBRL(dados.cards.proximos_val);
         document.getElementById('card-proximos-qtd').innerText = dados.cards.proximos_qtd;
     }
 
-    // Chama as funções que desenham Gráficos e Calendário
     renderizarGraficos(dados.graficos);
     renderizarCalendario(dados.calendario);
-}
-function renderizarGraficos(dados) {
-    if (typeof Chart === 'undefined') return; // Evita erro se o Chart.js não carregar
-
-    // Gráfico de Linha (Fluxo por Mês)
-    const ctxMes = document.getElementById('chartMes');
-    if (estadoApp.chartMes) estadoApp.chartMes.destroy(); // Limpa gráfico anterior
-
-    estadoApp.chartMes = new Chart(ctxMes, {
-        type: 'line',
-        data: {
-            labels: dados.por_mes.map(d => d.mes),
-            datasets: [{
-                label: 'Total (R$)',
-                data: dados.por_mes.map(d => d.total),
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                fill: true,
-                tension: 0.3
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-    });
-
-    // Gráfico de Rosca (Categorias)
-    const ctxCat = document.getElementById('chartCat');
-    if (estadoApp.chartCat) estadoApp.chartCat.destroy();
-
-    estadoApp.chartCat = new Chart(ctxCat, {
-        type: 'doughnut',
-        data: {
-            labels: dados.por_categoria.map(d => d.categoria),
-            datasets: [{
-                data: dados.por_categoria.map(d => d.total),
-                backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#6366f1']
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-    });
-}
-
-function renderizarCalendario(eventos) {
-    const el = document.getElementById('calendar');
-    if (!el) return;
-
-    if (!eventos || eventos.length === 0) {
-        el.innerHTML = '<p class="text-center text-muted" style="padding:20px;">Nenhum vencimento previsto.</p>';
-        return;
-    }
-
-    // Agrupa eventos por data
-    const dias = {};
-    eventos.forEach(ev => {
-        if(!dias[ev.vencimento]) dias[ev.vencimento] = [];
-        dias[ev.vencimento].push(ev);
-    });
-
-    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;">';
-
-    Object.keys(dias).sort().forEach(data => {
-        const lista = dias[data];
-        const total = lista.reduce((acc, i) => acc + parseFloat(i.valor), 0);
-
-        // Cor da borda baseada no status
-        let corBorda = '#f59e0b'; // Amarelo (Padrão)
-        if (lista.some(i => i.status === 'Vencido')) corBorda = '#ef4444'; // Vermelho
-        else if (lista.every(i => i.status === 'Pago')) corBorda = '#10b981'; // Verde
-
-        html += `
-        <div style="background: var(--bg-card); padding: 10px; border-radius: 8px; border-left: 4px solid ${corBorda}; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-            <div style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">${formatarDataBR(data).substring(0,5)}</div>
-            <div style="font-size:0.75rem; color:#666;">${lista.length} conta(s)</div>
-            <div style="font-weight:bold; color:var(--text-main); font-size:0.9rem;">${formatarMoedaBRL(total)}</div>
-        </div>`;
-    });
-
-    html += '</div>';
-    el.innerHTML = html;
-}
-
-// --- INTERATIVIDADE DOS CARDS ---
-
-function verDetalhes(tipo) {
-    navegar('lista');
-
-    // Pequeno delay para a tela carregar antes de filtrar
-    setTimeout(() => {
-        if (tipo === 'vencidos') preFiltrarLista('Vencido');
-        if (tipo === 'proximos') preFiltrarLista('Pendente', 7); // Próximos 7 dias
-    }, 100);
-}
-
-function preFiltrarLista(status, diasFuturos = null) {
-    const selStatus = document.getElementById('filtro-status');
-    const inpInicio = document.getElementById('filtro-data-inicio');
-    const inpFim = document.getElementById('filtro-data-fim');
-
-    // Limpa filtros anteriores
-    if(inpInicio) inpInicio.value = '';
-    if(inpFim) inpFim.value = '';
-
-    if (selStatus) {
-        if(status === 'Vencido') {
-            selStatus.value = 'Todos'; // O filtro de data fará o trabalho
-            // Define data fim como "ontem"
-            let ontem = new Date();
-            ontem.setDate(ontem.getDate() - 1);
-            inpFim.value = ontem.toISOString().split('T')[0];
-        } else {
-            selStatus.value = status;
-        }
-    }
-
-    if (diasFuturos) {
-        // Define intervalo: Hoje até Hoje + X dias
-        const hoje = new Date();
-        inpInicio.value = hoje.toISOString().split('T')[0];
-
-        let futuro = new Date();
-        futuro.setDate(futuro.getDate() + diasFuturos);
-        inpFim.value = futuro.toISOString().split('T')[0];
-    }
-
-    carregarFinanceiro(1);
-}
-
-function toggleCalendarSection() {
-    const wrap = document.getElementById('calendar-wrapper');
-    const header = document.querySelector('.toggle-header');
-
-    if (wrap.style.display === 'none' || wrap.classList.contains('hidden-content')) {
-        wrap.style.display = 'block';
-        wrap.classList.remove('hidden-content');
-        header.classList.add('open');
-    } else {
-        wrap.style.display = 'none';
-        header.classList.remove('open');
-    }
 }
 
 function renderizarGraficos(dadosGraficos) {
     if (!dadosGraficos) return;
+    if (typeof Chart === 'undefined') return;
 
     // Gráfico de Linha (Fluxo/Vencimentos)
     const ctxMes = document.getElementById('chartMes');
@@ -418,7 +290,10 @@ function renderizarGraficos(dadosGraficos) {
                     tension: 0.4
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
         });
     }
 
@@ -435,18 +310,71 @@ function renderizarGraficos(dadosGraficos) {
                     backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
         });
     }
 }
 
+function renderizarCalendario(eventos) {
+    const el = document.getElementById('calendar');
+    if (!el) return;
+
+    if (!eventos || eventos.length === 0) {
+        el.innerHTML = '<p class="text-center text-muted" style="padding:20px;">Nenhum vencimento previsto.</p>';
+        return;
+    }
+
+    const dias = {};
+    eventos.forEach(ev => {
+        if (!dias[ev.vencimento]) dias[ev.vencimento] = [];
+        dias[ev.vencimento].push(ev);
+    });
+
+    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;">';
+
+    Object.keys(dias).sort().forEach(data => {
+        const lista = dias[data];
+        const total = lista.reduce((acc, i) => acc + parseFloat(i.valor), 0);
+
+        let corBorda = '#f59e0b'; // Amarelo
+        if (lista.some(i => i.status === 'Vencido')) corBorda = '#ef4444'; // Vermelho
+        else if (lista.every(i => i.status === 'Pago')) corBorda = '#10b981'; // Verde
+
+        html += `
+        <div style="background: var(--bg-card); padding: 10px; border-radius: 8px; border-left: 4px solid ${corBorda}; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">${formatarDataBR(data).substring(0,5)}</div>
+            <div style="font-size:0.75rem; color:#666;">${lista.length} conta(s)</div>
+            <div style="font-weight:bold; color:var(--text-main); font-size:0.9rem;">${formatarMoedaBRL(total)}</div>
+        </div>`;
+    });
+
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function toggleCalendarSection() {
+    const wrap = document.getElementById('calendar-wrapper');
+    const header = document.querySelector('.toggle-header');
+
+    if (wrap.style.display === 'none' || wrap.classList.contains('hidden-content')) {
+        wrap.style.display = 'block';
+        wrap.classList.remove('hidden-content');
+        header.classList.add('open');
+    } else {
+        wrap.style.display = 'none';
+        header.classList.remove('open');
+    }
+}
+
 /* ==========================================================================
-   6. FINANCEIRO (CRUD e Listagem)
+   6. FINANCEIRO (CRUD E LISTAGEM)
    ========================================================================== */
 
 function copiarCodigo(codigo) {
     if (!codigo) return showToast("Não há código de barras.", "error");
-
     navigator.clipboard.writeText(codigo).then(() => {
         showToast("Código copiado para a área de transferência!");
     }).catch(() => {
@@ -455,7 +383,6 @@ function copiarCodigo(codigo) {
 }
 
 function abrirBanco() {
-    // Abre o Internet Banking da Caixa em nova aba
     window.open('https://internetbanking.caixa.gov.br/', '_blank');
 }
 
@@ -464,7 +391,6 @@ async function carregarFinanceiro(pagina = 1) {
     const tbody = document.querySelector('#tabela-registros tbody');
     tbody.innerHTML = '<tr><td colspan="6" class="text-center">Carregando...</td></tr>';
 
-    // Captura os valores dos filtros
     const busca = document.getElementById('filtro-busca').value;
     const statusFiltro = document.getElementById('filtro-status') ? document.getElementById('filtro-status').value : 'Todos';
     const cat = document.getElementById('filtro-cat') ? document.getElementById('filtro-cat').value : 'Todas';
@@ -472,8 +398,8 @@ async function carregarFinanceiro(pagina = 1) {
     const dFim = document.getElementById('filtro-data-fim') ? document.getElementById('filtro-data-fim').value : '';
 
     let url = `/financeiro.php?pagina=${pagina}&busca=${encodeURIComponent(busca)}&status=${statusFiltro}&categoria=${encodeURIComponent(cat)}`;
-    if(dIni) url += `&data_inicio=${dIni}`;
-    if(dFim) url += `&data_fim=${dFim}`;
+    if (dIni) url += `&data_inicio=${dIni}`;
+    if (dFim) url += `&data_fim=${dFim}`;
 
     const res = await apiRequest(url);
 
@@ -484,33 +410,30 @@ async function carregarFinanceiro(pagina = 1) {
     }
 
     document.getElementById('info-paginas').innerText = `Página ${pagina} de ${res.total_paginas}`;
+    estadoApp.totalPaginasFinanceiro = res.total_paginas;
 
-    // Data de hoje para comparação (YYYY-MM-DD)
-    const hojeStr = new Date().toLocaleDateString('en-CA'); // Formato ISO local
+    const hojeStr = new Date().toLocaleDateString('en-CA');
 
     res.registros.forEach(r => {
-        // --- Lógica de Status Corrigida ---
         let statusClass = 'status-Pendente';
         let statusTexto = r.status;
 
         if (r.status === 'Pago') {
             statusClass = 'status-Pago';
         } else if (r.status !== 'Pago') {
-            // Se não está pago e a data de vencimento é MENOR que hoje
             if (r.vencimento < hojeStr) {
                 statusClass = 'status-Vencido';
-                statusTexto = 'Vencido'; // Força o texto visual
+                statusTexto = 'Vencido';
             } else {
                 statusClass = 'status-Pendente';
             }
         }
 
         const temCodigo = r.codigo_barras && r.codigo_barras.length > 5;
-        const btnCopy = temCodigo
-            ? `<button class="btn-icon btn-copy" onclick="copiarCodigo('${r.codigo_barras}')" title="Copiar Código">📋</button>`
-            : '';
+        const btnCopy = temCodigo ?
+            `<button class="btn-icon btn-copy" onclick="copiarCodigo('${r.codigo_barras}')" title="Copiar Código">📋</button>` :
+            '';
 
-        // Botão da Caixa
         const btnBank = `<button class="btn-icon btn-link" onclick="abrirBanco()" title="Acessar Caixa">🏦</button>`;
 
         const tr = document.createElement('tr');
@@ -538,17 +461,9 @@ async function carregarFinanceiro(pagina = 1) {
 }
 
 function prepararNovoRegistro() {
-    // Limpa formulário
     document.getElementById('form-boleto').reset();
     document.getElementById('boleto-id-hidden').value = '';
     document.getElementById('form-titulo').innerText = 'Novo Registro';
-
-    // Define data de hoje no vencimento por padrão se vazio
-    if (!document.getElementById('boleto-venc').value) {
-        document.getElementById('boleto-venc').value = new Date().toISOString().split('T')[0];
-    }
-
-    // Foca no primeiro campo
     setTimeout(() => document.getElementById('boleto-cod').focus(), 100);
 }
 
@@ -556,7 +471,7 @@ async function salvarBoleto(manterNaTela = false) {
     const id = document.getElementById('boleto-id-hidden').value;
 
     const payload = {
-        id: id || null, // Importante para o backend saber se é UPDATE ou INSERT
+        id: id || null,
         descricao: document.getElementById('boleto-desc').value,
         valor: converterMoedaParaFloat(document.getElementById('boleto-valor').value),
         vencimento: document.getElementById('boleto-venc').value,
@@ -569,21 +484,16 @@ async function salvarBoleto(manterNaTela = false) {
         return showToast("Preencha Descrição, Valor e Vencimento.", "error");
     }
 
-    // Define se é Edição ou Novo
     let url = '/financeiro.php?action=salvar';
-    if (id) url = `/financeiro.php?action=atualizar&id=${id}`; // Caso sua API use update via URL
+    if (id) url = `/financeiro.php?action=atualizar&id=${id}`;
 
-    // Envia para o Backend
-    const res = await apiRequest('/financeiro.php', 'POST', payload); // Usando POST padrão para ambos
+    const res = await apiRequest('/financeiro.php', 'POST', payload);
 
     if (res && res.success) {
         showToast("Registro salvo com sucesso!");
-
         if (manterNaTela) {
-            // Modo "Salvar + Novo": Limpa e mantém na tela
             prepararNovoRegistro();
         } else {
-            // Modo "Salvar e Sair": Volta para lista
             navegar('lista');
         }
     } else {
@@ -594,39 +504,30 @@ async function salvarBoleto(manterNaTela = false) {
 async function editarRegistro(id) {
     const res = await apiRequest(`/financeiro.php?id=${id}`);
     if (res && res.id) {
-        // Preenche o ID e o Código oculto
         document.getElementById('edit-id').value = res.id;
-
-        // Verifica se o elemento edit-cod existe antes de tentar preencher
         const codInput = document.getElementById('edit-cod');
-        if(codInput) codInput.value = res.codigo_barras || '';
+        if (codInput) codInput.value = res.codigo_barras || '';
 
-        // Preenche os campos visuais
         document.getElementById('edit-desc').value = res.descricao;
         document.getElementById('edit-venc').value = res.vencimento;
         document.getElementById('edit-cat').value = res.categoria;
         document.getElementById('edit-status').value = res.status;
         document.getElementById('edit-valor').value = formatarMoedaBRL(res.valor);
 
-        // Abre o modal
         document.getElementById('modal-editar').classList.remove('hidden');
     }
 }
 
 async function salvarEdicao() {
-    // Pega os dados dos campos do MODAL (edit-*)
     const id = document.getElementById('edit-id').value;
     const desc = document.getElementById('edit-desc').value;
     const valorStr = document.getElementById('edit-valor').value;
     const venc = document.getElementById('edit-venc').value;
     const cat = document.getElementById('edit-cat').value;
     const status = document.getElementById('edit-status').value;
-
-    // Tenta pegar o código de barras (se o input hidden existir)
     const codInput = document.getElementById('edit-cod');
     const codigoBarras = codInput ? codInput.value : '';
 
-    // Validação
     const valorFloat = converterMoedaParaFloat(valorStr);
 
     if (!desc || valorFloat <= 0 || !venc) {
@@ -643,13 +544,12 @@ async function salvarEdicao() {
         codigo_barras: codigoBarras
     };
 
-    // Envia para o Backend
     const res = await apiRequest('/financeiro.php', 'POST', payload);
 
     if (res && res.success) {
         showToast("Registro atualizado com sucesso!");
         fecharModalEdicao();
-        carregarFinanceiro(estadoApp.paginaAtualFinanceiro); // Atualiza a lista
+        carregarFinanceiro(estadoApp.paginaAtualFinanceiro);
     } else {
         showToast(res.message || "Erro ao atualizar.", "error");
     }
@@ -673,49 +573,103 @@ async function baixarRegistro(id) {
     }
 }
 
-// Leitor de Código de Barras (Mock/Real)
-// --- LEITOR DE CÓDIGO DE BARRAS (Inteligente) ---
-async function lerCodigoBarras() {
-    const input = document.getElementById('boleto-cod');
-    // Remove tudo que não for número
-    const codigo = input.value.replace(/[^0-9]/g, '');
-
-    if (codigo.length < 44) return; // Código incompleto
-
-    // Tenta extrair dados de boleto bancário (47 dígitos)
-    if (codigo.length === 47) {
-        // Valor: Últimos 10 dígitos (ex: 0000015000 = R$ 150,00)
-        const valorStr = codigo.substring(37);
-        const valor = parseFloat(valorStr) / 100;
-
-        // Fator Vencimento: Dígitos 33 a 37
-        const fator = parseInt(codigo.substring(33, 37));
-
-        // Preenche Valor
-        if (!isNaN(valor) && valor > 0) {
-            document.getElementById('boleto-valor').value = formatarMoedaBRL(valor);
-        }
-
-        // Preenche Data (Base: 07/10/1997)
-        if (fator >= 1000) {
-            const dataBase = new Date('1997-10-07');
-            dataBase.setDate(dataBase.getDate() + fator);
-            document.getElementById('boleto-venc').value = dataBase.toISOString().split('T')[0];
-        }
-
-        showToast("Código lido! Valor e Data preenchidos.", "success");
-        // Pula para o campo de descrição
-        document.getElementById('boleto-desc').focus();
+function mudarPagina(delta) {
+    const novaPagina = estadoApp.paginaAtualFinanceiro + delta;
+    if (novaPagina > 0 && novaPagina <= estadoApp.totalPaginasFinanceiro) {
+        carregarFinanceiro(novaPagina);
     }
 }
 
 /* ==========================================================================
-   7. FLUXO DE CAIXA
+   7. AUTOMAÇÃO (LEITOR DE CÓDIGO E AUTO-COMPLETE)
+   ========================================================================== */
+
+async function lerCodigoBarras() {
+    const input = document.getElementById('boleto-cod');
+    const codigo = input.value.replace(/[^0-9]/g, '');
+
+    if (codigo.length < 44) return;
+
+    if (codigo.length === 47) {
+        const valorStr = codigo.substring(37);
+        const valor = parseFloat(valorStr) / 100;
+        const fator = parseInt(codigo.substring(33, 37));
+
+        if (!isNaN(valor) && valor > 0) {
+            document.getElementById('boleto-valor').value = formatarMoedaBRL(valor);
+        }
+
+        if (fator >= 1000) {
+            let dataBase = new Date('1997-10-07');
+            dataBase.setDate(dataBase.getDate() + fator);
+            const dataAtual = new Date();
+            if (dataBase.getFullYear() < dataAtual.getFullYear() - 5) {
+                dataBase.setDate(dataBase.getDate() + 9000);
+            }
+            showToast("Código lido! Valor e Data preenchidos.", "success");
+            document.getElementById('boleto-desc').focus();
+        }
+    }
+}
+
+function verificarFornecedorPreenchido() {
+    const desc = document.getElementById('boleto-desc').value.toLowerCase();
+    const catSelect = document.getElementById('boleto-cat');
+
+    const mapa = {
+        'cemig': 'Água/Luz/Internet',
+        'energia': 'Água/Luz/Internet',
+        'luz': 'Água/Luz/Internet',
+        'agua': 'Água/Luz/Internet',
+        'saneago': 'Água/Luz/Internet',
+        'embasa': 'Água/Luz/Internet',
+        'internet': 'Água/Luz/Internet',
+        'vivo': 'Água/Luz/Internet',
+        'claro': 'Água/Luz/Internet',
+        'oi': 'Água/Luz/Internet',
+        'aluguel': 'Aluguel & Condomínio',
+        'condominio': 'Aluguel & Condomínio',
+        'imobiliaria': 'Aluguel & Condomínio',
+        'salario': 'Folha de Pagamento',
+        'pagamento': 'Folha de Pagamento',
+        'adiantamento': 'Folha de Pagamento',
+        'drogasil': 'Medicamentos (Estoque)',
+        'farma': 'Medicamentos (Estoque)',
+        'eurofarma': 'Medicamentos (Estoque)',
+        'cimed': 'Medicamentos (Estoque)',
+        'papelaria': 'Materiais de Consumo',
+        'limpeza': 'Materiais de Consumo',
+        'embalagens': 'Materiais de Consumo',
+        'simples': 'Impostos & Taxas',
+        'das': 'Impostos & Taxas',
+        'inss': 'Impostos & Taxas',
+        'fgts': 'Impostos & Taxas',
+        'prefeitura': 'Impostos & Taxas'
+    };
+
+    for (const chave in mapa) {
+        if (desc.includes(chave)) {
+            catSelect.value = mapa[chave];
+            break;
+        }
+    }
+}
+
+function verificarVencimento() {
+    const data = document.getElementById('boleto-venc').value;
+    const aviso = document.getElementById('aviso-vencido');
+    if (aviso && data) {
+        const hoje = new Date().toISOString().split('T')[0];
+        aviso.style.display = data < hoje ? 'block' : 'none';
+    }
+}
+
+/* ==========================================================================
+   8. FLUXO DE CAIXA
    ========================================================================== */
 
 async function carregarFluxo() {
     const mesInput = document.getElementById('filtro-mes-fluxo');
-    // Define mês atual se vazio
     if (!mesInput.value) {
         const hoje = new Date();
         const yyyy = hoje.getFullYear();
@@ -750,7 +704,6 @@ async function carregarFluxo() {
         });
     }
 
-    // Atualiza Totais
     if (res) {
         document.getElementById('total-entradas').innerText = res.total_entradas_fmt || 'R$ 0,00';
         document.getElementById('total-saidas').innerText = res.total_saidas_fmt || 'R$ 0,00';
@@ -759,8 +712,7 @@ async function carregarFluxo() {
 }
 
 async function salvarMovimentoRapido(tipo) {
-    const prefixo = tipo === 'entrada' ? 'ent' : 'sai'; // IDs: ent-desc, ent-valor...
-
+    const prefixo = tipo === 'entrada' ? 'ent' : 'sai';
     const desc = document.getElementById(`${prefixo}-desc`).value;
     const valorStr = document.getElementById(`${prefixo}-valor`).value;
     const data = document.getElementById(`${prefixo}-data`).value;
@@ -770,7 +722,7 @@ async function salvarMovimentoRapido(tipo) {
     const payload = {
         descricao: desc,
         valor: converterMoedaParaFloat(valorStr),
-        data_registro: data, // snake_case para o PHP
+        data_registro: data,
         tipo: tipo.toUpperCase()
     };
 
@@ -778,25 +730,22 @@ async function salvarMovimentoRapido(tipo) {
 
     if (res && res.success) {
         showToast("Movimentação registrada!");
-        // Limpar campos
         document.getElementById(`${prefixo}-desc`).value = '';
         document.getElementById(`${prefixo}-valor`).value = '';
-        carregarFluxo(); // Recarrega tabela
+        carregarFluxo();
     } else {
         showToast("Erro ao salvar.", "error");
     }
 }
 
 /* ==========================================================================
-   8. FORNECEDORES & CONFIG
+   9. FORNECEDORES & CONFIGURAÇÕES
    ========================================================================== */
 
 async function carregarFornecedores() {
     const res = await apiRequest('/fornecedores.php');
     if (res) {
         estadoApp.fornecedoresCache = res;
-
-        // Atualiza Datalist
         const dl = document.getElementById('lista-fornecedores');
         if (dl) {
             dl.innerHTML = '';
@@ -810,7 +759,6 @@ async function carregarFornecedores() {
 }
 
 async function carregarConfiguracoes() {
-    // Carrega tabela de fornecedores
     const tbody = document.getElementById('tbody-fornecedores');
     if (tbody) {
         tbody.innerHTML = '';
@@ -830,7 +778,6 @@ async function carregarConfiguracoes() {
         });
     }
 
-    // Carrega Usuários (Se admin)
     if (estadoApp.usuario?.funcao === 'Admin') {
         const tbodyUsers = document.querySelector('#tabela-usuarios tbody');
         const resUsers = await apiRequest('/admin.php?resource=usuarios');
@@ -853,7 +800,12 @@ async function salvarNovoFornecedor() {
 
     if (!nome) return showToast("Nome é obrigatório.", "error");
 
-    const payload = { nome, cnpj, telefone: tel, categoria_padrao: cat }; // snake_case
+    const payload = {
+        nome,
+        cnpj,
+        telefone: tel,
+        categoria_padrao: cat
+    };
     const res = await apiRequest('/fornecedores.php', 'POST', payload);
 
     if (res && res.success) {
@@ -876,7 +828,7 @@ async function excluirFornecedor(id) {
 }
 
 /* ==========================================================================
-   9. LOGS DO SISTEMA
+   10. LOGS DO SISTEMA
    ========================================================================== */
 
 async function carregarLogs() {
@@ -904,98 +856,9 @@ async function carregarLogs() {
 }
 
 /* ==========================================================================
-   10. INICIALIZAÇÃO E EVENTOS GLOBAIS
+   11. CONTROLES DE UI E MODAIS
    ========================================================================== */
 
-document.addEventListener("DOMContentLoaded", () => {
-    // 1. Verifica login
-    verificarSessao();
-
-    // 2. Prepara datas nos inputs de "hoje"
-    const hoje = new Date().toISOString().split('T')[0];
-    document.querySelectorAll('input[type="date"]').forEach(inp => {
-        // Só preenche se não tiver valor e NÃO for um filtro
-        if (!inp.value && !inp.id.startsWith('filtro-')) {
-            inp.value = hoje;
-        }
-    });
-
-    // 3. Adiciona listeners para máscaras de moeda
-    document.querySelectorAll('.input-money').forEach(inp => {
-        inp.addEventListener('input', () => mascaraMoedaInput(inp));
-    });
-
-    // 4. Listeners de Teclado
-    document.addEventListener('keydown', function(event) {
-        const telaNovo = document.getElementById('view-novo');
-        const telaLogin = document.getElementById('login-screen');
-
-        // 1. Se estiver na tela de LOGIN
-        if (telaLogin && !telaLogin.classList.contains('hidden')) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                fazerLogin();
-            }
-            return; // Não executa o resto
-        }
-
-        // 2. Se estiver na tela de NOVO LANÇAMENTO
-        // (Verifica se ela existe e se está visível na tela)
-        if (telaNovo && !telaNovo.classList.contains('hidden') && telaNovo.offsetParent !== null) {
-
-            // TECLA ENTER
-            if (event.key === 'Enter') {
-                event.preventDefault(); // Impede qualquer envio de formulário
-                // Salva o boleto (passa true se segurar Ctrl para "Salvar e Continuar")
-                salvarBoleto(event.ctrlKey);
-            }
-
-            // TECLA ESC
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                const desc = document.getElementById('boleto-desc').value;
-
-                // Se já escreveu algo, limpa. Se estiver vazio, fecha.
-                if (desc.trim() !== '') {
-                    prepararNovoRegistro(); // Limpa
-                } else {
-                    navegar('lista'); // Fecha
-                }
-            }
-        }
-    });
-
-    // 5. Configuração do Tema (Dark Mode) - Se existir botão
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) document.body.setAttribute('data-theme', savedTheme);
-});
-
-function toggleDarkMode() {
-    const isDark = document.body.getAttribute('data-theme') === 'dark';
-    const newTheme = isDark ? 'light' : 'dark';
-    document.body.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-}
-
-// Funções para Paginação
-function mudarPagina(delta) {
-    const novaPagina = estadoApp.paginaAtualFinanceiro + delta;
-    if (novaPagina > 0 && novaPagina <= estadoApp.totalPaginasFinanceiro) {
-        carregarFinanceiro(novaPagina);
-    }
-}
-
-// 1. Conecta o 'nav' do HTML à função 'navegar' do JS
-function nav(tela, elemento) {
-    navegar(tela);
-}
-
-// 2. Conecta o filtro do dashboard
-function filtrarDashboard(periodo, elemento) {
-    carregarDashboard(periodo);
-}
-
-// 3. Função para abrir o modal de logout
 function confirmarLogout() {
     const modal = document.getElementById('modal-logout');
     if (modal) modal.classList.remove('hidden');
@@ -1006,161 +869,182 @@ function fecharModalLogout() {
     if (modal) modal.classList.add('hidden');
 }
 
-function fazerLogoutReal() {
-    logout();
-}
-
-// 4. Função para pré-filtrar a lista (ex: clicar no card "A Pagar")
-function preFiltrarLista(status) {
-    const select = document.getElementById('filtro-status');
-    if (select) {
-        select.value = status;
-        // Pequeno delay para garantir que a tela carregou
-        setTimeout(() => carregarLista(1), 100);
-    }
-}
-function nav(tela) { navegar(tela); }
-
-// Login
-function fazerLogin() { login(event); }
-
-// Dashboard
-function filtrarDashboard(periodo) { carregarDashboard(periodo); }
-
-// Listagem (Registros)
-function carregarLista(pagina) { carregarFinanceiro(pagina); }
-function debounceCarregarLista() { carregarFinanceiro(1); } // Versão simplificada
-
-// Formulários
-function mascaraMoeda(input) { mascaraMoedaInput(input); }
-function limparFormulario() { prepararNovoRegistro(); }
-function salvarEdicao() { salvarBoleto(); }
-
-// Fornecedores
-function cadastrarFornecedor() { salvarNovoFornecedor(); }
-
-// Logout
-function fazerLogoutReal() { logout(); }
-
-// Fluxo de Caixa
-function salvarEntradaCaixa() { salvarMovimentoRapido('entrada'); }
-function salvarSaidaCaixa() { salvarMovimentoRapido('saida'); }
-// --- UI / MODAIS / INTERFACE ---
-
-// Modal de Logout
-function confirmarLogout() {
-    document.getElementById('modal-logout').classList.remove('hidden');
-}
-function fecharModalLogout() {
-    document.getElementById('modal-logout').classList.add('hidden');
-}
-
-// Modal de Edição
 function fecharModalEdicao() {
     document.getElementById('modal-editar').classList.add('hidden');
 }
 
-// Modal Genérico
 function fecharModal() {
     document.getElementById('modal-detalhes').classList.add('hidden');
 }
 
-// Ver Detalhes (Card Amarelo)
-function verDetalhes(tipo, titulo) {
-    // Exemplo simples para não quebrar
-    alert(`Visualizando detalhes de: ${titulo}`);
-    // Idealmente abriria o modal-detalhes aqui
-}
-
-// Mostrar/Esconder Senha
 function toggleSenha() {
     const input = document.getElementById('login-pass');
     input.type = input.type === 'password' ? 'text' : 'password';
 }
 
-// Calendário (Toggle)
-function toggleCalendarSection() {
-    const content = document.getElementById('calendar-wrapper');
-    const header = document.querySelector('.toggle-header');
-    content.classList.toggle('show');
-    header.classList.toggle('open');
+function verDetalhes(tipo, titulo) {
+    navegar('lista');
+    setTimeout(() => {
+        if (tipo === 'vencidos') preFiltrarLista('Vencido');
+        if (tipo === 'proximos') preFiltrarLista('Pendente', 7);
+    }, 100);
 }
 
-// Filtro Rápido (Ex: Clicar no card "A Pagar" vai para lista filtrada)
-function preFiltrarLista(status) {
-    const select = document.getElementById('filtro-status');
-    if(select) {
-        select.value = status;
-        setTimeout(() => carregarFinanceiro(1), 100);
+function preFiltrarLista(status, diasFuturos = null) {
+    const selStatus = document.getElementById('filtro-status');
+    const inpInicio = document.getElementById('filtro-data-inicio');
+    const inpFim = document.getElementById('filtro-data-fim');
+
+    if (inpInicio) inpInicio.value = '';
+    if (inpFim) inpFim.value = '';
+
+    if (selStatus) {
+        if (status === 'Vencido') {
+            selStatus.value = 'Todos';
+            let ontem = new Date();
+            ontem.setDate(ontem.getDate() - 1);
+            inpFim.value = ontem.toISOString().split('T')[0];
+        } else {
+            selStatus.value = status;
+        }
     }
-}
-// --- FUNCIONALIDADES PENDENTES (Placeholders) ---
 
+    if (diasFuturos) {
+        const hoje = new Date();
+        inpInicio.value = hoje.toISOString().split('T')[0];
+        let futuro = new Date();
+        futuro.setDate(futuro.getDate() + diasFuturos);
+        inpFim.value = futuro.toISOString().split('T')[0];
+    }
+
+    carregarFinanceiro(1);
+}
+
+function toggleDarkMode() {
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
+    const newTheme = isDark ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+}
+
+/* ==========================================================================
+   12. WRAPPERS HTML (Conectores onclick)
+   ========================================================================== */
+// Estas funções conectam os atributos onclick do HTML à lógica do JS
+
+function nav(tela) {
+    navegar(tela);
+}
+function filtrarDashboard(periodo) {
+    carregarDashboard(periodo);
+}
+function carregarLista(pagina) {
+    carregarFinanceiro(pagina);
+}
+function debounceCarregarLista() {
+    carregarFinanceiro(1);
+}
+function mascaraMoeda(input) {
+    mascaraMoedaInput(input);
+}
+function limparFormulario() {
+    prepararNovoRegistro();
+}
+function cadastrarFornecedor() {
+    salvarNovoFornecedor();
+}
+function fazerLogoutReal() {
+    logout();
+}
+function fazerLogin() {
+    login(event);
+}
+function salvarEntradaCaixa() {
+    salvarMovimentoRapido('entrada');
+}
+function salvarSaidaCaixa() {
+    salvarMovimentoRapido('saida');
+}
+function salvarConfiguracoes() {
+    showToast("Perfil salvo com sucesso!");
+}
 function baixarExcelFluxo() {
     alert("Funcionalidade de Excel ainda não implementada no Backend.");
 }
-
 function adicionarCategoriaPersonalizada() {
     alert("Adicionar Categoria: Em desenvolvimento.");
 }
-
 function resetarCategorias() {
-    if(confirm("Restaurar categorias padrão?")) {
+    if (confirm("Restaurar categorias padrão?")) {
         alert("Categorias restauradas.");
     }
 }
-
 function criarNovoUsuario() {
     alert("Criação de usuários: Disponível apenas na versão Pro.");
 }
 
-function salvarConfiguracoes() {
-    showToast("Perfil salvo com sucesso!");
-}
+/* ==========================================================================
+   13. INICIALIZAÇÃO
+   ========================================================================== */
 
-// --- AUTO-CATEGORIA ---
-function verificarFornecedorPreenchido() {
-    const desc = document.getElementById('boleto-desc').value.toLowerCase();
-    const catSelect = document.getElementById('boleto-cat');
-
-    // Mapa de palavras-chave -> Categorias
-    const mapa = {
-        'cemig': 'Água/Luz/Internet', 'energia': 'Água/Luz/Internet', 'luz': 'Água/Luz/Internet',
-        'agua': 'Água/Luz/Internet', 'saneago': 'Água/Luz/Internet', 'embasa': 'Água/Luz/Internet',
-        'internet': 'Água/Luz/Internet', 'vivo': 'Água/Luz/Internet', 'claro': 'Água/Luz/Internet', 'oi': 'Água/Luz/Internet',
-        'aluguel': 'Aluguel & Condomínio', 'condominio': 'Aluguel & Condomínio', 'imobiliaria': 'Aluguel & Condomínio',
-        'salario': 'Folha de Pagamento', 'pagamento': 'Folha de Pagamento', 'adiantamento': 'Folha de Pagamento',
-        'drogasil': 'Medicamentos (Estoque)', 'farma': 'Medicamentos (Estoque)', 'eurofarma': 'Medicamentos (Estoque)', 'cimed': 'Medicamentos (Estoque)',
-        'papelaria': 'Materiais de Consumo', 'limpeza': 'Materiais de Consumo', 'embalagens': 'Materiais de Consumo',
-        'simples': 'Impostos & Taxas', 'das': 'Impostos & Taxas', 'inss': 'Impostos & Taxas', 'fgts': 'Impostos & Taxas', 'prefeitura': 'Impostos & Taxas'
-    };
-
-    // Verifica se alguma palavra chave está na descrição
-    for (const chave in mapa) {
-        if (desc.includes(chave)) {
-            catSelect.value = mapa[chave];
-            break; // Para na primeira correspondência
-        }
-    }
-}
-function verificarVencimento() {
-    // Lógica para avisar se data < hoje (opcional)
-    const data = document.getElementById('boleto-venc').value;
-    const aviso = document.getElementById('aviso-vencido');
-    if(aviso && data) {
-        const hoje = new Date().toISOString().split('T')[0];
-        aviso.style.display = data < hoje ? 'block' : 'none';
-    }
-}
-
-// --- CORREÇÃO DE FORMULÁRIO (Impede Recarregamento) ---
 document.addEventListener("DOMContentLoaded", () => {
+    // 1. Verifica login
+    verificarSessao();
+
+    // 2. Prepara datas nos inputs de "hoje"
+    const hoje = new Date().toISOString().split('T')[0];
+    document.querySelectorAll('input[type="date"]').forEach(inp => {
+        if (!inp.value && !inp.id.startsWith('filtro-')) {
+            inp.value = hoje;
+        }
+    });
+
+    // 3. Adiciona listeners para máscaras de moeda
+    document.querySelectorAll('.input-money').forEach(inp => {
+        inp.addEventListener('input', () => mascaraMoedaInput(inp));
+    });
+
+    // 4. Impede reload de form
     const form = document.getElementById("form-boleto");
     if (form) {
         form.addEventListener("submit", (e) => {
-            e.preventDefault(); // Bloqueia o recarregamento padrão
-            // Opcional: Chama o salvar aqui se quiser que o Enter funcione nativamente
-            // salvarBoleto();
+            e.preventDefault();
         });
     }
+
+    // 5. Configuração do Tema
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) document.body.setAttribute('data-theme', savedTheme);
+
+    // 6. Listeners de Teclado
+    document.addEventListener('keydown', function(event) {
+        const telaNovo = document.getElementById('view-novo');
+        const telaLogin = document.getElementById('login-screen');
+
+        // Se estiver na tela de LOGIN
+        if (telaLogin && !telaLogin.classList.contains('hidden')) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                fazerLogin();
+            }
+            return;
+        }
+
+        // Se estiver na tela de NOVO LANÇAMENTO
+        if (telaNovo && !telaNovo.classList.contains('hidden') && telaNovo.offsetParent !== null) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                salvarBoleto(event.ctrlKey);
+            }
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                const desc = document.getElementById('boleto-desc').value;
+                if (desc.trim() !== '') {
+                    prepararNovoRegistro();
+                } else {
+                    navegar('lista');
+                }
+            }
+        }
+    });
 });
