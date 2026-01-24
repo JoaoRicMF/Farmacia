@@ -24,14 +24,14 @@ if ($action === 'logout') {
 
 // --- VERIFICAR SESSÃO (CHECK) ---
 if ($action === 'check') {
-    if (isset($_SESSION['id'])) {
+    if (isset($_SESSION['user_id'])) { // Alterado de $_SESSION['id'] para 'user_id'
         echo json_encode([
-            "id" => $_SESSION['id'],
+            "id" => $_SESSION['user_id'],   // Front-end espera "id"
             "nome" => $_SESSION['user_nome'],
             "funcao" => $_SESSION['user_funcao']
         ]);
     } else {
-        http_response_code(401); // Não autorizado
+        http_response_code(401);
         echo json_encode(["message" => "Não logado"]);
     }
     exit;
@@ -66,13 +66,13 @@ if ($method === 'POST') {
 
         // Verifica senha (texto puro conforme seu banco atual)
         if ($data->senha === $row['senha']) {
-            $_SESSION['user_id'] = $row['id'];
+            $_SESSION['user_id'] = $row['id']; // Padronizado para user_id
             $_SESSION['user_nome'] = $row['nome'];
             $_SESSION['user_funcao'] = $row['funcao'];
 
             echo json_encode([
                 "success" => true,
-                "id" => $row['id'],
+                "id" => $row['id'],           // Garantindo que retorne "id" para o script.js
                 "nome" => $row['nome'],
                 "funcao" => $row['funcao']
             ]);

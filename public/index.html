@@ -7,7 +7,9 @@
     <meta name="csrf-token" content="">
     <link rel="stylesheet" href="style.css">
     <title>Financeiro Farmácia Nova Farma</title>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
 </head>
@@ -184,7 +186,7 @@
                     <span class="arrow-icon">▼</span>
                 </div>
                 <div id="calendar-wrapper" class="hidden-content">
-                    <div id="calendar" style="padding: 20px;"></div>
+                    <div id="calendar" style="min-height: 500px;"></div>
                 </div>
             </div>
         </div>
@@ -511,7 +513,7 @@
 
                 <div style="max-height: 200px; overflow-y: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px;">
                     <table style="width:100%; font-size: 0.9rem;">
-                        <tbody id="tabela-fornecedores">
+                        <tbody id="tbody-fornecedores"> </tbody>
                         </tbody>
                     </table>
                 </div>

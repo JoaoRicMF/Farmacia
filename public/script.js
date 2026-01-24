@@ -270,7 +270,11 @@ async function carregarDashboard(periodo = '7d') {
 
 function renderizarGraficos(dadosGraficos) {
     if (!dadosGraficos) return;
-    if (typeof Chart === 'undefined') return;
+    // Verifica se a biblioteca Chart.js está disponível no escopo global
+    if (typeof Chart === 'undefined') {
+        console.error("Erro: A biblioteca Chart.js não foi carregada corretamente.");
+        return;
+    }
 
     // Gráfico de Linha (Fluxo/Vencimentos)
     const ctxMes = document.getElementById('chartMes');
@@ -318,40 +322,30 @@ function renderizarGraficos(dadosGraficos) {
 }
 
 function renderizarCalendario(eventos) {
-    const el = document.getElementById('calendar');
-    if (!el) return;
+    const calendarEl = document.getElementById('calendar');
+    if (!calendarEl) return;
 
-    if (!eventos || eventos.length === 0) {
-        el.innerHTML = '<p class="text-center text-muted" style="padding:20px;">Nenhum vencimento previsto.</p>';
-        return;
-    }
+    // Formata os eventos vindos da API para o padrão do FullCalendar
+    const eventsParsed = eventos.map(ev => ({
+        id: ev.id,
+        title: `${ev.descricao} - R$ ${ev.valor}`,
+        start: ev.vencimento,
+        backgroundColor: ev.status === 'Pago' ? '#10b981' : (ev.status === 'Vencido' ? '#ef4444' : '#f59e0b'),
+        borderColor: 'transparent',
+        extendedProps: { status: ev.status }
+    }));
 
-    const dias = {};
-    eventos.forEach(ev => {
-        if (!dias[ev.vencimento]) dias[ev.vencimento] = [];
-        dias[ev.vencimento].push(ev);
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        locale: 'pt-br',
+        events: eventos.map(ev => ({
+            id: ev.id,
+            title: ev.descricao,
+            start: ev.vencimento,
+            backgroundColor: ev.status === 'Pago' ? '#10b981' : '#ef4444'
+        }))
     });
-
-    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;">';
-
-    Object.keys(dias).sort().forEach(data => {
-        const lista = dias[data];
-        const total = lista.reduce((acc, i) => acc + parseFloat(i.valor), 0);
-
-        let corBorda = '#f59e0b'; // Amarelo
-        if (lista.some(i => i.status === 'Vencido')) corBorda = '#ef4444'; // Vermelho
-        else if (lista.every(i => i.status === 'Pago')) corBorda = '#10b981'; // Verde
-
-        html += `
-        <div style="background: var(--bg-card); padding: 10px; border-radius: 8px; border-left: 4px solid ${corBorda}; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-            <div style="font-weight:bold; font-size:0.85rem; margin-bottom:4px;">${formatarDataBR(data).substring(0,5)}</div>
-            <div style="font-size:0.75rem; color:#666;">${lista.length} conta(s)</div>
-            <div style="font-weight:bold; color:var(--text-main); font-size:0.9rem;">${formatarMoedaBRL(total)}</div>
-        </div>`;
-    });
-
-    html += '</div>';
-    el.innerHTML = html;
+    calendar.render();
 }
 
 function toggleCalendarSection() {
@@ -362,6 +356,10 @@ function toggleCalendarSection() {
         wrap.style.display = 'block';
         wrap.classList.remove('hidden-content');
         header.classList.add('open');
+
+        // Se estiver usando a inicialização do FullCalendar,
+        // recarregue o dashboard para disparar o render()
+        carregarDashboard();
     } else {
         wrap.style.display = 'none';
         header.classList.remove('open');
@@ -732,8 +730,11 @@ async function carregarFluxo() {
     const res = await apiRequest(`/fluxo.php?mes=${mesInput.value}`);
     tbody.innerHTML = '';
 
-    if (!res || !res.movimentacoes || res.movimentacoes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="100%" class="text-center py-4">Sem movimentações neste mês.</td></tr>';
+    if (res) {
+        // IDs corrigidos para bater com o index.html
+        document.getElementById('fluxo-entradas').innerText = res.total_entradas_fmt || 'R$ 0,00';
+        document.getElementById('fluxo-saidas').innerText = res.total_saidas_fmt || 'R$ 0,00';
+        document.getElementById('fluxo-saldo').innerText = res.saldo_fmt || 'R$ 0,00';
     } else {
         res.movimentacoes.forEach(mov => {
             const tr = document.createElement('tr');
