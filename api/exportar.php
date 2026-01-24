@@ -4,31 +4,32 @@ header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename=financeiro_farmacia_' . date('Y-m-d') . '.csv');
 
 session_start();
+// 1. Importa a conexão correta
 include_once '../config/database.php';
 
-// Verificação de segurança
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     exit;
 }
 
+// 2. Cria a conexão e atribui à variável que o seu código espera
 $db = (new Database())->getConnection();
 
-// Abrir o "ficheiro" de saída
 $output = fopen('php://output', 'w');
+// Adiciona o BOM para o Excel abrir com acentuação correta
+fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
 
-// Cabeçalhos das colunas
-fputcsv($output, array('ID', 'Vencimento', 'Descricao', 'Valor', 'Categoria', 'Status', 'Codigo Barras'));
+fputcsv($output, array('ID', 'Vencimento', 'Descrição', 'Valor', 'Categoria', 'Status'), ';');
 
-// Buscar todos os registos
-$query = "SELECT id, vencimento, descricao, valor, categoria, status, codigo_barras FROM Financeiro ORDER BY vencimento ASC";
+// 3. Usa o nome correto da tabela: 'Financeiro'
+$query = "SELECT id, vencimento, descricao, valor, categoria, status FROM Financeiro ORDER BY vencimento ";
 $stmt = $db->prepare($query);
 $stmt->execute();
 
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-    // Formatar valor para o padrão Excel se necessário
-    $row['valor'] = number_format($row['valor'], 2, ',', '');
-    fputcsv($output, $row);
+    // Formata o valor para o Excel reconhecer como número (padrão brasileiro)
+    $row['valor'] = number_format($row['valor'], 2, ',', '.');
+    fputcsv($output, $row, ';');
 }
 
 fclose($output);

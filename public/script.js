@@ -464,37 +464,48 @@ function prepararNovoRegistro() {
     setTimeout(() => document.getElementById('boleto-cod').focus(), 100);
 }
 
-async function salvarBoleto(manterNaTela = false) {
-    const id = document.getElementById('boleto-id-hidden').value;
+async function salvarBoleto(event) {
+    if (event) event.preventDefault();
 
-    const payload = {
-        id: id || null,
-        descricao: document.getElementById('boleto-desc').value,
-        valor: converterMoedaParaFloat(document.getElementById('boleto-valor').value),
-        vencimento: document.getElementById('boleto-venc').value,
-        categoria: document.getElementById('boleto-cat').value,
-        status: document.getElementById('boleto-status').value,
-        codigo_barras: document.getElementById('boleto-cod').value
+    const id = document.getElementById('boletoId').value;
+    // Note que a URL é fixa, sem "?action="
+    const url = '../api/financeiro.php';
+
+    const dados = {
+        descricao: document.getElementById('descricao').value,
+        valor: document.getElementById('valor').value,
+        vencimento: document.getElementById('vencimento').value,
+        categoria_id: document.getElementById('categoria').value,
+        fornecedor_id: document.getElementById('fornecedor').value,
+        status: document.getElementById('status').value
     };
 
-    if (!payload.descricao || payload.valor <= 0 || !payload.vencimento) {
-        return showToast("Preencha Descrição, Valor e Vencimento.", "error");
+    // Se o ID existir, ele é adicionado ao objeto para o PHP fazer o UPDATE
+    if (id) {
+        dados.id = id;
     }
 
-    let url = '/financeiro.php?action=salvar';
-    if (id) url = `/financeiro.php?action=atualizar&id=${id}`;
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dados)
+        });
 
-    const res = await apiRequest(url, 'POST', payload);
+        const resultado = await response.json();
 
-    if (res && res.success) {
-        showToast("Registro salvo com sucesso!");
-        if (manterNaTela) {
-            prepararNovoRegistro();
+        if (resultado.success) {
+            alert(id ? 'Boleto atualizado com sucesso!' : 'Boleto salvo com sucesso!');
+            fecharModal();
+            carregarBoletos(); // Atualiza a lista na tela
         } else {
-            navegar('lista');
+            alert('Erro: ' + resultado.error);
         }
-    } else {
-        showToast(res.message || "Erro ao salvar.", "error");
+    } catch (error) {
+        console.error('Erro na requisição:', error);
+        alert('Erro ao conectar com o servidor.');
     }
 }
 
@@ -717,6 +728,8 @@ function verificarVencimento() {
 
 async function carregarFluxo() {
     const mesInput = document.getElementById('filtro-mes-fluxo');
+
+    // 1. Garante que haja um mês selecionado (padrão mês atual)
     if (!mesInput.value) {
         const hoje = new Date();
         const yyyy = hoje.getFullYear();
@@ -727,37 +740,49 @@ async function carregarFluxo() {
     const tbody = document.querySelector('#tabela-fluxo tbody');
     tbody.innerHTML = LOADER_HTML;
 
+    // 2. Chamada à API
     const res = await apiRequest(`/fluxo.php?mes=${mesInput.value}`);
     tbody.innerHTML = '';
 
+    // 3. Verificação de segurança: res precisa existir e ter movimentacoes
     if (res) {
-        // IDs corrigidos para bater com o index.html
-        document.getElementById('fluxo-entradas').innerText = res.total_entradas_fmt || 'R$ 0,00';
-        document.getElementById('fluxo-saidas').innerText = res.total_saidas_fmt || 'R$ 0,00';
-        document.getElementById('fluxo-saldo').innerText = res.saldo_fmt || 'R$ 0,00';
+        const atualizarTexto = (id, valor) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = valor || 'R$ 0,00';
+        };
+
+        atualizarTexto('fluxo-entradas', res.total_entradas_fmt);
+        atualizarTexto('fluxo-saidas', res.total_saidas_fmt);
+        atualizarTexto('fluxo-saldo', res.saldo_fmt);
+
+        atualizarTexto('total-entradas', res.total_entradas_fmt);
+        atualizarTexto('total-saidas', res.total_saidas_fmt);
+        atualizarTexto('total-saldo', res.saldo_fmt);
+
+        // 4. CORREÇÃO DA LÓGICA: O loop deve estar FORA do else
+        if (res.movimentacoes && res.movimentacoes.length > 0) {
+            res.movimentacoes.forEach(mov => {
+                const tr = document.createElement('tr');
+                const isEntrada = mov.tipo === 'ENTRADA';
+                const corClass = isEntrada ? 'text-success' : 'text-danger';
+                const sinal = isEntrada ? '+' : '-';
+
+                tr.innerHTML = `
+                    <td>${formatarDataBR(mov.data)}</td>
+                    <td>${mov.descricao}</td>
+                    <td>${mov.categoria_nome || mov.categoria || '-'}</td>
+                    <td class="text-right font-weight-bold ${corClass}">
+                        ${sinal} ${formatarMoedaBRL(mov.valor)}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhuma movimentação neste período.</td></tr>';
+        }
     } else {
-        res.movimentacoes.forEach(mov => {
-            const tr = document.createElement('tr');
-            const isEntrada = mov.tipo === 'ENTRADA';
-            const corClass = isEntrada ? 'text-success' : 'text-danger';
-            const sinal = isEntrada ? '+' : '-';
-
-            tr.innerHTML = `
-                <td>${formatarDataBR(mov.data)}</td>
-                <td>${mov.descricao}</td>
-                <td>${mov.categoria || '-'}</td>
-                <td class="text-right font-weight-bold ${corClass}">
-                    ${sinal} ${formatarMoedaBRL(mov.valor)}
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    if (res) {
-        document.getElementById('total-entradas').innerText = res.total_entradas_fmt || 'R$ 0,00';
-        document.getElementById('total-saidas').innerText = res.total_saidas_fmt || 'R$ 0,00';
-        document.getElementById('total-saldo').innerText = res.saldo_fmt || 'R$ 0,00';
+        // Caso a API falhe ou retorne nulo
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar dados.</td></tr>';
     }
 }
 
@@ -984,24 +1009,35 @@ async function salvarNovoFornecedor() {
     const nome = document.getElementById('novo-forn-nome').value;
     const cnpj = document.getElementById('novo-forn-cnpj').value;
     const tel = document.getElementById('novo-forn-tel').value;
-    const cat = document.getElementById('novo-forn-cat').value;
-
-    if (!nome) return showToast("Nome é obrigatório.", "error");
-
-    const payload = {
-        nome,
-        cnpj,
+    const categoriaPadrao = document.getElementById('novo-forn-cat').value;
+    const dados = {
+        nome: nome,
+        cnpj: cnpj,
         telefone: tel,
-        categoria_padrao: cat
+        categoriaPadrao: categoriaPadrao // O PHP espera 'categoriaPadrao' (CamelCase)
     };
-    const res = await apiRequest('/fornecedores.php', 'POST', payload);
 
-    if (res && res.success) {
-        showToast("Fornecedor cadastrado!");
-        document.getElementById('novo-forn-nome').value = '';
-        document.getElementById('novo-forn-cnpj').value = '';
-        await carregarFornecedores();
-        carregarConfiguracoes();
+    try {
+        const response = await fetch('../api/fornecedores.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dados)
+        });
+
+        const resultado = await response.json();
+
+        if (resultado.success) {
+            alert('Fornecedor cadastrado com sucesso!');
+            // Aqui você pode adicionar funções para fechar o modal ou limpar os campos
+            // fecharModalFornecedor();
+        } else {
+            alert('Erro ao salvar: ' + resultado.error);
+        }
+    } catch (error) {
+        console.error('Erro na requisição:', error);
+        alert('Erro de conexão com o servidor.');
     }
 }
 
@@ -1179,8 +1215,22 @@ async function adicionarCategoriaPersonalizada() {
         showToast(res.message || "Erro ao adicionar categoria ou ela já existe.", "error");
     }
 }
-function criarNovoUsuario() {
-    alert("Criação de usuários: Disponível apenas na versão Pro.");
+async function criarNovoUsuario() {
+    const dados = {
+        nome: document.getElementById('user-nome').value,
+        login: document.getElementById('user-login').value,
+        password: document.getElementById('user-pass').value,
+        nivel: document.getElementById('user-nivel').value
+    };
+
+    const response = await fetch('../api/admin.php?action=criarUsuario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dados)
+    });
+
+    const res = await response.json();
+    if(res.success) alert("Utilizador criado!");
 }
 
 /* ==========================================================================
