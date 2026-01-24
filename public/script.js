@@ -711,30 +711,37 @@ async function carregarFluxo() {
     }
 }
 
-async function salvarMovimentoRapido(tipo) {
+async function handleSalvarMovimentoRapido(tipo) {
     const prefixo = tipo === 'entrada' ? 'ent' : 'sai';
-    const desc = document.getElementById(`${prefixo}-desc`).value;
-    const valorStr = document.getElementById(`${prefixo}-valor`).value;
-    const data = document.getElementById(`${prefixo}-data`).value;
 
-    if (!desc || !valorStr || !data) return showToast("Preencha todos os campos.", "error");
+    // Captura dos elementos
+    const elDesc = document.getElementById(`${prefixo}-desc`);
+    const elValor = document.getElementById(`${prefixo}-valor`);
+    const elData = document.getElementById(`${prefixo}-data`);
+
+    if (!elDesc.value || !elValor.value || !elData.value) {
+        return showToast("Preencha todos os campos.", "error");
+    }
 
     const payload = {
-        descricao: desc,
-        valor: converterMoedaParaFloat(valorStr),
-        data_registro: data,
+        descricao: elDesc.value,
+        valor: converterMoedaParaFloat(elValor.value),
+        data: elData.value,
         tipo: tipo.toUpperCase()
     };
 
     const res = await apiRequest('/fluxo.php?action=salvar', 'POST', payload);
 
     if (res && res.success) {
-        showToast("Movimentação registrada!");
-        document.getElementById(`${prefixo}-desc`).value = '';
-        document.getElementById(`${prefixo}-valor`).value = '';
-        carregarFluxo();
+        showToast(`${tipo.charAt(0).toUpperCase() + tipo.slice(1)} registrada com sucesso!`);
+
+        // Limpa os campos
+        elDesc.value = '';
+        elValor.value = '';
+
+        carregarFluxo(); // Atualiza a tabela e os totais
     } else {
-        showToast("Erro ao salvar.", "error");
+        showToast(res.message || "Erro ao salvar movimentação.", "error");
     }
 }
 
