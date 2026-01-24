@@ -16,13 +16,52 @@ if (!$db) {
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
-// ... [MANTER O CÓDIGO DO POST/SALVAR IGUAL] ...
+// SALVAR MOVIMENTAÇÃO (ENTRADA OU SAÍDA)
 if ($method === 'POST' && $action === 'salvar') {
-    // (O código original de salvar estava correto, apenas certifique-se de usar $db checado)
-    // ... Copiar lógica de insert original ...
     $data = json_decode(file_get_contents("php://input"));
-    // ... Lógica de Insert ...
-    // Para abreviar, assumo que você manteve o original aqui
+
+    if (!$data->tipo || !$data->valor || !$data->data_registro) {
+        echo json_encode(["success" => false, "message" => "Dados incompletos"]);
+        exit;
+    }
+
+    $userId = $_SESSION['id'] ?? null;
+
+    if (!$userId) {
+        echo json_encode(["success" => false, "message" => "Usuário não autenticado"]);
+        exit;
+    }
+
+    if ($data->tipo === 'ENTRADA') {
+        // Insere na tabela de Entradas usando a coluna 'id' para a chave estrangeira
+        $sql = "INSERT INTO EntradaCaixa (dataRegistro, formaPagamento, valor, id) 
+                VALUES (:data, :forma, :valor, :user)";
+        $stmt = $db->prepare($sql);
+        $params = [
+            ":data"  => $data->data_registro,
+            ":forma" => $data->descricao,
+            ":valor" => $data->valor,
+            ":user"  => $userId
+        ];
+    } else {
+        // Insere na tabela de Saídas usando a coluna 'id' para a chave estrangeira
+        $sql = "INSERT INTO SaidaCaixa (dataRegistro, descricao, valor, id) 
+                VALUES (:data, :desc, :valor, :user)";
+        $stmt = $db->prepare($sql);
+        $params = [
+            ":data"  => $data->data_registro,
+            ":desc"  => $data->descricao,
+            ":valor" => $data->valor,
+            ":user"  => $userId
+        ];
+    }
+
+    if ($stmt->execute($params)) {
+        echo json_encode(["success" => true]);
+    } else {
+        echo json_encode(["success" => false, "message" => "Erro ao gravar no banco"]);
+    }
+    exit;
 }
 
 

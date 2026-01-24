@@ -24,9 +24,9 @@ if ($action === 'logout') {
 
 // --- VERIFICAR SESSÃO (CHECK) ---
 if ($action === 'check') {
-    if (isset($_SESSION['user_id'])) {
+    if (isset($_SESSION['id'])) {
         echo json_encode([
-            "id" => $_SESSION['user_id'],
+            "id" => $_SESSION['id'],
             "nome" => $_SESSION['user_nome'],
             "funcao" => $_SESSION['user_funcao']
         ]);
