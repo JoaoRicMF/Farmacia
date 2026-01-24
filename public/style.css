@@ -632,3 +632,24 @@ tr.loading-row td { text-align: center; background-color: var(--bg-body); pointe
 /* Botão Banco (Roxo) */
 .btn-link { color: #7c3aed; background: rgba(124, 58, 237, 0.1); }
 .btn-link:hover { background: #7c3aed; color: white; }
+
+.list-item-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: var(--bg-card);
+    border-bottom: 1px solid;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+
+.list-item-flex span {
+    font-weight: 500;
+}
+
+.categorias-container {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 15px;
+}

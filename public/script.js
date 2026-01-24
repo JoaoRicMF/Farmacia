@@ -748,6 +748,98 @@ async function handleSalvarMovimentoRapido(tipo) {
    9. FORNECEDORES & CONFIGURAÇÕES
    ========================================================================== */
 
+/* ==========================================================================
+   GERENCIAMENTO DINÂMICO DE CATEGORIAS
+   ========================================================================== */
+
+// Função principal para carregar categorias
+async function carregarCategoriasSistema() {
+    const categorias = await apiRequest('/categorias.php');
+    if (!categorias || !Array.isArray(categorias)) return;
+
+    // 1. Atualiza todos os Dropdowns (Selects)
+    const selects = ['filtro-cat', 'boleto-cat', 'edit-cat', 'novo-forn-cat'];
+    selects.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        const valorAtual = el.value; // Mantém seleção se houver
+        const temTodas = el.querySelector('option[value="Todas"]');
+        el.innerHTML = temTodas ? '<option value="Todas">Todas as Categorias</option>' : '';
+
+        categorias.forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat.nome;
+            opt.textContent = cat.nome;
+            el.appendChild(opt);
+        });
+        el.value = valorAtual;
+    });
+
+    // 2. Renderiza a lista na aba de Configurações para maior dinamicidade
+    renderizarListaCategoriasConfig(categorias);
+}
+
+// Função com confirmação para Restaurar Padrões
+async function resetarCategorias() {
+    // Pop-up de confirmação
+    const confirmacao = confirm("⚠️ ATENÇÃO: Isso removerá todas as suas categorias personalizadas e voltará para as definições originais da farmácia. Deseja continuar?");
+
+    if (!confirmacao) return;
+
+    const res = await apiRequest('/categorias.php?action=reset', 'POST');
+    if (res && res.success) {
+        showToast("Padrões restaurados com sucesso!");
+        carregarCategoriasSistema();
+    }
+}
+
+function renderizarListaCategoriasConfig(categorias) {
+    const container = document.getElementById('lista-categorias-config');
+    if (!container) return;
+
+    if (!categorias || categorias.length === 0) {
+        container.innerHTML = '<p class="text-center text-muted">Nenhuma categoria cadastrada.</p>';
+        return;
+    }
+
+    let html = '<div class="list-group mt-3">';
+    categorias.forEach(cat => {
+        html += `
+            <div class="list-item-flex" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
+                <span><strong>${cat.nome}</strong></span>
+                <button class="btn-icon btn-trash" onclick="excluirCategoria(${cat.id})" title="Excluir">🗑</button>
+            </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Aproveite para adicionar a função de excluir que a lista utiliza
+async function excluirCategoria(id) {
+    if (!confirm("Tem certeza que deseja remover esta categoria?")) return;
+
+    const res = await apiRequest(`/categorias.php?id=${id}`, 'DELETE');
+    if (res && res.success) {
+        showToast("Categoria removida.");
+        carregarCategoriasSistema();
+    }
+}
+
+// Função para salvar nova categoria personalizada
+async function handleAdicionarCategoria() {
+    const nome = prompt("Digite o nome da nova categoria:");
+    if (!nome) return;
+
+    const res = await apiRequest('/categorias.php', 'POST', { nome: nome });
+    if (res && res.success) {
+        showToast("Categoria adicionada!");
+        carregarCategoriasSistema();
+    } else {
+        showToast("Erro ao adicionar ou categoria já existe.", "error");
+    }
+}
+
 async function carregarFornecedores() {
     const res = await apiRequest('/fornecedores.php');
 
@@ -1014,14 +1106,26 @@ function salvarConfiguracoes() {
     showToast("Perfil salvo com sucesso!");
 }
 function baixarExcelFluxo() {
-    alert("Funcionalidade de Excel ainda não implementada no Backend.");
+    // Redireciona para o script PHP que gera o ficheiro
+    window.location.href = CONFIG.API_URL + '/exportar.php';
+    showToast("A preparar o download da planilha...");
 }
-function adicionarCategoriaPersonalizada() {
-    alert("Adicionar Categoria: Em desenvolvimento.");
-}
-function resetarCategorias() {
-    if (confirm("Restaurar categorias padrão?")) {
-        alert("Categorias restauradas.");
+async function adicionarCategoriaPersonalizada() {
+    const nome = prompt("Digite o nome da nova categoria:");
+    if (!nome || nome.trim() === "") return;
+
+    // Faz a chamada para a API de categorias
+    const res = await apiRequest('/categorias.php', 'POST', {
+        nome: nome.trim(),
+        cor: '#3b82f6' // Cor padrão azul
+    });
+
+    if (res && res.success) {
+        showToast("Categoria adicionada com sucesso!");
+        // Recarrega as categorias nos selects e na lista da aba config
+        await carregarCategoriasSistema();
+    } else {
+        showToast(res.message || "Erro ao adicionar categoria ou ela já existe.", "error");
     }
 }
 function criarNovoUsuario() {
@@ -1035,6 +1139,7 @@ function criarNovoUsuario() {
 document.addEventListener("DOMContentLoaded", () => {
     // 1. Verifica login
     verificarSessao();
+    carregarCategoriasSistema();
 
     // 2. Prepara datas nos inputs de "hoje"
     const hoje = new Date().toISOString().split('T')[0];
