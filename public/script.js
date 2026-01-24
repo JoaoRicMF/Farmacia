@@ -51,8 +51,7 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
             return null;
         }
 
-        const data = await response.json();
-        return data;
+        return await response.json();
     } catch (error) {
         console.error(`Erro na requisição para ${endpoint}:`, error);
         showToast("Erro de conexão com o servidor.", "error");
@@ -487,7 +486,7 @@ async function salvarBoleto(manterNaTela = false) {
     let url = '/financeiro.php?action=salvar';
     if (id) url = `/financeiro.php?action=atualizar&id=${id}`;
 
-    const res = await apiRequest('/financeiro.php', 'POST', payload);
+    const res = await apiRequest(url, 'POST', payload);
 
     if (res && res.success) {
         showToast("Registro salvo com sucesso!");
@@ -928,7 +927,7 @@ function toggleSenha() {
     input.type = input.type === 'password' ? 'text' : 'password';
 }
 
-function verDetalhes(tipo, titulo) {
+function verDetalhes(tipo) {
     navegar('lista');
     setTimeout(() => {
         if (tipo === 'vencidos') preFiltrarLista('Vencido');
