@@ -1222,19 +1222,32 @@ document.addEventListener("DOMContentLoaded", () => {
         const telaLogin = document.getElementById('login-screen');
 
         // Se estiver na tela de LOGIN
-        if (telaLogin && !telaLogin.classList.contains('hidden')) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                fazerLogin();
-            }
-            return;
-        }
-
-        // Se estiver na tela de NOVO LANÇAMENTO
         if (telaNovo && !telaNovo.classList.contains('hidden') && telaNovo.offsetParent !== null) {
             if (event.key === 'Enter') {
+                // Se o elemento focado for um botão, deixa ele clicar normalmente
+                if (event.target.tagName === 'BUTTON') return;
+
                 event.preventDefault();
-                salvarBoleto(event.ctrlKey);
+
+                // Lista de IDs dos campos na ordem que você quer que o foco pule
+                const ordemCampos = [
+                    'boleto-cod',
+                    'boleto-desc',
+                    'boleto-valor',
+                    'boleto-venc',
+                    'boleto-cat',
+                    'boleto-status'
+                ];
+
+                const indexAtual = ordemCampos.indexOf(event.target.id);
+
+                if (indexAtual > -1 && indexAtual < ordemCampos.length - 1) {
+                    // Pula para o próximo campo da lista
+                    document.getElementById(ordemCampos[indexAtual + 1]).focus();
+                } else if (indexAtual === ordemCampos.length - 1) {
+                    // Se estiver no último campo, salva o boleto
+                    salvarBoleto(event.ctrlKey);
+                }
             }
             if (event.key === 'Escape') {
                 event.preventDefault();
