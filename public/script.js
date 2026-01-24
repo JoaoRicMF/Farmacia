@@ -583,32 +583,82 @@ function mudarPagina(delta) {
    7. AUTOMAÇÃO (LEITOR DE CÓDIGO E AUTO-COMPLETE)
    ========================================================================== */
 
-async function lerCodigoBarras() {
-    const input = document.getElementById('boleto-cod');
-    const codigo = input.value.replace(/[^0-9]/g, '');
+function lerCodigoBarras(codigo) {
+    // Remove qualquer caractere que não seja número
+    const numerico = codigo.replace(/[^0-9]/g, '');
+    const tam = numerico.length;
 
-    if (codigo.length < 44) return;
+    let resultado = {
+        valor: 0.0,
+        vencimento: null,
+        tipo: "Desconhecido",
+        valido: false
+    };
 
-    if (codigo.length === 47) {
-        const valorStr = codigo.substring(37);
-        const valor = parseFloat(valorStr) / 100;
-        const fator = parseInt(codigo.substring(33, 37));
+    // 1. BOLETOS DE CONCESSIONÁRIA / TRIBUTOS (48 DÍGITOS)
+    // Ex: Água, Luz, Telefone, IPTU, DARF
+    if (numerico.startsWith('8') && (tam === 48 || tam === 44)) {
+        resultado.tipo = "Concessionária/Tributo";
 
-        if (!isNaN(valor) && valor > 0) {
-            document.getElementById('boleto-valor').value = formatarMoedaBRL(valor);
+        let linhaLimpa = numerico;
+        if (tam === 48) {
+            // Remove os dígitos verificadores das posições 12, 24, 36 e 48
+            linhaLimpa = numerico.substring(0, 11) +
+                numerico.substring(12, 23) +
+                numerico.substring(24, 35) +
+                numerico.substring(36, 47);
         }
 
-        if (fator >= 1000) {
-            let dataBase = new Date('1997-10-07');
-            dataBase.setDate(dataBase.getDate() + fator);
-            const dataAtual = new Date();
-            if (dataBase.getFullYear() < dataAtual.getFullYear() - 5) {
-                dataBase.setDate(dataBase.getDate() + 9000);
-            }
-            showToast("Código lido! Valor e Data preenchidos.", "success");
-            document.getElementById('boleto-desc').focus();
-        }
+        // O valor começa na posição 4 e tem 11 dígitos
+        const valorStr = linhaLimpa.substring(4, 15);
+        resultado.valor = parseFloat(valorStr) / 100;
+        resultado.valido = true;
     }
+
+    // 2. BOLETOS BANCÁRIOS (47 DÍGITOS OU 44 DO CÓDIGO DE BARRAS)
+    else if (tam === 47 || tam === 44) {
+        resultado.tipo = "Bancário";
+
+        let fator = "";
+        let valorStr = "";
+
+        if (tam === 47) {
+            // Linha Digitável: Fator (33-37), Valor (37-47)
+            fator = numerico.substring(33, 37);
+            valorStr = numerico.substring(37);
+        } else {
+            // Código de Barras: Fator (5-9), Valor (9-19)
+            fator = numerico.substring(5, 9);
+            valorStr = numerico.substring(9, 19);
+        }
+
+        resultado.valor = parseFloat(valorStr) / 100;
+
+        // Cálculo da Data com regra de 2026
+        if (fator && fator !== "0000") {
+            const dataBase = new Date(1997, 9, 7); // 07/10/1997
+            let dataVencimento = new Date(dataBase);
+            dataVencimento.setDate(dataBase.getDate() + parseInt(fator));
+
+            // Regra de Ouro: O fator resetou em 22/02/2022 (virou 1000 novamente)
+            // Para boletos de 2025/2026, se a data calculada for antiga, somamos 9000 dias.
+            const dataCorte = new Date(2022, 1, 22); // Fevereiro é mês 1 no JS
+            if (dataVencimento < dataCorte) {
+                dataVencimento.setDate(dataVencimento.getDate() + 9000);
+            }
+
+            resultado.vencimento = dataVencimento.toISOString().split('T')[0];
+        }
+        resultado.valido = true;
+    }
+
+    // 3. DETECÇÃO DE PIX (BR Code)
+    if (codigo.startsWith('000201')) {
+        resultado.tipo = "PIX Copia e Cola";
+        resultado.valido = true;
+    }
+
+    return resultado;
 }
 
 function verificarFornecedorPreenchido() {
