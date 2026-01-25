@@ -8,7 +8,7 @@ require_once __DIR__ . '/../config/database.php';
 session_start();
 
 // Verifica se está logado
-if (!isset($_SESSION['usuario_id']) || $_SESSION['funcao'] !== 'admin') {
+if (!isset($_SESSION['user_id']) || $_SESSION['user_funcao'] !== 'Admin') {
     http_response_code(403);
     echo json_encode(['error' => 'Acesso negado']);
     exit;

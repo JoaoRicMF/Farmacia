@@ -2,16 +2,16 @@
 // config/database.php
 
 class Database {
-    private $host = "localhost";
+    private $host = "127.0.0.1"; // Alterado de localhost para 127.0.0.1 para evitar conflitos de socket
     private $db_name = "farmacia_db";
     private $username = "root";
-    private $password = "150406";
+    private $password = "150406"; // Certifique-se que a senha do usuário root no MariaDB é a mesma
     public $conn;
 
     public function getConnection() {
         $this->conn = null;
         try {
-            // 1. Conecta ao servidor sem selecionar o banco para poder criá-lo
+            // Se o MariaDB estiver em porta diferente, adicione ";port=XXXX" ao DSN
             $this->conn = new PDO("mysql:host=" . $this->host, $this->username, $this->password);
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
