@@ -1,5 +1,7 @@
 <?php
 // api/exportar.php
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Erros vão para o log, não para o navegador
 header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename=financeiro_farmacia_' . date('Y-m-d') . '.csv');
 

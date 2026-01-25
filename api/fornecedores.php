@@ -1,5 +1,7 @@
 <?php
-header("Content-Type: application/json");
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Erros vão para o log, não para o navegador
+header("Content-Type: application/json; charset=UTF-8");
 session_start();
 include_once '../config/database.php';
 

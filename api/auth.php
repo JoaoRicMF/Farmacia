@@ -1,8 +1,7 @@
 <?php
 // Desativa a exibição de erros na tela (vai apenas para o log)
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
-
+ini_set('display_errors', 0); // Erros vão para o log, não para o navegador
 header("Content-Type: application/json; charset=UTF-8");
 
 // Inicia sessão apenas se não existir

@@ -34,31 +34,26 @@ const LOADER_HTML = `
 async function apiRequest(endpoint, method = 'GET', body = null) {
     const options = {
         method,
-        headers: {
-            'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' }
     };
-
     if (body) options.body = JSON.stringify(body);
 
     try {
         const response = await fetch(`${CONFIG.API_URL}${endpoint}`, options);
+        const text = await response.text(); // Lê como texto primeiro para validar
 
-        // Tratamento de Erro 401 (Sessão Expirada)
-        if (response.status === 401) {
-            console.warn("Sessão expirada ou não autorizado.");
-            logoutFrontend();
-            return null;
+        try {
+            const data = JSON.parse(text);
+            if (!response.ok) throw new Error(data.error || data.message || `Erro ${response.status}`);
+            return data;
+        } catch (e) {
+            console.error("Resposta inválida do servidor:", text);
+            throw new Error("O servidor não retornou um JSON válido.");
         }
-
-        return await response.json();
     } catch (error) {
-        console.error(`Erro na requisição para ${endpoint}:`, error);
-        showToast("Erro de conexão com o servidor.", "error");
-        return {
-            success: false,
-            message: "Erro de rede"
-        };
+        console.error(`Erro em ${endpoint}:`, error);
+        showToast(error.message, "error"); // Mostra o erro real na tela
+        return null;
     }
 }
 
