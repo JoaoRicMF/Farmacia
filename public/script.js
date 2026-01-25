@@ -459,48 +459,64 @@ function prepararNovoRegistro() {
     setTimeout(() => document.getElementById('boleto-cod').focus(), 100);
 }
 
+// public/script.js
+
+// 1. CORREÇÃO: Caminho relativo para evitar erro 404
+const API_URL = '../api';
+
+// ... (Mantenha o resto do código de máscaras e eventos) ...
+
+// Função corrigida para salvar Boleto
 async function salvarBoleto(event) {
-    if (event) event.preventDefault();
+    event.preventDefault();
 
-    const id = document.getElementById('boletoId').value;
-    // Note que a URL é fixa, sem "?action="
-    const url = '../api/financeiro.php';
+    const descricao = document.getElementById('descricao').value;
+    const valor = document.getElementById('valor').value;
+    const vencimento = document.getElementById('vencimento').value;
+    const codigoBarras = document.getElementById('linha-digitavel').value;
 
-    const dados = {
-        descricao: document.getElementById('descricao').value,
-        valor: document.getElementById('valor').value,
-        vencimento: document.getElementById('vencimento').value,
-        categoria_id: document.getElementById('categoria').value,
-        fornecedor_id: document.getElementById('fornecedor').value,
-        status: document.getElementById('status').value
+    // Elementos Select
+    const categoriaSelect = document.getElementById('categoria');
+    const fornecedorSelect = document.getElementById('fornecedor');
+
+    // 2. CORREÇÃO: Enviar o NOME da categoria/fornecedor, não o ID.
+    // O banco (tabela Financeiro) armazena VARCHAR, não INT (FK).
+    const categoriaNome = categoriaSelect.options[categoriaSelect.selectedIndex].text;
+
+    // Se o fornecedor for opcional ou usado na descrição
+    const fornecedorNome = fornecedorSelect.value ? fornecedorSelect.options[fornecedorSelect.selectedIndex].text : '';
+
+    // Monta o payload conforme o PHP espera
+    const payload = {
+        descricao: descricao + (fornecedorNome ? " - " + fornecedorNome : ""), // Concatena fornecedor se desejar
+        valor: valor,
+        vencimento: vencimento,
+        categoria: categoriaNome, // Envia "Medicamentos" em vez de "1"
+        codigo_barras: codigoBarras
     };
 
-    // Se o ID existir, ele é adicionado ao objeto para o PHP fazer o UPDATE
-    if (id) {
-        dados.id = id;
-    }
-
     try {
-        const response = await fetch(url, {
+        // 3. CORREÇÃO: Adiciona ?action=salvar na URL
+        const response = await fetch(`${API_URL}/financeiro.php?action=salvar`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(dados)
+            body: JSON.stringify(payload)
         });
 
-        const resultado = await response.json();
+        const result = await response.json();
 
-        if (resultado.success) {
-            alert(id ? 'Boleto atualizado com sucesso!' : 'Boleto salvo com sucesso!');
-            fecharModal();
-            carregarBoletos(); // Atualiza a lista na tela
+        if (result.success) {
+            alert('Boleto salvo com sucesso!');
+            document.getElementById('form-boleto').reset();
+            carregarDashboard(); // Atualiza a tela se existir
         } else {
-            alert('Erro: ' + resultado.error);
+            alert('Erro ao salvar: ' + (result.message || result.error));
         }
     } catch (error) {
         console.error('Erro na requisição:', error);
-        alert('Erro ao conectar com o servidor.');
+        alert('Erro de conexão com o servidor.');
     }
 }
 

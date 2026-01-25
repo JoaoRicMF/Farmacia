@@ -1,115 +1,114 @@
 <?php
+// api/financeiro.php
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Erros vão para o log, não para o navegador
+ini_set('display_errors', 0);
 header("Content-Type: application/json; charset=UTF-8");
+
 session_start();
-include_once '../config/database.php';
+require_once '../config/database.php';
 
-if (!isset($_SESSION['user_id'])) { http_response_code(401); exit; }
+// Verifica sessão (Segurança básica)
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Não autorizado']);
+    exit;
+}
 
-$db = (new Database())->getConnection();
+$database = new Database();
+$db = $database->getConnection();
+
 $method = $_SERVER['REQUEST_METHOD'];
-$id = $_GET['id'] ?? null;
-$action = $_GET['action'] ?? '';
+$action = $_GET['action'] ?? ''; // Captura a ação da URL
 
-// --- BAIXAR (PAGAR) ---
-if ($method === 'POST' && $id && $action === 'baixar') {
-    $stmt = $db->prepare("UPDATE Financeiro SET status='Pago', data_processamento=NOW() WHERE id=:id");
-    echo json_encode(["success" => $stmt->execute([':id' => $id])]);
-    exit;
-}
-
-// --- EXCLUIR ---
-if ($method === 'POST' && $id && $action === 'excluir') { // Mudado para POST para facilitar compatibilidade
-    $stmt = $db->prepare("DELETE FROM Financeiro WHERE id=:id");
-    echo json_encode(["success" => $stmt->execute([':id' => $id])]);
-    exit;
-}
-
-// --- BUSCAR UM (GET ID) ---
-if ($method === 'GET' && $id) {
-    $stmt = $db->prepare("SELECT * FROM Financeiro WHERE id=:id");
-    $stmt->execute([':id' => $id]);
-    echo json_encode($stmt->fetch(PDO::FETCH_ASSOC));
-    exit;
-}
-
-// --- LISTAR COM FILTROS (GET) ---
-if ($method === 'GET' && !$id) {
-    $pagina = (int)($_GET['pagina'] ?? 1);
-    $limit = 20;
-    $offset = ($pagina - 1) * $limit;
-
-    $busca = isset($_GET['busca']) ? "%".$_GET['busca']."%" : "%";
-    $status = isset($_GET['status']) && $_GET['status'] != 'Todos' ? $_GET['status'] : null;
-    $categoria = isset($_GET['categoria']) && $_GET['categoria'] != 'Todas' ? $_GET['categoria'] : null;
-
-    // Novos filtros de data
-    $dataInicio = $_GET['data_inicio'] ?? null;
-    $dataFim = $_GET['data_fim'] ?? null;
-
-    $sql = "SELECT * FROM Financeiro WHERE descricao LIKE :busca";
-    $params = [":busca" => $busca];
-
-    if ($status) {
-        $sql .= " AND status = :status";
-        $params[':status'] = $status;
-    }
-    if ($categoria) {
-        $sql .= " AND categoria = :categoria";
-        $params[':categoria'] = $categoria;
-    }
-    if ($dataInicio) {
-        $sql .= " AND vencimento >= :inicio";
-        $params[':inicio'] = $dataInicio;
-    }
-    if ($dataFim) {
-        $sql .= " AND vencimento <= :fim";
-        $params[':fim'] = $dataFim;
-    }
-
-    // Paginação
-    $sqlTotal = str_replace("SELECT *", "SELECT COUNT(*) as total", $sql);
-    $sql .= " ORDER BY vencimento ASC LIMIT $limit OFFSET $offset";
-
-    // Executar Total
-    $stmtCount = $db->prepare($sqlTotal);
-    $stmtCount->execute($params);
-    $totalRegs = $stmtCount->fetch()['total'];
-
-    // Executar Registros
-    $stmt = $db->prepare($sql);
-    $stmt->execute($params);
-    $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    echo json_encode([
-        "registros" => $registros,
-        "total_paginas" => ceil($totalRegs / $limit),
-        "pagina_atual" => $pagina
-    ]);
-    exit;
-}
-
-// --- SALVAR (POST) ---
-if ($method === 'POST' && !$action) {
+// --- AÇÃO: SALVAR (CRIAR NOVO BOLETO) ---
+if ($method === 'POST' && $action === 'salvar') {
     $data = json_decode(file_get_contents("php://input"));
 
-    $sql = (isset($data->id) || $id)
-        ? "UPDATE Financeiro SET descricao=:d, valor=:v, vencimento=:ve, categoria=:c, status=:s, codigo_barras=:cb WHERE id=:id"
-        : "INSERT INTO Financeiro (descricao, valor, vencimento, categoria, status, codigo_barras) VALUES (:d, :v, :ve, :c, :s, :cb)";
+    if (empty($data->descricao) || empty($data->valor) || empty($data->vencimento)) {
+        echo json_encode(['success' => false, 'message' => 'Dados incompletos']);
+        exit;
+    }
 
-    $stmt = $db->prepare($sql);
-    $params = [
-        ":d" => $data->descricao,
-        ":v" => $data->valor,
-        ":ve" => $data->vencimento,
-        ":c" => $data->categoria,
-        ":s" => $data->status,
-        ":cb" => $data->codigo_barras ?? ''
-    ];
-    if (isset($data->id) || $id) $params[":id"] = $data->id ?? $id;
+    try {
+        // Insere na tabela Financeiro
+        // Nota: Status padrão é 'Pendente' (definido no banco)
+        $query = "INSERT INTO Financeiro (descricao, valor, vencimento, categoria, codigo_barras, status) 
+                  VALUES (:descricao, :valor, :vencimento, :categoria, :codigo, 'Pendente')";
 
-    if($stmt->execute($params)) echo json_encode(["success" => true]);
-    else echo json_encode(["success" => false, "message" => "Erro SQL"]);
+        $stmt = $db->prepare($query);
+
+        $stmt->bindParam(':descricao', $data->descricao);
+        $stmt->bindParam(':valor', $data->valor);
+        $stmt->bindParam(':vencimento', $data->vencimento);
+        $stmt->bindParam(':categoria', $data->categoria);     // Espera String (ex: "Água")
+        $stmt->bindParam(':codigo', $data->codigo_barras);
+
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Erro ao inserir no banco']);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => 'Erro SQL: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+// --- AÇÃO: LISTAR (PARA O DASHBOARD) ---
+if ($method === 'GET') {
+    $status = $_GET['status'] ?? null; // Opcional: filtrar por 'Pendente' ou 'Pago'
+
+    try {
+        $sql = "SELECT * FROM Financeiro";
+        if ($status) {
+            $sql .= " WHERE status = :status";
+        }
+        $sql .= " ORDER BY vencimento ASC";
+
+        $stmt = $db->prepare($sql);
+        if ($status) {
+            $stmt->bindParam(':status', $status);
+        }
+        $stmt->execute();
+
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Formatar valores para o front
+        foreach ($result as &$row) {
+            $row['valor_fmt'] = "R$ " . number_format((float)$row['valor'], 2, ',', '.');
+            $row['vencimento_fmt'] = date('d/m/Y', strtotime($row['vencimento']));
+        }
+
+        echo json_encode($result);
+
+    } catch (PDOException $e) {
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// --- AÇÃO: PAGAR (DAR BAIXA) ---
+if ($method === 'POST' && $action === 'pagar') {
+    $data = json_decode(file_get_contents("php://input"));
+
+    if (empty($data->id)) {
+        echo json_encode(['success' => false, 'message' => 'ID não informado']);
+        exit;
+    }
+
+    try {
+        $query = "UPDATE Financeiro SET status = 'Pago', data_processamento = NOW() WHERE id = :id";
+        $stmt = $db->prepare($query);
+        $stmt->bindParam(':id', $data->id);
+
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Erro ao atualizar']);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => 'Erro SQL: ' . $e->getMessage()]);
+    }
+    exit;
 }
 ?>
