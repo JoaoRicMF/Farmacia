@@ -1,38 +1,24 @@
 <?php
 // api/dashboard.php
-ob_start(); // 1. Inicia o buffer para segurar qualquer erro/warning
+require_once 'utils.php';
+require_once '../config/database.php';
 
-// 2. Configurações de erro (Logar no servidor, esconder do usuário)
+ob_start();
 ini_set('display_errors', 0);
-ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-header("Content-Type: application/json; charset=UTF-8");
+verificarAuth();
 
-$response = ['success' => false, 'message' => 'Erro ao carregar dashboard'];
+// Inicializa com sucesso por padrão para evitar variável indefinida
 $httpCode = 200;
 
 try {
-    if (session_status() === PHP_SESSION_NONE) session_start();
-
-    // Verificação de Sessão
-    if (!isset($_SESSION['user_id'])) {
-        $httpCode = 401;
-        throw new Exception("Sessão expirada");
-    }
-
-    require_once '../config/database.php';
-    $database = new Database();
-    $db = $database->getConnection();
-
-    // Verifica se a conexão foi estabelecida
-    if (!$db) {
-        throw new Exception("Falha na conexão com o banco de dados.");
-    }
+    $dbClass = new Database();
+    $db = $dbClass->getConnection();
 
     $periodo = $_GET['periodo'] ?? '7d';
 
-    // Definição da data de corte
+    // Definição da data de corte para gráficos e listagens
     $dataInicio = date('Y-m-d');
     if ($periodo == '7d') $dataInicio = date('Y-m-d', strtotime('-7 days'));
     elseif ($periodo == '30d') $dataInicio = date('Y-m-d', strtotime('-30 days'));
@@ -40,18 +26,36 @@ try {
     elseif ($periodo == '1y') $dataInicio = date('Y-m-d', strtotime('-365 days'));
     elseif ($periodo == 'all') $dataInicio = '1900-01-01';
 
-    // --- CARDS ---
+    // --- CÁLCULOS DO MÊS ATUAL (Sincronização com Fluxo) ---
+    // 1. Total Entradas (EntradaCaixa) Mês Atual
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM EntradaCaixa WHERE MONTH(dataRegistro) = MONTH(CURRENT_DATE()) AND YEAR(dataRegistro) = YEAR(CURRENT_DATE())");
+    $stmt->execute();
+    $entradasMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+
+    // 2. Total Saídas Caixa (SaidaCaixa) Mês Atual
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM SaidaCaixa WHERE MONTH(dataRegistro) = MONTH(CURRENT_DATE()) AND YEAR(dataRegistro) = YEAR(CURRENT_DATE())");
+    $stmt->execute();
+    $saidasCaixaMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+
+    // 3. Total Financeiro Pago (Contas) Mês Atual
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM Financeiro WHERE status = 'Pago' AND MONTH(COALESCE(data_processamento, vencimento)) = MONTH(CURRENT_DATE()) AND YEAR(COALESCE(data_processamento, vencimento)) = YEAR(CURRENT_DATE())");
+    $stmt->execute();
+    $contasPagasMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+
+    // Totais Consolidados
+    $totalSaidasMes = $saidasCaixaMes + $contasPagasMes;
+    $saldoMes = $entradasMes - $totalSaidasMes;
+
+    // --- CARDS ORIGINAIS (Ajustados) ---
     $cards = [];
 
-    // A Pagar (Total Pendente Geral)
+    // A Pagar (Pendente Geral)
     $stmt = $db->prepare("SELECT SUM(valor) as total FROM Financeiro WHERE status != 'Pago' AND status != 'Cancelado'");
     $stmt->execute();
     $cards['pagar_mes'] = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
-    // Pagos (Mês atual)
-    $stmt = $db->prepare("SELECT SUM(valor) as total FROM Financeiro WHERE status = 'Pago' AND MONTH(vencimento) = MONTH(CURRENT_DATE()) AND YEAR(vencimento) = YEAR(CURRENT_DATE())");
-    $stmt->execute();
-    $cards['pago_mes'] = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+    // Pagos Mês (Apenas Contas)
+    $cards['pago_mes'] = $contasPagasMes;
 
     // Vencidos
     $stmt = $db->prepare("SELECT SUM(valor) as val, COUNT(*) as qtd FROM Financeiro WHERE status != 'Pago' AND vencimento < CURRENT_DATE()");
@@ -67,8 +71,13 @@ try {
     $cards['proximos_val'] = (float)($res['val'] ?? 0);
     $cards['proximos_qtd'] = (int)($res['qtd'] ?? 0);
 
+    // Novos dados adicionados ao JSON
+    $cards['entradas_mes'] = $entradasMes;
+    $cards['saidas_totais_mes'] = $totalSaidasMes;
+    $cards['saldo_mes'] = $saldoMes;
+
     // --- GRÁFICOS ---
-    // Por Mês
+    // Gráfico 1: Evolução Mensal
     $sqlMes = "SELECT DATE_FORMAT(vencimento, '%m/%Y') as mes, SUM(valor) as total 
                FROM Financeiro 
                WHERE vencimento >= :inicio 
@@ -79,7 +88,7 @@ try {
     $stmt->execute();
     $graficoMes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Por Categoria
+    // Gráfico 2: Categorias
     $sqlCat = "SELECT categoria, SUM(valor) as total 
                FROM Financeiro 
                WHERE vencimento >= :inicio 
@@ -103,7 +112,7 @@ try {
     $calendario = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $response = [
-        "success" => true, // Importante para o JS validar
+        "success" => true,
         "cards" => $cards,
         "graficos" => [
             "por_mes" => $graficoMes,
@@ -112,14 +121,9 @@ try {
         "calendario" => $calendario
     ];
 
-} catch (Throwable $e) { // Captura Exception e Error
-    $httpCode = ($e->getCode() >= 400 && $e->getCode() < 600) ? $e->getCode() : 500;
+} catch (Exception $e) {
+    $httpCode = 500;
     $response = ['success' => false, 'message' => $e->getMessage()];
-    error_log("Erro Dashboard: " . $e->getMessage());
 }
 
-// 3. Limpeza Final (O Segredo)
-ob_clean();
-http_response_code($httpCode);
-echo json_encode($response);
-exit;
+enviarResponse($response, $httpCode);

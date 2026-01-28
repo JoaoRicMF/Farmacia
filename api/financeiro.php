@@ -1,24 +1,21 @@
 <?php
 // api/financeiro.php
-ob_start();
+require_once 'utils.php'; // Usa o novo utils para padronização
+require_once '../config/database.php';
 
+// Inicia Buffer e Configura Erros
+ob_start();
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-header("Content-Type: application/json; charset=UTF-8");
+// Usa função do utils.php para validar sessão
+verificarAuth();
 
 $response = ['success' => false, 'message' => 'Erro interno'];
 $httpCode = 200;
 
 try {
-    if (session_status() === PHP_SESSION_NONE) session_start();
-
-    if (!isset($_SESSION['user_id'])) {
-        throw new Exception("Sessão expirada", 401);
-    }
-
-    require_once '../config/database.php';
     $dbClass = new Database();
     $db = $dbClass->getConnection();
     $userNome = $_SESSION['user_nome'];
@@ -29,37 +26,87 @@ try {
 
     // --- LISTAGEM (GET) ---
     if ($method === 'GET') {
-        // ... (Sua lógica de GET existente) ...
-        // Vou resumir para o exemplo:
         $busca = $_GET['busca'] ?? '';
-        $sql = "SELECT * FROM Financeiro WHERE descricao LIKE :b OR codigo_barras LIKE :b ORDER BY vencimento LIMIT 50";
-        $stmt = $db->prepare($sql);
-        $stmt->execute([':b' => "%$busca%"]);
-        $dados = $stmt->fetchAll();
+        $status = $_GET['status'] ?? 'Todos';
+        $cat = $_GET['categoria'] ?? 'Todas';
+        $dInicio = $_GET['data_inicio'] ?? null;
+        $dFim = $_GET['data_fim'] ?? null;
+        $pagina = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
+        $limite = 10;
+        $offset = ($pagina - 1) * $limite;
 
-        $response = ['success' => true, 'registros' => $dados];
+        // Construção da Query Dinâmica
+        $sql = "SELECT * FROM Financeiro WHERE (descricao LIKE :b OR codigo_barras LIKE :b)";
+        $params = [':b' => "%$busca%"];
+
+        if ($status !== 'Todos') {
+            $sql .= " AND status = :st";
+            $params[':st'] = $status;
+        }
+        if ($cat !== 'Todas') {
+            $sql .= " AND categoria = :cat";
+            $params[':cat'] = $cat;
+        }
+        if ($dInicio && $dFim) {
+            $sql .= " AND vencimento BETWEEN :di AND :df";
+            $params[':di'] = $dInicio;
+            $params[':df'] = $dFim;
+        }
+
+        // Contagem Total para Paginação
+        $stmtCount = $db->prepare(str_replace("SELECT *", "SELECT COUNT(*)", $sql));
+        $stmtCount->execute($params);
+        $totalRegistros = $stmtCount->fetchColumn();
+        $totalPaginas = ceil($totalRegistros / $limite);
+
+        // Busca Paginada
+        $sql .= " ORDER BY vencimento ASC LIMIT $limite OFFSET $offset";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $dados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $response = [
+            'success' => true,
+            'registros' => $dados,
+            'pagina_atual' => $pagina,
+            'total_paginas' => $totalPaginas
+        ];
+    }
+
+    // --- BAIXA DE REGISTRO (NOVO) ---
+    elseif ($method === 'POST' && $action === 'baixar') {
+        $idBaixa = $id ?? json_decode(file_get_contents("php://input"))->id ?? null;
+
+        if (!$idBaixa) throw new Exception("ID inválido para baixa.");
+
+        // Atualiza status e define data de processamento
+        $sql = "UPDATE Financeiro SET status = 'Pago', data_processamento = NOW() WHERE id = :id";
+        $stmt = $db->prepare($sql);
+        $stmt->execute([':id' => $idBaixa]);
+
+        if ($stmt->rowCount() > 0) {
+            registrarLog($db, $userNome, "Baixar Título", "ID: $idBaixa - Status alterado para Pago");
+            $response = ['success' => true, 'message' => 'Título baixado com sucesso!'];
+        } else {
+            throw new Exception("Registro não encontrado ou já pago.");
+        }
     }
 
     // --- SALVAR / EDITAR (POST) ---
-    // Aceita POST puro ou POST com ?action=salvar
     elseif ($method === 'POST' && ($action === 'salvar' || empty($action) || $action === 'editar')) {
         $input = json_decode(file_get_contents("php://input"));
+        if (!$input) throw new Exception("JSON inválido");
 
-        if (!$input) throw new Exception("JSON de entrada inválido");
-
-        // Validação mínima
         if (empty($input->descricao) || empty($input->valor)) {
-            throw new Exception("Dados obrigatórios faltando");
+            throw new Exception("Campos obrigatórios faltando.");
         }
 
         if (!empty($input->id)) {
-            // UPDATE
             $sql = "UPDATE Financeiro SET descricao=:d, valor=:v, vencimento=:ve, categoria=:c, status=:s, codigo_barras=:cb WHERE id=:id";
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':id', $input->id);
             $logAction = "Editar Financeiro";
         } else {
-            // INSERT
             $sql = "INSERT INTO Financeiro (descricao, valor, vencimento, categoria, status, codigo_barras) VALUES (:d, :v, :ve, :c, :s, :cb)";
             $stmt = $db->prepare($sql);
             $logAction = "Novo Financeiro";
@@ -75,30 +122,24 @@ try {
         $stmt->execute();
         registrarLog($db, $userNome, $logAction, "R$ $input->valor - $input->descricao");
 
-        $response = ['success' => true, 'message' => 'Registro salvo com sucesso'];
+        $response = ['success' => true, 'message' => 'Salvo com sucesso'];
     }
 
-    // --- EXCLUIR (DELETE ou POST action=excluir) ---
+    // --- EXCLUIR ---
     elseif (($method === 'DELETE') || ($method === 'POST' && $action === 'excluir')) {
         $idDel = $id ?? json_decode(file_get_contents("php://input"))->id ?? null;
-
         if (!$idDel) throw new Exception("ID não fornecido");
 
         $stmt = $db->prepare("DELETE FROM Financeiro WHERE id = :id");
         $stmt->execute([':id' => $idDel]);
         registrarLog($db, $userNome, "Excluir Financeiro", "ID: $idDel");
 
-        $response = ['success' => true];
+        $response = ['success' => true, 'message' => 'Registro excluído'];
     }
 
 } catch (Exception $e) {
-    // Se for erro de sessão, retorna 401, senão 500
     $httpCode = ($e->getCode() === 401) ? 401 : 500;
     $response = ['success' => false, 'message' => $e->getMessage()];
-    error_log("Financeiro API Error: " . $e->getMessage());
 }
 
-ob_clean(); // LIMPEZA BLINDADA
-http_response_code($httpCode);
-echo json_encode($response);
-exit;
+enviarResponse($response, $httpCode);
