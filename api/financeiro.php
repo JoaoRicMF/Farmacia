@@ -1,6 +1,6 @@
 <?php
 // api/financeiro.php
-require_once 'utils.php'; // Usa o novo utils para padronização
+require_once 'utils.php'; // Padronização de respostas e autenticação
 require_once '../config/database.php';
 
 // Inicia Buffer e Configura Erros
@@ -9,7 +9,7 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-// Usa função do utils.php para validar sessão
+// Valida sessão (retorna 401 se inválido)
 verificarAuth();
 
 $response = ['success' => false, 'message' => 'Erro interno'];
@@ -19,6 +19,16 @@ try {
     $dbClass = new Database();
     $db = $dbClass->getConnection();
     $userNome = $_SESSION['user_nome'];
+
+    // --- ROTINA DE AUTO-UPDATE (VENCIDOS) ---
+    // Executa antes de qualquer ação para garantir dados atualizados
+    // Atualiza status para 'Vencido' se estiver 'Pendente' e a data for anterior a hoje
+    $sqlAutoUpdate = "UPDATE Financeiro 
+                      SET status = 'Vencido' 
+                      WHERE status = 'Pendente' 
+                      AND vencimento < CURRENT_DATE()";
+    $db->query($sqlAutoUpdate);
+    // ----------------------------------------
 
     $method = $_SERVER['REQUEST_METHOD'];
     $action = $_GET['action'] ?? '';
@@ -31,6 +41,7 @@ try {
         $cat = $_GET['categoria'] ?? 'Todas';
         $dInicio = $_GET['data_inicio'] ?? null;
         $dFim = $_GET['data_fim'] ?? null;
+
         $pagina = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
         $limite = 10;
         $offset = ($pagina - 1) * $limite;
@@ -53,13 +64,13 @@ try {
             $params[':df'] = $dFim;
         }
 
-        // Contagem Total para Paginação
+        // 1. Contagem Total (para paginação)
         $stmtCount = $db->prepare(str_replace("SELECT *", "SELECT COUNT(*)", $sql));
         $stmtCount->execute($params);
         $totalRegistros = $stmtCount->fetchColumn();
         $totalPaginas = ceil($totalRegistros / $limite);
 
-        // Busca Paginada
+        // 2. Busca Paginada
         $sql .= " ORDER BY vencimento ASC LIMIT $limite OFFSET $offset";
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
@@ -73,7 +84,7 @@ try {
         ];
     }
 
-    // --- BAIXA DE REGISTRO (NOVO) ---
+    // --- BAIXA DE REGISTRO (POST action=baixar) ---
     elseif ($method === 'POST' && $action === 'baixar') {
         $idBaixa = $id ?? json_decode(file_get_contents("php://input"))->id ?? null;
 
@@ -92,21 +103,23 @@ try {
         }
     }
 
-    // --- SALVAR / EDITAR (POST) ---
+    // --- SALVAR / EDITAR (POST action=salvar ou vazio) ---
     elseif ($method === 'POST' && ($action === 'salvar' || empty($action) || $action === 'editar')) {
         $input = json_decode(file_get_contents("php://input"));
         if (!$input) throw new Exception("JSON inválido");
 
         if (empty($input->descricao) || empty($input->valor)) {
-            throw new Exception("Campos obrigatórios faltando.");
+            throw new Exception("Campos obrigatórios faltando (Descrição e Valor).");
         }
 
         if (!empty($input->id)) {
+            // UPDATE
             $sql = "UPDATE Financeiro SET descricao=:d, valor=:v, vencimento=:ve, categoria=:c, status=:s, codigo_barras=:cb WHERE id=:id";
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':id', $input->id);
             $logAction = "Editar Financeiro";
         } else {
+            // INSERT
             $sql = "INSERT INTO Financeiro (descricao, valor, vencimento, categoria, status, codigo_barras) VALUES (:d, :v, :ve, :c, :s, :cb)";
             $stmt = $db->prepare($sql);
             $logAction = "Novo Financeiro";
@@ -125,7 +138,7 @@ try {
         $response = ['success' => true, 'message' => 'Salvo com sucesso'];
     }
 
-    // --- EXCLUIR ---
+    // --- EXCLUIR (DELETE ou POST action=excluir) ---
     elseif (($method === 'DELETE') || ($method === 'POST' && $action === 'excluir')) {
         $idDel = $id ?? json_decode(file_get_contents("php://input"))->id ?? null;
         if (!$idDel) throw new Exception("ID não fornecido");

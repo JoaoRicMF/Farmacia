@@ -175,6 +175,40 @@ async function login(event) {
         showToast(res.message || "Usuário ou senha inválidos.", "error");
     }
 }
+async function confirmarResetSenha() {
+    const idUser = document.getElementById('reset-id-user').value;
+    const novaSenha = document.getElementById('reset-nova-senha').value;
+
+    if (!idUser || !novaSenha) {
+        return showToast("A nova senha é obrigatória.", "error");
+    }
+
+    const btn = document.querySelector('#modal-reset-senha .btn-primary');
+    const textoOriginal = btn.innerText;
+    btn.innerText = "Salvando...";
+    btn.disabled = true;
+
+    const res = await apiRequest('admin.php?action=resetSenha', 'POST', {
+        id: idUser,
+        novaSenha: novaSenha
+    });
+
+    btn.innerText = textoOriginal;
+    btn.disabled = false;
+
+    if (res && res.success) {
+        showToast("Senha alterada com sucesso!");
+        document.getElementById('reset-nova-senha').value = ''; // Limpa o campo
+        document.getElementById('modal-reset-senha').classList.add('hidden'); // Fecha modal
+    } else {
+        showToast(res.message || "Erro ao resetar senha.", "error");
+    }
+}
+
+// Função auxiliar para fechar o modal (já referenciada no HTML)
+function fecharModalReset() {
+    document.getElementById('modal-reset-senha').classList.add('hidden');
+}
 
 function logoutFrontend() {
     estadoApp.usuario = null;
@@ -449,34 +483,44 @@ function prepararNovoRegistro() {
 
 // Função unificada para salvar boletos
 async function salvarBoleto(event) {
-    if(event) event.preventDefault();
+    if (event) event.preventDefault();
 
-    const descricao = document.getElementById('descricao').value;
-    const valor = document.getElementById('valor').value;
-    const vencimento = document.getElementById('vencimento').value;
-    const codigoBarras = document.getElementById('linha-digitavel').value;
-    const categoriaSelect = document.getElementById('categoria');
-    const fornecedorSelect = document.getElementById('fornecedor');
+    // Mapeamento correto dos IDs do index.html
+    const descInput = document.getElementById('boleto-desc');
+    const valorInput = document.getElementById('boleto-valor');
+    const vencInput = document.getElementById('boleto-venc');
+    const codInput = document.getElementById('boleto-cod');
+    const catSelect = document.getElementById('boleto-cat');
+    const statusSelect = document.getElementById('boleto-status');
 
-    const categoriaNome = categoriaSelect.options[categoriaSelect.selectedIndex].text;
-    const fornecedorNome = fornecedorSelect.value ? fornecedorSelect.options[fornecedorSelect.selectedIndex].text : '';
+    // Validação básica
+    if (!descInput.value || !valorInput.value || !vencInput.value) {
+        return showToast("Preencha a descrição, valor e vencimento.", "error");
+    }
 
+    // Preparação do Payload
     const payload = {
-        descricao: descricao + (fornecedorNome ? " - " + fornecedorNome : ""),
-        valor: valor,
-        vencimento: vencimento,
-        categoria: categoriaNome,
-        codigo_barras: codigoBarras
+        descricao: descInput.value,
+        valor: converterMoedaParaFloat(valorInput.value), // Converte "R$ 1.000,00" para 1000.00
+        vencimento: vencInput.value,
+        categoria: catSelect.value || "Outros",
+        status: statusSelect.value,
+        codigo_barras: codInput.value
     };
 
+    // Envio para a API
     const res = await apiRequest('financeiro.php?action=salvar', 'POST', payload);
 
     if (res && res.success) {
-        alert('Boleto salvo com sucesso!');
-        document.getElementById('form-boleto').reset();
-        carregarDashboard();
+        showToast('Boleto salvo com sucesso!');
+        // Limpa formulário se não for "Salvar + Novo" (lógica controlada pelo botão no HTML)
+        if (!event || event.type === 'submit') {
+            document.getElementById('form-boleto').reset();
+            prepararNovoRegistro();
+        }
+        carregarDashboard(); // Atualiza os cards
     } else {
-        alert('Erro ao salvar: ' + (res.message || res.error || 'Erro desconhecido'));
+        showToast('Erro ao salvar: ' + (res.message || 'Erro desconhecido'), 'error');
     }
 }
 
@@ -566,7 +610,7 @@ function lerCodigoBarras() {
 
     if (codigo.length < 44) return;
 
-    let valor = 0.0;
+    let valor;
     let dataVencimento = null;
 
     if (codigo.startsWith('8')) {
@@ -610,18 +654,24 @@ function lerCodigoBarras() {
 }
 
 function verificarFornecedorPreenchido() {
-    const desc = document.getElementById('boleto-desc').value.toLowerCase();
+    const descInput = document.getElementById('boleto-desc');
     const catSelect = document.getElementById('boleto-cat');
-    const mapa = {
-        'cemig': 'Água/Luz/Internet', 'energia': 'Água/Luz/Internet', 'internet': 'Água/Luz/Internet',
-        'vivo': 'Água/Luz/Internet', 'claro': 'Água/Luz/Internet', 'oi': 'Água/Luz/Internet',
-        'aluguel': 'Aluguel & Condomínio', 'drogasil': 'Medicamentos (Estoque)', 'farma': 'Medicamentos (Estoque)',
-        'simples': 'Impostos & Taxas', 'das': 'Impostos & Taxas'
-    };
-    for (const chave in mapa) {
-        if (desc.includes(chave)) {
-            catSelect.value = mapa[chave];
-            break;
+
+    if (!descInput || !catSelect) return;
+
+    const termoDigitado = descInput.value.toLowerCase();
+
+    // Verifica se o cache de fornecedores está carregado
+    if (estadoApp.fornecedoresCache && Array.isArray(estadoApp.fornecedoresCache)) {
+
+        // Procura um fornecedor cujo nome esteja contido no que foi digitado
+        const fornecedorEncontrado = estadoApp.fornecedoresCache.find(f =>
+            termoDigitado.includes(f.nome.toLowerCase())
+        );
+
+        if (fornecedorEncontrado && fornecedorEncontrado.categoriaPadrao) {
+            catSelect.value = fornecedorEncontrado.categoriaPadrao;
+            // Opcional: Feedback visual ou console.log(`Categoria ${fornecedorEncontrado.categoriaPadrao} aplicada autom.`);
         }
     }
 }
@@ -823,19 +873,34 @@ async function carregarConfiguracoes() {
     }
 
     if (estadoApp.usuario?.funcao === 'Admin') {
-        const tbodyUsers = document.querySelector('#tabela-usuarios tbody');
+        // CORREÇÃO: Uso do ID correto definido no index.html
+        const tbodyUsers = document.getElementById('tabela-usuarios-config');
+
         if (tbodyUsers) {
             const resUsers = await apiRequest('admin.php?resource=usuarios');
             tbodyUsers.innerHTML = '';
+
             if (resUsers && Array.isArray(resUsers)) {
                 resUsers.forEach(u => {
                     const tr = document.createElement('tr');
-                    tr.innerHTML = `<td>${u.nome}</td><td>${u.login}</td><td>${u.funcao}</td>`;
+                    tr.innerHTML = `
+                        <td>${u.nome}</td>
+                        <td>${u.login}</td>
+                        <td><span class="status-badge">${u.funcao}</span></td>
+                        <td class="text-right">
+                            <button class="btn-icon" onclick="abrirModalReset(${u.id}, '${u.nome}')" title="Alterar Senha">🔑</button>
+                            <button class="btn-icon btn-trash" onclick="excluirUsuario(${u.id})" title="Excluir">🗑</button>
+                        </td>`;
                     tbodyUsers.appendChild(tr);
                 });
             }
         }
     }
+}
+function abrirModalReset(id, nome) {
+    document.getElementById('reset-id-user').value = id;
+    document.getElementById('reset-nome-user').innerText = nome;
+    document.getElementById('modal-reset-senha').classList.remove('hidden');
 }
 
 async function salvarNovoFornecedor() {
@@ -885,6 +950,52 @@ async function carregarLogs() {
         tbody.appendChild(tr);
     });
 }
+async function salvarConfiguracoes() {
+    const nome = document.getElementById('conf-nome').value;
+    const senha = document.getElementById('conf-senha').value;
+    const login = document.getElementById('conf-login').value; // Necessário para a API validar
+    const idUser = estadoApp.usuario.id;
+    const funcaoUser = estadoApp.usuario.funcao; // Mantém a função atual
+
+    if (!nome) return showToast("O nome é obrigatório.", "error");
+
+    // 1. Atualiza dados cadastrais (Nome/Login)
+    const payloadPerfil = {
+        id: idUser,
+        nome: nome,
+        login: login, // A API admin.php exige o login
+        funcao: funcaoUser
+    };
+
+    const resPerfil = await apiRequest('admin.php?action=editar', 'POST', payloadPerfil);
+
+    if (resPerfil && resPerfil.success) {
+        let msg = "Perfil atualizado!";
+
+        // Atualiza estado local
+        estadoApp.usuario.nome = nome;
+        document.getElementById('user-display').innerText = nome;
+
+        // 2. Se houver senha, faz o update da senha separadamente
+        if (senha && senha.trim() !== "") {
+            const resSenha = await apiRequest('admin.php?action=resetSenha', 'POST', {
+                id: idUser,
+                novaSenha: senha
+            });
+
+            if (resSenha && resSenha.success) {
+                msg += " E senha alterada.";
+                document.getElementById('conf-senha').value = ''; // Limpa campo senha
+            } else {
+                msg += " Mas erro ao salvar senha.";
+            }
+        }
+
+        showToast(msg);
+    } else {
+        showToast(resPerfil?.message || "Erro ao atualizar perfil. (Requer Admin)", "error");
+    }
+}
 
 function confirmarLogout() { document.getElementById('modal-logout').classList.remove('hidden'); }
 function fecharModalLogout() { document.getElementById('modal-logout').classList.add('hidden'); }
@@ -909,8 +1020,17 @@ function fazerLogoutReal() { logout(); }
 function fazerLogin() { login(event); }
 function salvarEntradaCaixa() { handleSalvarMovimentoRapido('entrada'); }
 function salvarSaidaCaixa() { handleSalvarMovimentoRapido('saida'); }
-function salvarConfiguracoes() { showToast("Perfil salvo!"); }
-function baixarExcelFluxo() { window.location.href = CONFIG.API_URL + '/exportar.php'; }
+function baixarExcelFluxo() {
+    const mesInput = document.getElementById('filtro-mes-fluxo');
+    let url = CONFIG.API_URL + '/exportar.php';
+
+    // Se houver um mês selecionado no filtro de fluxo, anexa à URL
+    if (mesInput && mesInput.value) {
+        url += `?mes=${mesInput.value}`;
+    }
+
+    window.location.href = url;
+}
 
 /* ==========================================================================
    11. INICIALIZAÇÃO

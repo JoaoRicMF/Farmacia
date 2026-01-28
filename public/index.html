@@ -506,19 +506,32 @@
 
                 <div class="form-row">
                     <div class="half-width">
-                        <label for="novo-forn-nome" class="sr-only">Nome da Empresa</label>
-                        <input type="text" id="novo-forn-nome" placeholder="Nome da Empresa (Ex: Cimed)">
+                        <label for="novo-forn-nome">Nome da Empresa</label>
+                        <input type="text" id="novo-forn-nome" placeholder="Ex: Cimed Distribuidora">
                     </div>
-                    <div class="half-width" style="display:flex; gap:10px;">
-                        <label for="novo-forn-cat" class="sr-only">Categoria Padrão</label>
+                    <div class="half-width">
+                        <label for="novo-forn-cat">Categoria Padrão</label>
                         <select id="novo-forn-cat">
-                            <option value="">Categoria Padrão (Opcional)</option>
+                            <option value="">Selecione...</option>
                         </select>
-                        <button class="btn btn-primary" onclick="cadastrarFornecedor()">Salvar</button>
                     </div>
                 </div>
 
-                <div style="max-height: 200px; overflow-y: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px;">
+                <div class="form-row">
+                    <div class="half-width">
+                        <label for="novo-forn-cnpj">CNPJ (Opcional)</label>
+                        <input type="text" id="novo-forn-cnpj" placeholder="00.000.000/0000-00">
+                    </div>
+                    <div class="half-width" style="display:flex; align-items: flex-end; gap: 10px;">
+                        <div style="flex-grow: 1;">
+                            <label for="novo-forn-tel">Telefone (Opcional)</label>
+                            <input type="text" id="novo-forn-tel" placeholder="(00) 00000-0000">
+                        </div>
+                        <button class="btn btn-primary" onclick="cadastrarFornecedor()" style="margin-bottom: 2px;">Salvar</button>
+                    </div>
+                </div>
+
+                <div style="max-height: 200px; overflow-y: auto; margin-top: 15px; border: 1px solid var(--border); border-radius: 8px;">
                     <table style="width:100%; font-size: 0.9rem;">
                         <tbody id="tbody-fornecedores"></tbody>
                     </table>
