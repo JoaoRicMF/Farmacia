@@ -1,12 +1,13 @@
 /* ==========================================================================
-   FARMÁCIA SYSTEM - JAVASCRIPT PRINCIPAL (V3.0 ORGANIZED)
+   FARMÁCIA SYSTEM - JAVASCRIPT PRINCIPAL (CORRIGIDO)
    ========================================================================== */
 
 /* ==========================================================================
    1. CONFIGURAÇÕES E ESTADO GLOBAL
    ========================================================================== */
 const CONFIG = {
-    API_URL: '/api/categorias', // Se o index.html estiver na raiz, /api é o caminho correto
+    // CORREÇÃO 1: Caminho absoluto para a API (evita o erro /api/categorias/auth.php)
+    API_URL: '/api',
     ANIMATION_SPEED: 300
 };
 
@@ -30,11 +31,14 @@ const LOADER_HTML = `
    2. UTILITÁRIOS (HELPERS)
    ========================================================================== */
 
-// 2. Blindagem da função apiRequest
 async function apiRequest(url, method = 'GET', body = null) {
-    // Garante que o caminho comece com /api conforme definido na CONFIG
-    const endpoint = url.startsWith('/') ? url : '/' + url;
-    const fullUrl = `${CONFIG.API_URL}${endpoint}`;
+    // Remove barra inicial do endpoint se houver, para evitar duplicidade com CONFIG.API_URL
+    const endpoint = url.startsWith('/') ? url.substring(1) : url;
+
+    // Remove '/api/' do endpoint se o programador tiver colocado manualmente
+    const cleanEndpoint = endpoint.startsWith('api/') ? endpoint.substring(4) : endpoint;
+
+    const fullUrl = `${CONFIG.API_URL}/${cleanEndpoint}`;
 
     const options = {
         method: method,
@@ -50,13 +54,11 @@ async function apiRequest(url, method = 'GET', body = null) {
         const response = await fetch(fullUrl, options);
         const contentType = response.headers.get('content-type');
 
-        // Proteção contra retornos de erro do servidor em HTML (Error 500)
         if (!contentType || !contentType.includes('application/json')) {
             console.error("O servidor não retornou JSON. Status:", response.status);
             return null;
         }
 
-        // Redirecionamento automático em caso de deslogado (401)
         if (response.status === 401) {
             showToast("Sessão expirada. Redirecionando...", "error");
             setTimeout(() => window.location.reload(), 2000);
@@ -69,33 +71,25 @@ async function apiRequest(url, method = 'GET', body = null) {
         return null;
     }
 }
-async function checkSession() {
-    // Chama a API para ver se está logado
-    const data = await apiRequest('/api/auth.php?action=check');
+
+// Unificação das funções de checagem de sessão
+async function verificarSessao() {
+    // CORREÇÃO 2: Variável 'res' substituída por 'data'
+    const data = await apiRequest('auth.php?action=check');
 
     if (data && data.id) {
-        // Sucesso: Configura UI e carrega dados
-        document.getElementById('user-name').textContent = data.nome;
-        alternarTelas('dashboard');
-
-        // SÓ carrega os dados se estiver logado
-        await carregarDashboard();
-        // Carrega categorias em background
-        carregarCategoriasSistema();
+        iniciarApp(data);
         return true;
     } else {
-        // Falha: Mostra login
-        alternarTelas('login');
+        exibirTelaLogin();
         return false;
     }
 }
 
 function alternarTelas(tela) {
-    // Esconde tudo
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('app-screen').classList.add('hidden');
 
-    // Mostra o desejado
     if (tela === 'login') {
         document.getElementById('login-screen').classList.remove('hidden');
     } else {
@@ -119,7 +113,6 @@ function mascaraMoedaInput(input) {
 
 function converterMoedaParaFloat(valorString) {
     if (!valorString) return 0.00;
-    // Remove "R$", pontos e troca vírgula por ponto
     return parseFloat(valorString.replace(/[^\d,]/g, '').replace(',', '.'));
 }
 
@@ -130,7 +123,6 @@ function formatarDataBR(dataISO) {
     return `${dia}/${mes}/${ano}`;
 }
 
-// Toast Notification
 function showToast(mensagem, tipo = 'success') {
     const container = document.getElementById('toast-container');
     if (!container) return;
@@ -143,7 +135,6 @@ function showToast(mensagem, tipo = 'success') {
     `;
 
     container.appendChild(toast);
-
     setTimeout(() => toast.style.opacity = '1', 10);
     setTimeout(() => {
         toast.style.opacity = '0';
@@ -155,30 +146,19 @@ function showToast(mensagem, tipo = 'success') {
    3. AUTENTICAÇÃO
    ========================================================================== */
 
-async function verificarSessao() {
-    const data = await apiRequest('auth.php?action=check');
-    if (res && res.id) {
-        iniciarApp(res);
-    } else {
-        exibirTelaLogin();
-    }
-}
-
 async function login(event) {
     if (event) event.preventDefault();
 
     const user = document.getElementById('login-user').value;
     const pass = document.getElementById('login-pass').value;
     const btn = document.getElementById('btn-entrar');
-    const formData = new FormData(event.target);
-    const data = Object.fromEntries(formData.entries());
 
     if (!user || !pass) return showToast("Preencha usuário e senha.", "error");
 
     btn.disabled = true;
     btn.innerText = "Entrando...";
 
-    const res = await apiRequest('auth.php', 'POST', { // Adicione a / se necessário
+    const res = await apiRequest('auth.php', 'POST', {
         usuario: user,
         senha: pass
     });
@@ -186,18 +166,13 @@ async function login(event) {
     btn.disabled = false;
     btn.innerText = "Entrar";
 
-    // CHECK DE SEGURANÇA: Se res for null (erro de JSON ou rede), para aqui
-    if (!res) {
-        // O toast de erro já foi exibido no apiRequest
-        return;
-    }
+    if (!res) return;
 
-    // Agora é seguro acessar res.success
-    if (res && res.id) { // Verifique pelo ID ou pelo success
+    if (res && res.success) {
         showToast(`Bem-vindo, ${res.nome}!`);
         iniciarApp(res);
     } else {
-        showToast(res?.message || "Usuário ou senha inválidos.", "error");
+        showToast(res.message || "Usuário ou senha inválidos.", "error");
     }
 }
 
@@ -208,7 +183,7 @@ function logoutFrontend() {
 }
 
 async function logout() {
-    await apiRequest('/auth.php?action=logout');
+    await apiRequest('auth.php?action=logout');
     logoutFrontend();
 }
 
@@ -228,7 +203,7 @@ function iniciarApp(dadosUsuario) {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('app-screen').classList.remove('hidden');
 
-    carregarFornecedores();
+    carregarFornecedores(); // Carrega lista de fornecedores em background
     navegar('dashboard');
 }
 
@@ -283,14 +258,8 @@ function navegar(telaId) {
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('mobile-overlay');
-
     sidebar.classList.toggle('active');
-
-    if (sidebar.classList.contains('active')) {
-        overlay.style.display = 'block';
-    } else {
-        overlay.style.display = 'none';
-    }
+    overlay.style.display = sidebar.classList.contains('active') ? 'block' : 'none';
 }
 
 /* ==========================================================================
@@ -302,7 +271,7 @@ async function carregarDashboard(periodo = '7d') {
     const btn = document.querySelector(`.filter-btn[onclick*="'${periodo}'"]`);
     if (btn) btn.classList.add('active');
 
-    const dados = await apiRequest(`/dashboard.php?periodo=${periodo}`);
+    const dados = await apiRequest(`dashboard.php?periodo=${periodo}`);
     if (!dados) return;
 
     if (dados.cards) {
@@ -319,14 +288,8 @@ async function carregarDashboard(periodo = '7d') {
 }
 
 function renderizarGraficos(dadosGraficos) {
-    if (!dadosGraficos) return;
-    // Verifica se a biblioteca Chart.js está disponível no escopo global
-    if (typeof Chart === 'undefined') {
-        console.error("Erro: A biblioteca Chart.js não foi carregada corretamente.");
-        return;
-    }
+    if (!dadosGraficos || typeof Chart === 'undefined') return;
 
-    // Gráfico de Linha (Fluxo/Vencimentos)
     const ctxMes = document.getElementById('chartMes');
     if (ctxMes) {
         if (estadoApp.chartMes) estadoApp.chartMes.destroy();
@@ -343,14 +306,10 @@ function renderizarGraficos(dadosGraficos) {
                     tension: 0.4
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
-            }
+            options: { responsive: true, maintainAspectRatio: false }
         });
     }
 
-    // Gráfico de Rosca (Categorias)
     const ctxCat = document.getElementById('chartCat');
     if (ctxCat) {
         if (estadoApp.chartCat) estadoApp.chartCat.destroy();
@@ -363,27 +322,14 @@ function renderizarGraficos(dadosGraficos) {
                     backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
-            }
+            options: { responsive: true, maintainAspectRatio: false }
         });
     }
 }
 
 function renderizarCalendario(eventos) {
     const calendarEl = document.getElementById('calendar');
-    if (!calendarEl) return;
-
-    // Formata os eventos vindos da API para o padrão do FullCalendar
-    const eventsParsed = eventos.map(ev => ({
-        id: ev.id,
-        title: `${ev.descricao} - R$ ${ev.valor}`,
-        start: ev.vencimento,
-        backgroundColor: ev.status === 'Pago' ? '#10b981' : (ev.status === 'Vencido' ? '#ef4444' : '#f59e0b'),
-        borderColor: 'transparent',
-        extendedProps: { status: ev.status }
-    }));
+    if (!calendarEl || typeof FullCalendar === 'undefined') return;
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
@@ -392,7 +338,7 @@ function renderizarCalendario(eventos) {
             id: ev.id,
             title: ev.descricao,
             start: ev.vencimento,
-            backgroundColor: ev.status === 'Pago' ? '#10b981' : '#ef4444'
+            backgroundColor: ev.status === 'Pago' ? '#10b981' : (ev.status === 'Vencido' ? '#ef4444' : '#f59e0b')
         }))
     });
     calendar.render();
@@ -406,9 +352,6 @@ function toggleCalendarSection() {
         wrap.style.display = 'block';
         wrap.classList.remove('hidden-content');
         header.classList.add('open');
-
-        // Se estiver usando a inicialização do FullCalendar,
-        // recarregue o dashboard para disparar o render()
         carregarDashboard();
     } else {
         wrap.style.display = 'none';
@@ -417,16 +360,12 @@ function toggleCalendarSection() {
 }
 
 /* ==========================================================================
-   6. FINANCEIRO (CRUD E LISTAGEM)
+   6. FINANCEIRO
    ========================================================================== */
 
 function copiarCodigo(codigo) {
     if (!codigo) return showToast("Não há código de barras.", "error");
-    navigator.clipboard.writeText(codigo).then(() => {
-        showToast("Código copiado para a área de transferência!");
-    }).catch(() => {
-        showToast("Erro ao copiar.", "error");
-    });
+    navigator.clipboard.writeText(codigo).then(() => showToast("Copiado!")).catch(() => showToast("Erro.", "error"));
 }
 
 function abrirBanco() {
@@ -436,21 +375,21 @@ function abrirBanco() {
 async function carregarFinanceiro(pagina = 1) {
     estadoApp.paginaAtualFinanceiro = pagina;
     const tbody = document.querySelector('#tabela-registros tbody');
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Carregando...</td></tr>';
+    tbody.innerHTML = LOADER_HTML;
 
     const busca = document.getElementById('filtro-busca').value;
-    const statusFiltro = document.getElementById('filtro-status') ? document.getElementById('filtro-status').value : 'Todos';
-    const cat = document.getElementById('filtro-cat') ? document.getElementById('filtro-cat').value : 'Todas';
-    const dIni = document.getElementById('filtro-data-inicio') ? document.getElementById('filtro-data-inicio').value : '';
-    const dFim = document.getElementById('filtro-data-fim') ? document.getElementById('filtro-data-fim').value : '';
+    const status = document.getElementById('filtro-status')?.value || 'Todos';
+    const cat = document.getElementById('filtro-cat')?.value || 'Todas';
+    const dIni = document.getElementById('filtro-data-inicio')?.value || '';
+    const dFim = document.getElementById('filtro-data-fim')?.value || '';
 
-    let url = `/financeiro.php?pagina=${pagina}&busca=${encodeURIComponent(busca)}&status=${statusFiltro}&categoria=${encodeURIComponent(cat)}`;
+    let url = `financeiro.php?pagina=${pagina}&busca=${encodeURIComponent(busca)}&status=${status}&categoria=${encodeURIComponent(cat)}`;
     if (dIni) url += `&data_inicio=${dIni}`;
     if (dFim) url += `&data_fim=${dFim}`;
 
     const res = await apiRequest(url);
-
     tbody.innerHTML = '';
+
     if (!res || !res.registros || res.registros.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
         return;
@@ -471,17 +410,11 @@ async function carregarFinanceiro(pagina = 1) {
             if (r.vencimento < hojeStr) {
                 statusClass = 'status-Vencido';
                 statusTexto = 'Vencido';
-            } else {
-                statusClass = 'status-Pendente';
             }
         }
 
         const temCodigo = r.codigo_barras && r.codigo_barras.length > 5;
-        const btnCopy = temCodigo ?
-            `<button class="btn-icon btn-copy" onclick="copiarCodigo('${r.codigo_barras}')" title="Copiar Código">📋</button>` :
-            '';
-
-        const btnBank = `<button class="btn-icon btn-link" onclick="abrirBanco()" title="Acessar Caixa">🏦</button>`;
+        const btnCopy = temCodigo ? `<button class="btn-icon btn-copy" onclick="copiarCodigo('${r.codigo_barras}')" title="Copiar">📋</button>` : '';
 
         const tr = document.createElement('tr');
         if (statusTexto === 'Vencido') tr.classList.add('row-vencido');
@@ -497,7 +430,7 @@ async function carregarFinanceiro(pagina = 1) {
             <td><span class="status-badge ${statusClass}">${statusTexto}</span></td>
             <td class="text-right">
                 ${btnCopy}
-                ${btnBank}
+                <button class="btn-icon btn-link" onclick="abrirBanco()" title="Banco">🏦</button>
                 ${r.status !== 'Pago' ? `<button class="btn-icon btn-check" onclick="baixarRegistro(${r.id})" title="Pagar">✓</button>` : ''}
                 <button class="btn-icon btn-edit" onclick="editarRegistro(${r.id})" title="Editar">✎</button>
                 <button class="btn-icon btn-trash" onclick="excluirRegistro(${r.id})" title="Excluir">🗑</button>
@@ -514,69 +447,41 @@ function prepararNovoRegistro() {
     setTimeout(() => document.getElementById('boleto-cod').focus(), 100);
 }
 
-// public/script.js
-
-// 1. CORREÇÃO: Caminho relativo para evitar erro 404
-const API_URL = '../api';
-
-// ... (Mantenha o resto do código de máscaras e eventos) ...
-
-// Função corrigida para salvar Boleto
+// Função unificada para salvar boletos
 async function salvarBoleto(event) {
-    event.preventDefault();
+    if(event) event.preventDefault();
 
     const descricao = document.getElementById('descricao').value;
     const valor = document.getElementById('valor').value;
     const vencimento = document.getElementById('vencimento').value;
     const codigoBarras = document.getElementById('linha-digitavel').value;
-
-    // Elementos Select
     const categoriaSelect = document.getElementById('categoria');
     const fornecedorSelect = document.getElementById('fornecedor');
 
-    // 2. CORREÇÃO: Enviar o NOME da categoria/fornecedor, não o ID.
-    // O banco (tabela Financeiro) armazena VARCHAR, não INT (FK).
     const categoriaNome = categoriaSelect.options[categoriaSelect.selectedIndex].text;
-
-    // Se o fornecedor for opcional ou usado na descrição
     const fornecedorNome = fornecedorSelect.value ? fornecedorSelect.options[fornecedorSelect.selectedIndex].text : '';
 
-    // Monta o payload conforme o PHP espera
     const payload = {
-        descricao: descricao + (fornecedorNome ? " - " + fornecedorNome : ""), // Concatena fornecedor se desejar
+        descricao: descricao + (fornecedorNome ? " - " + fornecedorNome : ""),
         valor: valor,
         vencimento: vencimento,
-        categoria: categoriaNome, // Envia "Medicamentos" em vez de "1"
+        categoria: categoriaNome,
         codigo_barras: codigoBarras
     };
 
-    try {
-        // 3. CORREÇÃO: Adiciona ?action=salvar na URL
-        const response = await fetch(`${API_URL}/financeiro.php?action=salvar`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
+    const res = await apiRequest('financeiro.php?action=salvar', 'POST', payload);
 
-        const result = await response.json();
-
-        if (result.success) {
-            alert('Boleto salvo com sucesso!');
-            document.getElementById('form-boleto').reset();
-            carregarDashboard(); // Atualiza a tela se existir
-        } else {
-            alert('Erro ao salvar: ' + (result.message || result.error));
-        }
-    } catch (error) {
-        console.error('Erro na requisição:', error);
-        alert('Erro de conexão com o servidor.');
+    if (res && res.success) {
+        alert('Boleto salvo com sucesso!');
+        document.getElementById('form-boleto').reset();
+        carregarDashboard();
+    } else {
+        alert('Erro ao salvar: ' + (res.message || res.error || 'Erro desconhecido'));
     }
 }
 
 async function editarRegistro(id) {
-    const res = await apiRequest(`/financeiro.php?id=${id}`);
+    const res = await apiRequest(`financeiro.php?id=${id}`);
     if (res && res.id) {
         document.getElementById('edit-id').value = res.id;
         const codInput = document.getElementById('edit-cod');
@@ -599,14 +504,11 @@ async function salvarEdicao() {
     const venc = document.getElementById('edit-venc').value;
     const cat = document.getElementById('edit-cat').value;
     const status = document.getElementById('edit-status').value;
-    const codInput = document.getElementById('edit-cod');
-    const codigoBarras = codInput ? codInput.value : '';
+    const codigoBarras = document.getElementById('edit-cod')?.value || '';
 
     const valorFloat = converterMoedaParaFloat(valorStr);
 
-    if (!desc || valorFloat <= 0 || !venc) {
-        return showToast("Preencha Descrição, Valor e Vencimento.", "error");
-    }
+    if (!desc || valorFloat <= 0 || !venc) return showToast("Preencha Descrição, Valor e Vencimento.", "error");
 
     const payload = {
         id: id,
@@ -618,7 +520,7 @@ async function salvarEdicao() {
         codigo_barras: codigoBarras
     };
 
-    const res = await apiRequest('/financeiro.php', 'POST', payload);
+    const res = await apiRequest('financeiro.php', 'POST', payload);
 
     if (res && res.success) {
         showToast("Registro atualizado com sucesso!");
@@ -630,19 +532,19 @@ async function salvarEdicao() {
 }
 
 async function excluirRegistro(id) {
-    if (!confirm("Tem certeza que deseja excluir este registro?")) return;
-    const res = await apiRequest(`/financeiro.php?action=excluir&id=${id}`, 'POST');
+    if (!confirm("Tem certeza que deseja excluir?")) return;
+    const res = await apiRequest(`financeiro.php?action=excluir&id=${id}`, 'POST');
     if (res && res.success) {
-        showToast("Registro excluído.");
+        showToast("Excluído.");
         carregarFinanceiro(estadoApp.paginaAtualFinanceiro);
     }
 }
 
 async function baixarRegistro(id) {
-    if (!confirm("Confirmar pagamento/baixa deste registro?")) return;
-    const res = await apiRequest(`/financeiro.php?action=baixar&id=${id}`, 'POST');
+    if (!confirm("Confirmar baixa?")) return;
+    const res = await apiRequest(`financeiro.php?action=baixar&id=${id}`, 'POST');
     if (res && res.success) {
-        showToast("Baixa realizada com sucesso!");
+        showToast("Baixa realizada!");
         carregarFinanceiro(estadoApp.paginaAtualFinanceiro);
     }
 }
@@ -655,117 +557,67 @@ function mudarPagina(delta) {
 }
 
 /* ==========================================================================
-   7. AUTOMAÇÃO (LEITOR DE CÓDIGO E AUTO-COMPLETE)
+   7. AUTOMAÇÃO E LEITOR
    ========================================================================== */
 
 function lerCodigoBarras() {
     const inputCod = document.getElementById('boleto-cod');
-    const codigo = inputCod.value.replace(/[^0-9]/g, ''); // Apenas números
+    const codigo = inputCod.value.replace(/[^0-9]/g, '');
 
-    if (codigo.length < 44) return; // Ignora se for muito curto
+    if (codigo.length < 44) return;
 
     let valor = 0.0;
     let dataVencimento = null;
-    let ehBoletoBancario = false;
 
-    // --- TIPO 1: Arrecadação (Começa com 8) ---
     if (codigo.startsWith('8')) {
-        // Lógica de 48 dígitos (Concessionárias)
-        // Valor geralmente está nas posições 4 a 15 (11 digitos) ignorando verificadores se for linha digitável
-        // Simples aproximação para demonstração:
         let blocoValor = codigo.substring(4, 15);
         valor = parseFloat(blocoValor) / 100;
-    }
-    // --- TIPO 2: Bancário (Começa com outros, padrão 47 ou 44) ---
-    else {
-        ehBoletoBancario = true;
-        let fator = '';
-        let valorStr = '';
-
+    } else {
+        let fator = '', valorStr = '';
         if (codigo.length === 47) {
-            // Linha digitável: Fator pos 33-37 (4 digitos), Valor pos 37-fim
             fator = codigo.substring(33, 37);
             valorStr = codigo.substring(37);
         } else if (codigo.length === 44) {
-            // Código de barras puro: Fator pos 5-9, Valor pos 9-19
             fator = codigo.substring(5, 9);
             valorStr = codigo.substring(9, 19);
         }
-
         valor = parseFloat(valorStr) / 100;
 
-        // CÁLCULO DE DATA (Fator de Vencimento)
         if (fator && parseInt(fator) > 0) {
-            const dataBase = new Date(1997, 9, 7); // 07/10/1997
+            const dataBase = new Date(1997, 9, 7);
             const diasFator = parseInt(fator);
-
-            // Adiciona os dias do fator à data base
             let venc = new Date(dataBase);
             venc.setDate(dataBase.getDate() + diasFator);
 
-            // REGRA DE 2025/2026 (Pós-Reset de Fev/2022)
-            // Se a data calculada for anterior ao reset (21/02/2022), significa que estamos no novo ciclo
-            // Devemos somar 9000 dias (tamanho aproximado do ciclo do fator)
             const dataReset = new Date(2022, 1, 21);
-            if (venc < dataReset) {
-                venc.setDate(venc.getDate() + 9000); // Avança o ciclo
-            }
+            if (venc < dataReset) venc.setDate(venc.getDate() + 9000);
 
             dataVencimento = venc.toISOString().split('T')[0];
         }
     }
 
-    // Preenchimento Automático
     if (valor > 0) {
         const campoValor = document.getElementById('boleto-valor');
         campoValor.value = valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        // Aciona formatação manual para remover o simbolo R$ se o input for do tipo text simples com mascara
         mascaraMoedaInput(campoValor);
         showToast("Valor identificado: R$ " + valor.toFixed(2));
     }
-
     if (dataVencimento) {
         document.getElementById('boleto-venc').value = dataVencimento;
-        showToast("Vencimento identificado: " + formatarDataBR(dataVencimento));
-        verificarVencimento(); // Atualiza alerta visual
+        showToast("Vencimento: " + formatarDataBR(dataVencimento));
+        verificarVencimento();
     }
 }
 
 function verificarFornecedorPreenchido() {
     const desc = document.getElementById('boleto-desc').value.toLowerCase();
     const catSelect = document.getElementById('boleto-cat');
-
     const mapa = {
-        'cemig': 'Água/Luz/Internet',
-        'energia': 'Água/Luz/Internet',
-        'luz': 'Água/Luz/Internet',
-        'agua': 'Água/Luz/Internet',
-        'saneago': 'Água/Luz/Internet',
-        'embasa': 'Água/Luz/Internet',
-        'internet': 'Água/Luz/Internet',
-        'vivo': 'Água/Luz/Internet',
-        'claro': 'Água/Luz/Internet',
-        'oi': 'Água/Luz/Internet',
-        'aluguel': 'Aluguel & Condomínio',
-        'condominio': 'Aluguel & Condomínio',
-        'imobiliaria': 'Aluguel & Condomínio',
-        'salario': 'Folha de Pagamento',
-        'pagamento': 'Folha de Pagamento',
-        'adiantamento': 'Folha de Pagamento',
-        'drogasil': 'Medicamentos (Estoque)',
-        'farma': 'Medicamentos (Estoque)',
-        'eurofarma': 'Medicamentos (Estoque)',
-        'cimed': 'Medicamentos (Estoque)',
-        'papelaria': 'Materiais de Consumo',
-        'limpeza': 'Materiais de Consumo',
-        'embalagens': 'Materiais de Consumo',
-        'simples': 'Impostos & Taxas',
-        'das': 'Impostos & Taxas',
-        'inss': 'Impostos & Taxas',
-        'fgts': 'Impostos & Taxas',
-        'prefeitura': 'Impostos & Taxas'
+        'cemig': 'Água/Luz/Internet', 'energia': 'Água/Luz/Internet', 'internet': 'Água/Luz/Internet',
+        'vivo': 'Água/Luz/Internet', 'claro': 'Água/Luz/Internet', 'oi': 'Água/Luz/Internet',
+        'aluguel': 'Aluguel & Condomínio', 'drogasil': 'Medicamentos (Estoque)', 'farma': 'Medicamentos (Estoque)',
+        'simples': 'Impostos & Taxas', 'das': 'Impostos & Taxas'
     };
-
     for (const chave in mapa) {
         if (desc.includes(chave)) {
             catSelect.value = mapa[chave];
@@ -789,8 +641,6 @@ function verificarVencimento() {
 
 async function carregarFluxo() {
     const mesInput = document.getElementById('filtro-mes-fluxo');
-
-    // 1. Garante que haja um mês selecionado (padrão mês atual)
     if (!mesInput.value) {
         const hoje = new Date();
         const yyyy = hoje.getFullYear();
@@ -801,11 +651,9 @@ async function carregarFluxo() {
     const tbody = document.querySelector('#tabela-fluxo tbody');
     tbody.innerHTML = LOADER_HTML;
 
-    // 2. Chamada à API
-    const res = await apiRequest(`/fluxo.php?mes=${mesInput.value}`);
+    const res = await apiRequest(`fluxo.php?mes=${mesInput.value}`);
     tbody.innerHTML = '';
 
-    // 3. Verificação de segurança: res precisa existir e ter movimentacoes
     if (res) {
         const atualizarTexto = (id, valor) => {
             const el = document.getElementById(id);
@@ -815,12 +663,10 @@ async function carregarFluxo() {
         atualizarTexto('fluxo-entradas', res.total_entradas_fmt);
         atualizarTexto('fluxo-saidas', res.total_saidas_fmt);
         atualizarTexto('fluxo-saldo', res.saldo_fmt);
-
         atualizarTexto('total-entradas', res.total_entradas_fmt);
         atualizarTexto('total-saidas', res.total_saidas_fmt);
         atualizarTexto('total-saldo', res.saldo_fmt);
 
-        // 4. CORREÇÃO DA LÓGICA: O loop deve estar FORA do else
         if (res.movimentacoes && res.movimentacoes.length > 0) {
             res.movimentacoes.forEach(mov => {
                 const tr = document.createElement('tr');
@@ -839,25 +685,20 @@ async function carregarFluxo() {
                 tbody.appendChild(tr);
             });
         } else {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhuma movimentação neste período.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhuma movimentação.</td></tr>';
         }
     } else {
-        // Caso a API falhe ou retorne nulo
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar dados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar.</td></tr>';
     }
 }
 
 async function handleSalvarMovimentoRapido(tipo) {
     const prefixo = tipo === 'entrada' ? 'ent' : 'sai';
-
-    // Captura dos elementos
     const elDesc = document.getElementById(`${prefixo}-desc`);
     const elValor = document.getElementById(`${prefixo}-valor`);
     const elData = document.getElementById(`${prefixo}-data`);
 
-    if (!elDesc.value || !elValor.value || !elData.value) {
-        return showToast("Preencha todos os campos.", "error");
-    }
+    if (!elDesc.value || !elValor.value || !elData.value) return showToast("Preencha todos os campos.", "error");
 
     const payload = {
         descricao: elDesc.value,
@@ -866,44 +707,30 @@ async function handleSalvarMovimentoRapido(tipo) {
         tipo: tipo.toUpperCase()
     };
 
-    const res = await apiRequest('/fluxo.php?action=salvar', 'POST', payload);
+    const res = await apiRequest('fluxo.php?action=salvar', 'POST', payload);
 
     if (res && res.success) {
-        showToast(`${tipo.charAt(0).toUpperCase() + tipo.slice(1)} registrada com sucesso!`);
-
-        // Limpa os campos
-        elDesc.value = '';
-        elValor.value = '';
-
-        carregarFluxo(); // Atualiza a tabela e os totais
+        showToast("Registrado com sucesso!");
+        elDesc.value = ''; elValor.value = '';
+        carregarFluxo();
     } else {
-        showToast(res.message || "Erro ao salvar movimentação.", "error");
+        showToast(res.message || "Erro ao salvar.", "error");
     }
 }
 
 /* ==========================================================================
-   9. FORNECEDORES & CONFIGURAÇÕES
+   9. CATEGORIAS E FORNECEDORES
    ========================================================================== */
 
-/* ==========================================================================
-   GERENCIAMENTO DINÂMICO DE CATEGORIAS
-   ========================================================================== */
-
-// Função principal para carregar categorias
 async function carregarCategoriasSistema() {
     const categorias = await apiRequest('categorias.php');
     if (!categorias || !Array.isArray(categorias)) return;
 
-    // Lista de IDs de selects que precisam ser populados
     const selectsAlvo = ['filtro-cat', 'boleto-cat', 'edit-cat', 'novo-forn-cat'];
-
     selectsAlvo.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
-
-        const valorSelecionado = el.value; // Tenta preservar seleção
-
-        // Mantém a opção padrão inicial (Ex: "Todas" ou "Selecione...")
+        const valorSelecionado = el.value;
         const opcaoPadrao = el.firstElementChild ? el.firstElementChild.cloneNode(true) : null;
         el.innerHTML = '';
         if (opcaoPadrao) el.appendChild(opcaoPadrao);
@@ -914,38 +741,19 @@ async function carregarCategoriasSistema() {
             opt.textContent = cat.nome;
             el.appendChild(opt);
         });
-
-        // Restaura valor se ainda existir na lista
         if (valorSelecionado) el.value = valorSelecionado;
     });
 
-    // Atualiza lista visual na config
     renderizarListaCategoriasConfig(categorias);
-}
-
-// Função com confirmação para Restaurar Padrões
-async function resetarCategorias() {
-    // Pop-up de confirmação
-    const confirmacao = confirm("⚠️ ATENÇÃO: Isso removerá todas as suas categorias personalizadas e voltará para as definições originais da farmácia. Deseja continuar?");
-
-    if (!confirmacao) return;
-
-    const res = await apiRequest('/categorias.php?action=reset', 'POST');
-    if (res && res.success) {
-        showToast("Padrões restaurados com sucesso!");
-        carregarCategoriasSistema();
-    }
 }
 
 function renderizarListaCategoriasConfig(categorias) {
     const container = document.getElementById('lista-categorias-config');
     if (!container) return;
-
     if (!categorias || categorias.length === 0) {
-        container.innerHTML = '<p class="text-center text-muted">Nenhuma categoria cadastrada.</p>';
+        container.innerHTML = '<p class="text-center text-muted">Nenhuma categoria.</p>';
         return;
     }
-
     let html = '<div class="list-group mt-3">';
     categorias.forEach(cat => {
         html += `
@@ -958,38 +766,32 @@ function renderizarListaCategoriasConfig(categorias) {
     container.innerHTML = html;
 }
 
-// Aproveite para adicionar a função de excluir que a lista utiliza
 async function excluirCategoria(id) {
-    if (!confirm("Tem certeza que deseja remover esta categoria?")) return;
-
-    const res = await apiRequest(`/categorias.php?id=${id}`, 'DELETE');
+    if (!confirm("Remover categoria?")) return;
+    const res = await apiRequest(`categorias.php?id=${id}`, 'DELETE');
     if (res && res.success) {
         showToast("Categoria removida.");
         carregarCategoriasSistema();
     }
 }
 
-// Função para salvar nova categoria personalizada
-async function handleAdicionarCategoria() {
-    const nome = prompt("Digite o nome da nova categoria:");
-    if (!nome) return;
+async function adicionarCategoriaPersonalizada() {
+    const nome = prompt("Nome da nova categoria:");
+    if (!nome || nome.trim() === "") return;
 
-    const res = await apiRequest('/categorias.php', 'POST', { nome: nome });
+    const res = await apiRequest('categorias.php', 'POST', { nome: nome.trim() });
     if (res && res.success) {
-        showToast("Categoria adicionada!");
+        showToast("Adicionada!");
         carregarCategoriasSistema();
     } else {
-        showToast("Erro ao adicionar ou categoria já existe.", "error");
+        showToast(res.message || "Erro ao adicionar.", "error");
     }
 }
 
 async function carregarFornecedores() {
-    const res = await apiRequest('/fornecedores.php');
-
-    // VERIFICAÇÃO DE SEGURANÇA: Só prossegue se for uma lista (Array)
+    const res = await apiRequest('fornecedores.php');
     if (res && Array.isArray(res)) {
         estadoApp.fornecedoresCache = res;
-
         const dl = document.getElementById('lista-fornecedores');
         if (dl) {
             dl.innerHTML = '';
@@ -999,53 +801,32 @@ async function carregarFornecedores() {
                 dl.appendChild(opt);
             });
         }
-    } else {
-        console.warn("API de fornecedores não retornou uma lista válida:", res);
-        estadoApp.fornecedoresCache = []; // Evita erro no forEach depois
     }
 }
 
 async function carregarConfiguracoes() {
-    // Carrega tabela de fornecedores
     const tbody = document.getElementById('tbody-fornecedores');
-
     if (tbody) {
         tbody.innerHTML = '';
+        if (!estadoApp.fornecedoresCache || estadoApp.fornecedoresCache.length === 0) await carregarFornecedores();
 
-        // Se o cache estiver vazio, tenta carregar de novo
-        if (!estadoApp.fornecedoresCache || estadoApp.fornecedoresCache.length === 0) {
-            await carregarFornecedores();
-        }
-
-        // Se após tentar carregar, continuar vazio ou não for array, avisa
         if (Array.isArray(estadoApp.fornecedoresCache) && estadoApp.fornecedoresCache.length > 0) {
             estadoApp.fornecedoresCache.forEach(f => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${f.nome}</td>
-                    <td>${f.cnpj || '-'}</td>
-                    <td>${f.telefone || '-'}</td>
-                    <td class="text-right">
-                        <button class="btn-icon btn-trash" onclick="excluirFornecedor(${f.id})">🗑</button>
-                    </td>
-                `;
+                tr.innerHTML = `<td>${f.nome}</td><td>${f.cnpj || '-'}</td><td>${f.telefone || '-'}</td>
+                                <td class="text-right"><button class="btn-icon btn-trash" onclick="excluirFornecedor(${f.id})">🗑</button></td>`;
                 tbody.appendChild(tr);
             });
         } else {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum fornecedor cadastrado.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum fornecedor.</td></tr>';
         }
-    } else {
-        console.error("ERRO HTML: Não encontrei o elemento <tbody id='tbody-fornecedores'>.");
     }
 
-    // Carrega Usuários (Apenas se for Admin e a tabela existir)
     if (estadoApp.usuario?.funcao === 'Admin') {
         const tbodyUsers = document.querySelector('#tabela-usuarios tbody');
-        // Só chama a API se o elemento HTML existir
         if (tbodyUsers) {
-            const resUsers = await apiRequest('/admin.php?resource=usuarios');
+            const resUsers = await apiRequest('admin.php?resource=usuarios');
             tbodyUsers.innerHTML = '';
-
             if (resUsers && Array.isArray(resUsers)) {
                 resUsers.forEach(u => {
                     const tr = document.createElement('tr');
@@ -1055,62 +836,28 @@ async function carregarConfiguracoes() {
             }
         }
     }
-
-
-    if (estadoApp.usuario?.funcao === 'Admin') {
-        const tbodyUsers = document.querySelector('#tabela-usuarios tbody');
-        const resUsers = await apiRequest('/admin.php?resource=usuarios');
-        if (resUsers && tbodyUsers) {
-            tbodyUsers.innerHTML = '';
-            resUsers.forEach(u => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${u.nome}</td><td>${u.login}</td><td>${u.funcao}</td>`;
-                tbodyUsers.appendChild(tr);
-            });
-        }
-    }
 }
-
 
 async function salvarNovoFornecedor() {
     const nome = document.getElementById('novo-forn-nome').value;
     const cnpj = document.getElementById('novo-forn-cnpj').value;
     const tel = document.getElementById('novo-forn-tel').value;
     const categoriaPadrao = document.getElementById('novo-forn-cat').value;
-    const dados = {
-        nome: nome,
-        cnpj: cnpj,
-        telefone: tel,
-        categoriaPadrao: categoriaPadrao // O PHP espera 'categoriaPadrao' (CamelCase)
-    };
 
-    try {
-        const response = await fetch('../api/fornecedores.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(dados)
-        });
+    const res = await apiRequest('fornecedores.php', 'POST', {
+        nome: nome, cnpj: cnpj, telefone: tel, categoriaPadrao: categoriaPadrao
+    });
 
-        const resultado = await response.json();
-
-        if (resultado.success) {
-            alert('Fornecedor cadastrado com sucesso!');
-            // Aqui você pode adicionar funções para fechar o modal ou limpar os campos
-            // fecharModalFornecedor();
-        } else {
-            alert('Erro ao salvar: ' + resultado.error);
-        }
-    } catch (error) {
-        console.error('Erro na requisição:', error);
-        alert('Erro de conexão com o servidor.');
+    if (res && res.success) {
+        alert('Fornecedor cadastrado!');
+    } else {
+        alert('Erro ao salvar: ' + (res?.error || 'Erro desconhecido'));
     }
 }
 
 async function excluirFornecedor(id) {
     if (!confirm("Remover fornecedor?")) return;
-    const res = await apiRequest(`/fornecedores.php?id=${id}`, 'DELETE');
+    const res = await apiRequest(`fornecedores.php?id=${id}`, 'DELETE');
     if (res && res.success) {
         showToast("Fornecedor removido.");
         await carregarFornecedores();
@@ -1119,98 +866,31 @@ async function excluirFornecedor(id) {
 }
 
 /* ==========================================================================
-   10. LOGS DO SISTEMA
+   10. LOGS E UTILS
    ========================================================================== */
 
 async function carregarLogs() {
     const tbody = document.querySelector('#tabela-logs tbody');
     if (!tbody) return;
     tbody.innerHTML = LOADER_HTML;
-
-    const res = await apiRequest('/admin.php?resource=logs');
+    const res = await apiRequest('admin.php?resource=logs');
     tbody.innerHTML = '';
-
     if (!res || res.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3">Nenhum log registrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3">Nenhum log.</td></tr>';
         return;
     }
-
     res.forEach(log => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td style="font-size:0.85em; color:#666">${log.dataHora || log.data_hora}</td>
-            <td><strong>${log.usuario}</strong></td>
-            <td>${log.acao} ${log.detalhes ? `(${log.detalhes})` : ''}</td>
-        `;
+        tr.innerHTML = `<td style="font-size:0.85em; color:#666">${log.dataHora}</td><td><strong>${log.usuario}</strong></td><td>${log.acao}</td>`;
         tbody.appendChild(tr);
     });
 }
 
-/* ==========================================================================
-   11. CONTROLES DE UI E MODAIS
-   ========================================================================== */
-
-function confirmarLogout() {
-    const modal = document.getElementById('modal-logout');
-    if (modal) modal.classList.remove('hidden');
-}
-
-function fecharModalLogout() {
-    const modal = document.getElementById('modal-logout');
-    if (modal) modal.classList.add('hidden');
-}
-
-function fecharModalEdicao() {
-    document.getElementById('modal-editar').classList.add('hidden');
-}
-
-function fecharModal() {
-    document.getElementById('modal-detalhes').classList.add('hidden');
-}
-
-function toggleSenha() {
-    const input = document.getElementById('login-pass');
-    input.type = input.type === 'password' ? 'text' : 'password';
-}
-
-function verDetalhes(tipo) {
-    navegar('lista');
-    setTimeout(() => {
-        if (tipo === 'vencidos') preFiltrarLista('Vencido');
-        if (tipo === 'proximos') preFiltrarLista('Pendente', 7);
-    }, 100);
-}
-
-function preFiltrarLista(status, diasFuturos = null) {
-    const selStatus = document.getElementById('filtro-status');
-    const inpInicio = document.getElementById('filtro-data-inicio');
-    const inpFim = document.getElementById('filtro-data-fim');
-
-    if (inpInicio) inpInicio.value = '';
-    if (inpFim) inpFim.value = '';
-
-    if (selStatus) {
-        if (status === 'Vencido') {
-            selStatus.value = 'Todos';
-            let ontem = new Date();
-            ontem.setDate(ontem.getDate() - 1);
-            inpFim.value = ontem.toISOString().split('T')[0];
-        } else {
-            selStatus.value = status;
-        }
-    }
-
-    if (diasFuturos) {
-        const hoje = new Date();
-        inpInicio.value = hoje.toISOString().split('T')[0];
-        let futuro = new Date();
-        futuro.setDate(futuro.getDate() + diasFuturos);
-        inpFim.value = futuro.toISOString().split('T')[0];
-    }
-
-    carregarFinanceiro(1);
-}
-
+function confirmarLogout() { document.getElementById('modal-logout').classList.remove('hidden'); }
+function fecharModalLogout() { document.getElementById('modal-logout').classList.add('hidden'); }
+function fecharModalEdicao() { document.getElementById('modal-editar').classList.add('hidden'); }
+function fecharModal() { document.getElementById('modal-detalhes').classList.add('hidden'); }
+function toggleSenha() { const x = document.getElementById('login-pass'); x.type = x.type === 'password' ? 'text' : 'password'; }
 function toggleDarkMode() {
     const isDark = document.body.getAttribute('data-theme') === 'dark';
     const newTheme = isDark ? 'light' : 'dark';
@@ -1218,165 +898,57 @@ function toggleDarkMode() {
     localStorage.setItem('theme', newTheme);
 }
 
-/* ==========================================================================
-   12. WRAPPERS HTML (Conectores onclick)
-   ========================================================================== */
-// Estas funções conectam os atributos onclick do HTML à lógica do JS
-
-function nav(tela) {
-    navegar(tela);
-}
-function filtrarDashboard(periodo) {
-    carregarDashboard(periodo);
-}
-function carregarLista(pagina) {
-    carregarFinanceiro(pagina);
-}
-function debounceCarregarLista() {
-    carregarFinanceiro(1);
-}
-function mascaraMoeda(input) {
-    mascaraMoedaInput(input);
-}
-function limparFormulario() {
-    prepararNovoRegistro();
-}
-function cadastrarFornecedor() {
-    salvarNovoFornecedor();
-}
-function fazerLogoutReal() {
-    logout();
-}
-function fazerLogin() {
-    login(event);
-}
-function salvarEntradaCaixa() {
-    salvarMovimentoRapido('entrada');
-}
-function salvarSaidaCaixa() {
-    salvarMovimentoRapido('saida');
-}
-function salvarConfiguracoes() {
-    showToast("Perfil salvo com sucesso!");
-}
-function baixarExcelFluxo() {
-    // Redireciona para o script PHP que gera o ficheiro
-    window.location.href = CONFIG.API_URL + '/exportar.php';
-    showToast("A preparar o download da planilha...");
-}
-async function adicionarCategoriaPersonalizada() {
-    const nome = prompt("Digite o nome da nova categoria:");
-    if (!nome || nome.trim() === "") return;
-
-    // Faz a chamada para a API de categorias
-    const res = await apiRequest('/categorias.php', 'POST', {
-        nome: nome.trim(),
-        cor: '#3b82f6' // Cor padrão azul
-    });
-
-    if (res && res.success) {
-        showToast("Categoria adicionada com sucesso!");
-        // Recarrega as categorias nos selects e na lista da aba config
-        await carregarCategoriasSistema();
-    } else {
-        showToast(res.message || "Erro ao adicionar categoria ou ela já existe.", "error");
-    }
-}
-async function criarNovoUsuario() {
-    const dados = {
-        nome: document.getElementById('user-nome').value,
-        login: document.getElementById('user-login').value,
-        password: document.getElementById('user-pass').value,
-        nivel: document.getElementById('user-nivel').value
-    };
-
-    const response = await fetch('../api/admin.php?action=criarUsuario', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dados)
-    });
-
-    const res = await response.json();
-    if(res.success) alert("Utilizador criado!");
-}
+// Conectores HTML
+function nav(tela) { navegar(tela); }
+function filtrarDashboard(periodo) { carregarDashboard(periodo); }
+function carregarLista(pagina) { carregarFinanceiro(pagina); }
+function mascaraMoeda(input) { mascaraMoedaInput(input); }
+function limparFormulario() { prepararNovoRegistro(); }
+function cadastrarFornecedor() { salvarNovoFornecedor(); }
+function fazerLogoutReal() { logout(); }
+function fazerLogin() { login(event); }
+function salvarEntradaCaixa() { handleSalvarMovimentoRapido('entrada'); }
+function salvarSaidaCaixa() { handleSalvarMovimentoRapido('saida'); }
+function salvarConfiguracoes() { showToast("Perfil salvo!"); }
+function baixarExcelFluxo() { window.location.href = CONFIG.API_URL + '/exportar.php'; }
 
 /* ==========================================================================
-   13. INICIALIZAÇÃO
+   11. INICIALIZAÇÃO
    ========================================================================== */
 
 document.addEventListener("DOMContentLoaded", async () => {
-    // 1. Verifica login
-    const logado = await verificarSessao()
-    carregarCategoriasSistema();
+    const logado = await verificarSessao();
+
     if (logado) {
-        // Só carregue categorias se o login for válido
         carregarCategoriasSistema();
 
-        // 2. Prepara datas nos inputs de "hoje"
         const hoje = new Date().toISOString().split('T')[0];
         document.querySelectorAll('input[type="date"]').forEach(inp => {
-            if (!inp.value && !inp.id.startsWith('filtro-')) {
-                inp.value = hoje;
-            }
+            if (!inp.value && !inp.id.startsWith('filtro-')) inp.value = hoje;
         });
 
-        // 3. Adiciona listeners para máscaras de moeda
         document.querySelectorAll('.input-money').forEach(inp => {
             inp.addEventListener('input', () => mascaraMoedaInput(inp));
         });
 
-        // 4. Impede reload de form
         const form = document.getElementById("form-boleto");
-        if (form) {
-            form.addEventListener("submit", (e) => {
-                e.preventDefault();
-            });
-        }
+        if (form) form.addEventListener("submit", (e) => e.preventDefault());
 
-        // 5. Configuração do Tema
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme) document.body.setAttribute('data-theme', savedTheme);
 
-        // 6. Listeners de Teclado
+        // Listeners de Teclado para Enter
         document.addEventListener('keydown', function (event) {
             const telaNovo = document.getElementById('view-novo');
-            const telaLogin = document.getElementById('login-screen');
-
-            // Se estiver na tela de LOGIN
             if (telaNovo && !telaNovo.classList.contains('hidden') && telaNovo.offsetParent !== null) {
-                if (event.key === 'Enter') {
-                    // Se o elemento focado for um botão, deixa ele clicar normalmente
-                    if (event.target.tagName === 'BUTTON') return;
-
+                if (event.key === 'Enter' && event.target.tagName !== 'BUTTON') {
                     event.preventDefault();
-
-                    // Lista de IDs dos campos na ordem que você quer que o foco pule
-                    const ordemCampos = [
-                        'boleto-cod',
-                        'boleto-desc',
-                        'boleto-valor',
-                        'boleto-venc',
-                        'boleto-cat',
-                        'boleto-status'
-                    ];
-
+                    const ordemCampos = ['boleto-cod', 'boleto-desc', 'boleto-valor', 'boleto-venc', 'boleto-cat', 'boleto-status'];
                     const indexAtual = ordemCampos.indexOf(event.target.id);
-
                     if (indexAtual > -1 && indexAtual < ordemCampos.length - 1) {
-                        // Pula para o próximo campo da lista
                         document.getElementById(ordemCampos[indexAtual + 1]).focus();
                     } else if (indexAtual === ordemCampos.length - 1) {
-                        // Se estiver no último campo, salva o boleto
                         salvarBoleto(event.ctrlKey);
-                    }
-                }
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    const desc = document.getElementById('boleto-desc').value;
-                    if (desc.trim() !== '') {
-                        prepararNovoRegistro();
-                    } else {
-                        navegar('lista');
                     }
                 }
             }
