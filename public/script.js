@@ -6,7 +6,7 @@
    1. CONFIGURAÇÕES E ESTADO GLOBAL
    ========================================================================== */
 const CONFIG = {
-    API_URL: '/api', // Se o index.html estiver na raiz, /api é o caminho correto
+    API_URL: '/api/categorias', // Se o index.html estiver na raiz, /api é o caminho correto
     ANIMATION_SPEED: 300
 };
 
@@ -33,7 +33,8 @@ const LOADER_HTML = `
 // 2. Blindagem da função apiRequest
 async function apiRequest(url, method = 'GET', body = null) {
     // Garante que o caminho comece com /api conforme definido na CONFIG
-    const fullUrl = url.startsWith('http') ? url : `${CONFIG.API_URL}${url.startsWith('/') ? url : '/' + url}`;
+    const endpoint = url.startsWith('/') ? url : '/' + url;
+    const fullUrl = `${CONFIG.API_URL}${endpoint}`;
 
     const options = {
         method: method,
@@ -155,7 +156,7 @@ function showToast(mensagem, tipo = 'success') {
    ========================================================================== */
 
 async function verificarSessao() {
-    const res = await apiRequest('/auth.php?action=check');
+    const data = await apiRequest('auth.php?action=check');
     if (res && res.id) {
         iniciarApp(res);
     } else {
@@ -177,7 +178,7 @@ async function login(event) {
     btn.disabled = true;
     btn.innerText = "Entrando...";
 
-    const res = await apiRequest('auth.php', 'POST', {
+    const res = await apiRequest('auth.php', 'POST', { // Adicione a / se necessário
         usuario: user,
         senha: pass
     });
@@ -192,12 +193,11 @@ async function login(event) {
     }
 
     // Agora é seguro acessar res.success
-    if (res.success) {
+    if (res && res.id) { // Verifique pelo ID ou pelo success
         showToast(`Bem-vindo, ${res.nome}!`);
         iniciarApp(res);
     } else {
-        // Seguro acessar res.message pois sabemos que é um objeto válido
-        showToast(res.message || "Login falhou.", "error");
+        showToast(res?.message || "Usuário ou senha inválidos.", "error");
     }
 }
 
@@ -891,7 +891,7 @@ async function handleSalvarMovimentoRapido(tipo) {
 
 // Função principal para carregar categorias
 async function carregarCategoriasSistema() {
-    const categorias = await apiRequest('/categorias.php');
+    const categorias = await apiRequest('categorias.php');
     if (!categorias || !Array.isArray(categorias)) return;
 
     // Lista de IDs de selects que precisam ser populados
@@ -1304,78 +1304,82 @@ async function criarNovoUsuario() {
    13. INICIALIZAÇÃO
    ========================================================================== */
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     // 1. Verifica login
-    verificarSessao();
+    const logado = await verificarSessao()
     carregarCategoriasSistema();
+    if (logado) {
+        // Só carregue categorias se o login for válido
+        carregarCategoriasSistema();
 
-    // 2. Prepara datas nos inputs de "hoje"
-    const hoje = new Date().toISOString().split('T')[0];
-    document.querySelectorAll('input[type="date"]').forEach(inp => {
-        if (!inp.value && !inp.id.startsWith('filtro-')) {
-            inp.value = hoje;
+        // 2. Prepara datas nos inputs de "hoje"
+        const hoje = new Date().toISOString().split('T')[0];
+        document.querySelectorAll('input[type="date"]').forEach(inp => {
+            if (!inp.value && !inp.id.startsWith('filtro-')) {
+                inp.value = hoje;
+            }
+        });
+
+        // 3. Adiciona listeners para máscaras de moeda
+        document.querySelectorAll('.input-money').forEach(inp => {
+            inp.addEventListener('input', () => mascaraMoedaInput(inp));
+        });
+
+        // 4. Impede reload de form
+        const form = document.getElementById("form-boleto");
+        if (form) {
+            form.addEventListener("submit", (e) => {
+                e.preventDefault();
+            });
         }
-    });
 
-    // 3. Adiciona listeners para máscaras de moeda
-    document.querySelectorAll('.input-money').forEach(inp => {
-        inp.addEventListener('input', () => mascaraMoedaInput(inp));
-    });
+        // 5. Configuração do Tema
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) document.body.setAttribute('data-theme', savedTheme);
 
-    // 4. Impede reload de form
-    const form = document.getElementById("form-boleto");
-    if (form) {
-        form.addEventListener("submit", (e) => {
-            e.preventDefault();
+        // 6. Listeners de Teclado
+        document.addEventListener('keydown', function (event) {
+            const telaNovo = document.getElementById('view-novo');
+            const telaLogin = document.getElementById('login-screen');
+
+            // Se estiver na tela de LOGIN
+            if (telaNovo && !telaNovo.classList.contains('hidden') && telaNovo.offsetParent !== null) {
+                if (event.key === 'Enter') {
+                    // Se o elemento focado for um botão, deixa ele clicar normalmente
+                    if (event.target.tagName === 'BUTTON') return;
+
+                    event.preventDefault();
+
+                    // Lista de IDs dos campos na ordem que você quer que o foco pule
+                    const ordemCampos = [
+                        'boleto-cod',
+                        'boleto-desc',
+                        'boleto-valor',
+                        'boleto-venc',
+                        'boleto-cat',
+                        'boleto-status'
+                    ];
+
+                    const indexAtual = ordemCampos.indexOf(event.target.id);
+
+                    if (indexAtual > -1 && indexAtual < ordemCampos.length - 1) {
+                        // Pula para o próximo campo da lista
+                        document.getElementById(ordemCampos[indexAtual + 1]).focus();
+                    } else if (indexAtual === ordemCampos.length - 1) {
+                        // Se estiver no último campo, salva o boleto
+                        salvarBoleto(event.ctrlKey);
+                    }
+                }
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    const desc = document.getElementById('boleto-desc').value;
+                    if (desc.trim() !== '') {
+                        prepararNovoRegistro();
+                    } else {
+                        navegar('lista');
+                    }
+                }
+            }
         });
     }
-
-    // 5. Configuração do Tema
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) document.body.setAttribute('data-theme', savedTheme);
-
-    // 6. Listeners de Teclado
-    document.addEventListener('keydown', function(event) {
-        const telaNovo = document.getElementById('view-novo');
-        const telaLogin = document.getElementById('login-screen');
-
-        // Se estiver na tela de LOGIN
-        if (telaNovo && !telaNovo.classList.contains('hidden') && telaNovo.offsetParent !== null) {
-            if (event.key === 'Enter') {
-                // Se o elemento focado for um botão, deixa ele clicar normalmente
-                if (event.target.tagName === 'BUTTON') return;
-
-                event.preventDefault();
-
-                // Lista de IDs dos campos na ordem que você quer que o foco pule
-                const ordemCampos = [
-                    'boleto-cod',
-                    'boleto-desc',
-                    'boleto-valor',
-                    'boleto-venc',
-                    'boleto-cat',
-                    'boleto-status'
-                ];
-
-                const indexAtual = ordemCampos.indexOf(event.target.id);
-
-                if (indexAtual > -1 && indexAtual < ordemCampos.length - 1) {
-                    // Pula para o próximo campo da lista
-                    document.getElementById(ordemCampos[indexAtual + 1]).focus();
-                } else if (indexAtual === ordemCampos.length - 1) {
-                    // Se estiver no último campo, salva o boleto
-                    salvarBoleto(event.ctrlKey);
-                }
-            }
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                const desc = document.getElementById('boleto-desc').value;
-                if (desc.trim() !== '') {
-                    prepararNovoRegistro();
-                } else {
-                    navegar('lista');
-                }
-            }
-        }
-    });
 });

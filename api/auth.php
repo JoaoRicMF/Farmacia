@@ -34,13 +34,14 @@ try {
     elseif ($action === 'check') {
         if (isset($_SESSION['user_id'])) {
             $response = [
-                    "success" => true,
-                    "id" => $_SESSION['user_id'],
-                    "nome" => $_SESSION['user_nome'],
-                    "funcao" => $_SESSION['user_funcao']
+                "success" => true,
+                "id" => $_SESSION['user_id'],
+                "nome" => $_SESSION['user_nome'],
+                "funcao" => $_SESSION['user_funcao']
             ];
         } else {
-            $response = ["success" => true, "message" => "Operação realizada"];
+            // Retorne success false para o JS saber que deve mostrar a tela de login
+            $response = ["success" => false, "message" => "Nenhuma sessão ativa"];
             $httpCode = 200;
         }
     }
