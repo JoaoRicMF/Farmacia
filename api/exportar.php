@@ -26,4 +26,3 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
     fputcsv($output, $row, ';');
 }
 fclose($output);
-?>

@@ -34,7 +34,7 @@ const LOADER_HTML = `
 async function apiRequest(url, method = 'GET', body = null) {
     const options = {
         method: method,
-        headers: {}
+        headers: { 'Accept': 'application/json' }
     };
 
     if (body) {
@@ -45,26 +45,33 @@ async function apiRequest(url, method = 'GET', body = null) {
     try {
         const response = await fetch(url, options);
 
-        // Se for erro de autenticação (401), força logout visual e retorna null
+        // Se o servidor devolver 401 (Não autorizado), redireciona
         if (response.status === 401) {
-            console.warn("Sessão expirada ou não iniciada.");
             alternarTelas('login');
             return null;
         }
 
-        const text = await response.text();
+        const rawText = await response.text();
 
         try {
-            return text ? JSON.parse(text) : {}; // Tenta parsear JSON
-        } catch (e) {
-            console.error("Erro ao processar JSON:", text);
-            throw new Error("O servidor não retornou um JSON válido.");
+            // Tenta converter o texto puro em Objeto JS
+            const json = JSON.parse(rawText);
+            return json;
+        } catch (parseError) {
+            // Se falhar aqui, é porque o PHP enviou "sujeira"
+            console.group("⚠️ DEBUG ERRO JSON ⚠️");
+            console.error("URL:", url);
+            console.error("O que o servidor enviou (não é JSON válido):");
+            console.log(rawText); // <--- AQUI ESTÁ A RESPOSTA DO SEU PROBLEMA
+            console.groupEnd();
+
+            showToast("Erro Técnico: Veja o console (F12) para detalhes.", true);
+            throw new Error("Resposta inválida do servidor.");
         }
 
     } catch (error) {
-        console.error("Erro na requisição:", error);
-        showToast(error.message, true);
-        return null;
+        console.error(error);
+        return null; // Retorna nulo para não quebrar o resto do código
     }
 }
 async function checkSession() {

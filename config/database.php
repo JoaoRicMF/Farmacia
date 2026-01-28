@@ -1,18 +1,17 @@
 <?php
 // config/database.php
+// Garante que erros de configuração não vazem para o output
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
 
 // Função Global de Auditoria
 function registrarLog($db, $usuario, $acao, $detalhes = '') {
     try {
+        if (!$db) return;
         $stmt = $db->prepare("INSERT INTO Log (usuario, acao, detalhes) VALUES (:u, :a, :d)");
-        $stmt->execute([
-            ':u' => $usuario,
-            ':a' => $acao,
-            ':d' => $detalhes
-        ]);
+        $stmt->execute([':u' => $usuario, ':a' => $acao, ':d' => $detalhes]);
     } catch (Exception $e) {
-        // Falha silenciosa para não travar a operação principal
-        error_log("Erro ao registrar log: " . $e->getMessage());
+        error_log("Erro Log: " . $e->getMessage());
     }
 }
 
@@ -25,6 +24,7 @@ class Database {
     public $conn;
 
     public function __construct() {
+        // Use variáveis de ambiente ou defina valores fixos aqui
         $this->host = getenv('DB_HOST') ?: "127.0.0.1";
         $this->username = getenv('DB_USER') ?: "root";
         $this->password = getenv('DB_PASS') ?: "150406";
@@ -38,12 +38,15 @@ class Database {
         try {
             $this->conn = new PDO($dsn, $this->username, $this->password);
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         } catch(PDOException $exception) {
+            // Se erro for banco inexistente (1049), tenta criar
             if ($exception->getCode() == 1049) {
-                $this->configurarPrimeiroAcesso();
-            } else {
-                return null;
+                return $this->configurarPrimeiroAcesso();
             }
+            // LANÇA A EXCEÇÃO para ser capturada pelo try-catch da API
+            // Não retorna null, pois isso causa erro fatal no dashboard
+            throw new Exception("Conexão falhou: " . $exception->getMessage());
         }
         return $this->conn;
     }
@@ -59,8 +62,10 @@ class Database {
 
             $this->conn = $tempConn;
             $this->createTablesIfNotExist();
+            return $this->conn;
         } catch (PDOException $e) {
-            error_log("Erro no setup: " . $e->getMessage());
+            error_log("Erro Setup: " . $e->getMessage());
+            throw new Exception("Erro fatal ao criar banco de dados.");
         }
     }
 
@@ -155,4 +160,3 @@ class Database {
         }
     }
 }
-?>

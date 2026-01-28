@@ -1,79 +1,65 @@
 <?php
+// api/categorias.php
+ob_start(); // 1. INICIA BUFFER
+
+// 2. CONFIGURAÇÃO DE ERROS (Logs sim, Tela não)
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Erros vão para o log, não para o navegador
+
 header("Content-Type: application/json; charset=UTF-8");
-session_start();
-include_once '../config/database.php';
 
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(401); // Unauthorized
-    echo json_encode(["success" => false, "message" => "Não autorizado"]);
-    exit;
-}
+$response = [];
+$httpCode = 200;
 
-$database = new Database();
-$db = $database->getConnection();
-$method = $_SERVER['REQUEST_METHOD'];
-
-// Listar categorias
 try {
+    // 3. VERIFICAÇÃO DE SESSÃO
+    if (session_status() === PHP_SESSION_NONE) session_start();
+
+    if (!isset($_SESSION['user_id'])) {
+        $httpCode = 401;
+        throw new Exception("Não autorizado");
+    }
+
+    // 4. CONEXÃO
+    require_once '../config/database.php';
+    $database = new Database();
+    $db = $database->getConnection();
+
+    // 5. LÓGICA DE NEGÓCIO
+    $method = $_SERVER['REQUEST_METHOD'];
+
     if ($method === 'GET') {
-        $stmt = $db->query("SELECT * FROM Categorias ORDER BY nome ASC");
-        $categorias = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode($categorias);
-    }
+        // Busca categorias padrão e personalizadas
+        $query = "SELECT * FROM Categorias ORDER BY nome";
+        $stmt = $db->prepare($query);
+        $stmt->execute();
 
-// Salvar nova categoria
-    if ($method === 'POST') {
+        $response = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Se estiver vazio, retorna array vazio [] em vez de erro
+        if (!$response) $response = [];
+    }
+    elseif ($method === 'POST') {
+        // Caso implemente criação de categorias via API
         $data = json_decode(file_get_contents("php://input"));
-        if (empty($data->nome)) {
-            echo json_encode(["success" => false, "message" => "Nome obrigatório"]);
-            exit;
+        if (!empty($data->nome)) {
+            $stmt = $db->prepare("INSERT INTO Categorias (nome, cor) VALUES (:n, :c)");
+            $stmt->execute([':n' => $data->nome, ':c' => $data->cor ?? '#3b82f6']);
+            $response = ['success' => true, 'id' => $db->lastInsertId()];
+        } else {
+            throw new Exception("Nome da categoria obrigatório");
         }
-
-        $stmt = $db->prepare("INSERT INTO Categorias (nome, cor) VALUES (:nome, :cor)");
-        $success = $stmt->execute([
-            ':nome' => $data->nome,
-            ':cor' => $data->cor ?? '#3b82f6'
-        ]);
-
-        echo json_encode(["success" => $success]);
-        exit;
     }
-}catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(["success" => false, "message" => "Erro no banco de dados"]);
+
+} catch (Exception $e) {
+    $httpCode = ($e->getCode() == 401) ? 401 : 500;
+    $response = ['error' => $e->getMessage()];
+    error_log("Erro API Categorias: " . $e->getMessage());
 }
 
-// Excluir categoria
-if ($method === 'DELETE') {
-    $id = $_GET['id'] ?? null;
-    if ($id) {
-        $stmt = $db->prepare("DELETE FROM Categorias WHERE id = :id");
-        echo json_encode(["success" => $stmt->execute([':id' => $id])]);
-        exit;
-    }
-}
-// --- RESTAURAR PADRÕES  ---
-if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'reset') {
-    try {
-        $db->beginTransaction();
-        // Limpa categorias atuais (Cuidado: isso pode afetar registros vinculados se houver FK)
-        $db->query("DELETE FROM Categorias");
-
-        $padroes = ['Medicamentos (Estoque)', 'Água/Luz/Internet', 'Aluguel & Condomínio', 'Impostos & Taxas', 'Folha de Pagamento'];
-        $stmt = $db->prepare("INSERT INTO Categorias (nome) VALUES (:nome)");
-
-        foreach ($padroes as $p) {
-            $stmt->execute([':nome' => $p]);
-        }
-
-        $db->commit();
-        echo json_encode(["success" => true]);
-    } catch (Exception $e) {
-        $db->rollBack();
-        echo json_encode(["success" => false, "message" => $e->getMessage()]);
-    }
-    exit;
-}
-?>
+// 6. LIMPEZA FINAL (ESSENCIAL)
+ob_clean(); // Limpa qualquer warning ou espaço em branco anterior
+http_response_code($httpCode);
+echo json_encode($response);
+exit;

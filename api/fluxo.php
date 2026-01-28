@@ -87,12 +87,12 @@ if ($method === 'GET') {
 
     try {
         // Entradas
-        $stmt = $db->prepare("SELECT id_entrada as id, dataRegistro as data, formaPagamento as descricao, valor, 'ENTRADA' as tipo, 'Vendas' as categoria FROM EntradaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
+        $stmt = $db->prepare("SELECT id as id, dataRegistro as data, formaPagamento as descricao, valor, 'ENTRADA' as tipo, 'Vendas' as categoria FROM EntradaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
         $stmt->execute([':m' => $mesNum, ':a' => $ano]);
         $entradas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Saídas
-        $stmt = $db->prepare("SELECT id_saida as id, dataRegistro as data, descricao, valor, 'SAIDA' as tipo, 'Sangria/Despesa' as categoria FROM SaidaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
+        $stmt = $db->prepare("SELECT id as id, dataRegistro as data, descricao, valor, 'SAIDA' as tipo, 'Sangria/Despesa' as categoria FROM SaidaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
         $stmt->execute([':m' => $mesNum, ':a' => $ano]);
         $saidas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -132,4 +132,3 @@ if ($method === 'GET') {
         echo json_encode(["error" => "Erro ao buscar dados: " . $e->getMessage()]);
     }
 }
-?>

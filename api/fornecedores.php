@@ -31,4 +31,3 @@ if ($method === 'DELETE' && $id) {
     $stmt->execute([":id" => $id]);
     echo json_encode(["success" => true]);
 }
-?>

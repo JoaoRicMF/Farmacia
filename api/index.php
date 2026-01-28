@@ -6,4 +6,3 @@ header("Content-Type: application/json; charset=UTF-8");
 http_response_code(403); // Forbidden
 echo json_encode(["error" => "Acesso direto não permitido"]);
 exit;
-?>
