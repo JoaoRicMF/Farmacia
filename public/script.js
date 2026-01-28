@@ -45,7 +45,6 @@ async function apiRequest(url, method = 'GET', body = null) {
     try {
         const response = await fetch(url, options);
 
-        // Se o servidor devolver 401 (Não autorizado), redireciona
         if (response.status === 401) {
             alternarTelas('login');
             return null;
@@ -55,23 +54,22 @@ async function apiRequest(url, method = 'GET', body = null) {
 
         try {
             // Tenta converter o texto puro em Objeto JS
-            const json = JSON.parse(rawText);
-            return json;
+            return JSON.parse(rawText);
         } catch (parseError) {
-            // Se falhar aqui, é porque o PHP enviou "sujeira"
-            console.group("⚠️ DEBUG ERRO JSON ⚠️");
+            // DEBUG DA API: Mostra exatamente o que quebrou o JSON
+            console.group("⚠️ ERRO DE RESPOSTA DA API ⚠️");
             console.error("URL:", url);
-            console.error("O que o servidor enviou (não é JSON válido):");
-            console.log(rawText); // <--- AQUI ESTÁ A RESPOSTA DO SEU PROBLEMA
+            console.error("Erro no JSON.parse:", parseError);
+            console.log("Conteúdo bruto recebido do servidor:", rawText);
             console.groupEnd();
 
-            showToast("Erro Técnico: Veja o console (F12) para detalhes.", true);
-            throw new Error("Resposta inválida do servidor.");
+            showToast("Erro no servidor. Veja o console (F12).", "error");
+            return null;
         }
 
     } catch (error) {
-        console.error(error);
-        return null; // Retorna nulo para não quebrar o resto do código
+        console.error("Erro de Rede:", error);
+        return null;
     }
 }
 async function checkSession() {
@@ -189,10 +187,18 @@ async function login(event) {
     btn.disabled = false;
     btn.innerText = "Entrar";
 
-    if (res && res.success) {
+    // CHECK DE SEGURANÇA: Se res for null (erro de JSON ou rede), para aqui
+    if (!res) {
+        // O toast de erro já foi exibido no apiRequest
+        return;
+    }
+
+    // Agora é seguro acessar res.success
+    if (res.success) {
         showToast(`Bem-vindo, ${res.nome}!`);
         iniciarApp(res);
     } else {
+        // Seguro acessar res.message pois sabemos que é um objeto válido
         showToast(res.message || "Login falhou.", "error");
     }
 }
