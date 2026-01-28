@@ -21,6 +21,8 @@ let estadoApp = {
     fornecedoresCache: []
 };
 
+let buscaTimeout;
+
 // Elementos de UI reutilizáveis
 const LOADER_HTML = `
     <tr><td colspan="100%" class="text-center py-4">
@@ -443,6 +445,9 @@ async function carregarFinanceiro(pagina = 1) {
     const res = await apiRequest(url);
     tbody.innerHTML = '';
 
+    const corCategoria = (typeof estadoApp.categoriasCache !== 'undefined')
+        ? estadoApp.categoriasCache.find(c => c.nome === r.categoria)?.cor || '#2563eb'
+        : '#2563eb';
     if (!res || !res.registros || res.registros.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
         return;
@@ -707,6 +712,13 @@ function mascaraTelefone(input) {
     input.value = v;
 }
 
+function debounceCarregarLista() {
+    clearTimeout(buscaTimeout);
+    buscaTimeout = setTimeout(() => {
+        carregarFinanceiro(1);
+    }, 500); // Aguarda 500ms
+}
+
 function verificarFornecedorPreenchido() {
     const descInput = document.getElementById('boleto-desc');
     const catSelect = document.getElementById('boleto-cat');
@@ -854,15 +866,15 @@ async function carregarCategoriasSistema() {
 function renderizarListaCategoriasConfig(categorias) {
     const container = document.getElementById('lista-categorias-config');
     if (!container) return;
-    if (!categorias || categorias.length === 0) {
-        container.innerHTML = '<p class="text-center text-muted">Nenhuma categoria.</p>';
-        return;
-    }
+
     let html = '<div class="list-group mt-3">';
     categorias.forEach(cat => {
         html += `
-            <div class="list-item-flex" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
-                <span><strong>${cat.nome}</strong></span>
+            <div class="list-item-flex" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="width: 12px; height: 12px; border-radius: 50%; background-color: ${cat.cor || '#3b82f6'}; display: inline-block;"></span>
+                    <strong>${cat.nome}</strong>
+                </div>
                 <button class="btn-icon btn-trash" onclick="excluirCategoria(${cat.id})" title="Excluir">🗑</button>
             </div>`;
     });
@@ -909,6 +921,13 @@ async function carregarFornecedores() {
 }
 
 async function carregarConfiguracoes() {
+    // Populando campos de perfil do usuário (Novo)
+    if (estadoApp.usuario) {
+        const inputLogin = document.getElementById('conf-login');
+        const inputNome = document.getElementById('conf-nome');
+        if (inputLogin) inputLogin.value = estadoApp.usuario.usuario || estadoApp.usuario.login || '';
+        if (inputNome) inputNome.value = estadoApp.usuario.nome || '';
+    }
     const tbody = document.getElementById('tbody-fornecedores');
     if (tbody) {
         tbody.innerHTML = '';
@@ -1092,7 +1111,12 @@ async function carregarLogs() {
     }
     res.forEach(log => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td style="font-size:0.85em; color:#666">${log.dataHora}</td><td><strong>${log.usuario}</strong></td><td>${log.acao}</td>`;
+        tr.innerHTML = `
+        <td style="font-size:0.85em; color:var(--text-light)">${log.dataHora}</td>
+        <td><strong>${log.usuario}</strong></td>
+        <td>${log.acao}</td>
+        <td style="font-size:0.85em; color:var(--text-light)">${log.detalhes || '-'}</td>
+    `;
         tbody.appendChild(tr);
     });
 }

@@ -521,12 +521,12 @@
                 <div class="form-row">
                     <div class="half-width">
                         <label for="novo-forn-cnpj">CNPJ (Opcional)</label>
-                        <input type="text" id="novo-forn-cnpj" placeholder="00.000.000/0000-00">
+                        <input type="text" id="novo-forn-cnpj" placeholder="00.000.000/0000-00" oninput="mascaraCNPJ(this)">
                     </div>
                     <div class="half-width" style="display:flex; align-items: flex-end; gap: 10px;">
                         <div style="flex-grow: 1;">
                             <label for="novo-forn-tel">Telefone (Opcional)</label>
-                            <input type="text" id="novo-forn-tel" placeholder="(00) 00000-0000">
+                            <input type="text" id="novo-forn-tel" placeholder="(00) 00000-0000" oninput="mascaraTelefone(this)">
                         </div>
                         <button class="btn btn-primary" onclick="cadastrarFornecedor()" style="margin-bottom: 2px;">Salvar</button>
                     </div>
