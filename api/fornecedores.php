@@ -1,8 +1,8 @@
 <?php
+// api/fornecedores.php
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
-// Inicia o buffer para evitar que espaços em branco corrompam o JSON
 ob_start();
 
 header("Content-Type: application/json; charset=UTF-8");
@@ -18,7 +18,6 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// 2. Conexão Segura (Aqui estava o erro)
 $db = null;
 try {
     $database = new Database();
@@ -26,7 +25,6 @@ try {
 } catch (Exception $e) {
     ob_clean();
     http_response_code(500);
-    // Em produção, não envie o $e->getMessage() direto para o usuário por segurança
     echo json_encode(["error" => "Erro ao conectar com o banco de dados."]);
     exit;
 }
@@ -51,23 +49,25 @@ if ($method === 'POST') {
     $input = file_get_contents("php://input");
     $data = json_decode($input);
 
-    // Validação básica para evitar erro de "Undefined property"
     if (empty($data->nome)) {
-        http_response_code(400); // Bad Request
+        http_response_code(400);
         echo json_encode(["success" => false, "message" => "Nome do fornecedor é obrigatório"]);
         exit;
     }
 
     try {
-        $stmt = $db->prepare("INSERT INTO Fornecedor (nome, categoriaPadrao) VALUES (:n, :c)");
-        // Usa null coalescing (??) caso categoria_padrao não seja enviada
+        // CORREÇÃO: Inclusão de cnpj e telefone na query de INSERT
+        $stmt = $db->prepare("INSERT INTO Fornecedor (nome, cnpj, telefone, categoriaPadrao) VALUES (:n, :cnpj, :tel, :c)");
+
         $params = [
-            ":n" => $data->nome,
-            ":c" => $data->categoria_padrao ?? null
+            ":n"    => $data->nome,
+            ":cnpj" => $data->cnpj ?? null,      // Captura o CNPJ
+            ":tel"  => $data->telefone ?? null,  // Captura o Telefone
+            ":c"    => $data->categoriaPadrao ?? null // Corrigido nome da propriedade conforme JS (categoriaPadrao) ou input
         ];
 
         if ($stmt->execute($params)) {
-            http_response_code(201); // Created
+            http_response_code(201);
             echo json_encode(["success" => true, "id" => $db->lastInsertId()]);
         } else {
             http_response_code(500);
@@ -95,8 +95,7 @@ if ($method === 'DELETE') {
             echo json_encode(["success" => false]);
         }
     } catch (PDOException $e) {
-        // Erro comum: tentar apagar fornecedor que já tem produtos vinculados (Foreign Key constraint)
-        http_response_code(409); // Conflict
+        http_response_code(409);
         echo json_encode(["success" => false, "error" => "Não é possível excluir este fornecedor pois ele possui registros vinculados."]);
     }
 }

@@ -149,30 +149,49 @@ function showToast(mensagem, tipo = 'success') {
 async function login(event) {
     if (event) event.preventDefault();
 
-    const user = document.getElementById('login-user').value;
-    const pass = document.getElementById('login-pass').value;
+    const userVal = document.getElementById('login-user').value;
+    const passVal = document.getElementById('login-pass').value;
     const btn = document.getElementById('btn-entrar');
 
-    if (!user || !pass) return showToast("Preencha usuário e senha.", "error");
+    // Guarda o texto original para restaurar depois
+    const textoOriginal = btn.innerText;
 
-    btn.disabled = true;
-    btn.innerText = "Entrando...";
+    if (!userVal || !passVal) return showToast("Preencha usuário e senha.", "error");
 
-    const res = await apiRequest('auth.php', 'POST', {
-        usuario: user,
-        senha: pass
-    });
+    try {
+        // 1. Bloqueia UI
+        btn.disabled = true;
+        btn.innerText = "Entrando...";
 
-    btn.disabled = false;
-    btn.innerText = "Entrar";
+        // 2. Requisição
+        // Nota: apiRequest já trata JSON, mas se o servidor der erro 500 HTML fatal,
+        // ele pode retornar null ou lançar erro dependendo da sua implementação interna.
+        // Aqui assumimos que ele retorna o objeto ou null.
+        const res = await apiRequest('auth.php', 'POST', {
+            usuario: userVal,
+            senha: passVal
+        });
 
-    if (!res) return;
+        // 3. Validação da Resposta
+        if (!res) {
+            // Se res for null, provavelmente houve erro 500 ou falha de rede capturada pelo apiRequest
+            throw new Error("Falha na comunicação com o servidor. Verifique o banco de dados.");
+        }
 
-    if (res && res.success) {
-        showToast(`Bem-vindo, ${res.nome}!`);
-        iniciarApp(res);
-    } else {
-        showToast(res.message || "Usuário ou senha inválidos.", "error");
+        if (res.success) {
+            showToast(`Bem-vindo, ${res.nome}!`);
+            iniciarApp(res); // Função que troca as telas
+        } else {
+            showToast(res.message || "Credenciais inválidas.", "error");
+        }
+
+    } catch (error) {
+        console.error("Erro crítico no login:", error);
+        showToast("Erro no Login: " + error.message, "error");
+    } finally {
+        // 4. Restaura UI (Sempre executa, sucesso ou erro)
+        btn.disabled = false;
+        btn.innerText = textoOriginal;
     }
 }
 async function confirmarResetSenha() {
@@ -604,53 +623,88 @@ function mudarPagina(delta) {
    7. AUTOMAÇÃO E LEITOR
    ========================================================================== */
 
-function lerCodigoBarras() {
+async function lerCodigoBarras() {
     const inputCod = document.getElementById('boleto-cod');
-    const codigo = inputCod.value.replace(/[^0-9]/g, '');
+    // Remove espaços em branco, mas mantem caracteres caso seja um Hash Pix
+    const codigo = inputCod.value.trim();
 
-    if (codigo.length < 44) return;
+    if (codigo.length < 10) return; // Validação básica para evitar requisições inúteis
 
-    let valor;
-    let dataVencimento = null;
+    // Chama a API boleto.php para interpretar o código (Boleto ou PIX)
+    const res = await apiRequest('boleto.php', 'POST', { codigo: codigo });
 
-    if (codigo.startsWith('8')) {
-        let blocoValor = codigo.substring(4, 15);
-        valor = parseFloat(blocoValor) / 100;
+    if (res && res.valido) {
+        showToast("Código identificado com sucesso!");
+
+        // --- LÓGICA PIX ---
+        if (res.tipo === 'PIX Copia e Cola' || res.tipo.includes('PIX')) {
+            const modalQR = document.getElementById('modal-qrcode');
+            const imgQR = document.getElementById('img-qrcode');
+
+            if (modalQR && imgQR) {
+                // Usa API pública para gerar o QR Code visualmente a partir da string PIX
+                imgQR.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(codigo)}`;
+                modalQR.classList.remove('hidden');
+                showToast("QR Code PIX Gerado.", "success");
+            }
+        }
+
+        // --- PREENCHIMENTO AUTOMÁTICO DO FORMULÁRIO ---
+        if (res.valor > 0) {
+            const campoValor = document.getElementById('boleto-valor');
+            // Formata o valor retornado pela API para o padrão do input (R$ ...)
+            campoValor.value = formatarMoedaBRL(res.valor);
+        }
+
+        if (res.vencimento) {
+            document.getElementById('boleto-venc').value = res.vencimento;
+            verificarVencimento(); // Chama função auxiliar visual de vencimento
+        }
+
     } else {
-        let fator = '', valorStr = '';
-        if (codigo.length === 47) {
-            fator = codigo.substring(33, 37);
-            valorStr = codigo.substring(37);
-        } else if (codigo.length === 44) {
-            fator = codigo.substring(5, 9);
-            valorStr = codigo.substring(9, 19);
-        }
-        valor = parseFloat(valorStr) / 100;
+        // Opcional: Feedback discreto se não for válido
+        console.log("Código não reconhecido pela API.");
+    }
+}
 
-        if (fator && parseInt(fator) > 0) {
-            const dataBase = new Date(1997, 9, 7);
-            const diasFator = parseInt(fator);
-            let venc = new Date(dataBase);
-            venc.setDate(dataBase.getDate() + diasFator);
+function fecharModalQR() {
+    const modal = document.getElementById('modal-qrcode');
+    if (modal) modal.classList.add('hidden');
+}
 
-            const dataReset = new Date(2022, 1, 21);
-            if (venc < dataReset) venc.setDate(venc.getDate() + 9000);
+// Funções de Máscara
+function mascaraCNPJ(input) {
+    let v = input.value.replace(/\D/g, ''); // Remove tudo que não é dígito
 
-            dataVencimento = venc.toISOString().split('T')[0];
-        }
+    if (v.length > 14) v = v.substring(0, 14); // Limita tamanho
+
+    // Coloca ponto entre o segundo e o terceiro dígitos
+    v = v.replace(/^(\d{2})(\d)/, "$1.$2");
+    // Coloca ponto entre o quinto e o sexto dígitos
+    v = v.replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3");
+    // Coloca uma barra entre o oitavo e o nono dígitos
+    v = v.replace(/\.(\d{3})(\d)/, ".$1/$2");
+    // Coloca um hífen depois do bloco de quatro dígitos
+    v = v.replace(/(\d{4})(\d)/, "$1-$2");
+
+    input.value = v;
+}
+
+function mascaraTelefone(input) {
+    let v = input.value.replace(/\D/g, "");
+
+    if (v.length > 11) v = v.substring(0, 11);
+
+    // Formatação dinâmica para 10 (fixo) ou 11 (celular) dígitos
+    if (v.length > 10) {
+        v = v.replace(/^(\d\d)(\d{5})(\d{4}).*/, "($1) $2-$3");
+    } else if (v.length > 5) {
+        v = v.replace(/^(\d\d)(\d{4})(\d{0,4}).*/, "($1) $2-$3");
+    } else if (v.length > 2) {
+        v = v.replace(/^(\d\d)(\d{0,5})/, "($1) $2");
     }
 
-    if (valor > 0) {
-        const campoValor = document.getElementById('boleto-valor');
-        campoValor.value = valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        mascaraMoedaInput(campoValor);
-        showToast("Valor identificado: R$ " + valor.toFixed(2));
-    }
-    if (dataVencimento) {
-        document.getElementById('boleto-venc').value = dataVencimento;
-        showToast("Vencimento: " + formatarDataBR(dataVencimento));
-        verificarVencimento();
-    }
+    input.value = v;
 }
 
 function verificarFornecedorPreenchido() {
@@ -903,6 +957,98 @@ function abrirModalReset(id, nome) {
     document.getElementById('modal-reset-senha').classList.remove('hidden');
 }
 
+async function excluirUsuario(id) {
+    if (!confirm("Tem certeza que deseja excluir este usuário permanentemente?")) return;
+
+    // Envia requisição POST com action 'excluir' para o admin.php
+    const res = await apiRequest('admin.php?action=excluir', 'POST', { id: id });
+
+    if (res && res.success) {
+        showToast("Usuário excluído com sucesso!", "success");
+        // Atualiza a lista de usuários na tela de configurações
+        carregarConfiguracoes();
+    } else {
+        showToast(res?.message || "Erro ao excluir usuário.", "error");
+    }
+}
+
+async function resetarCategorias() {
+    if (!confirm("Isso apagará todas as categorias personalizadas e restaurará as padrões. Continuar?")) return;
+
+    // Assume-se que o endpoint categorias.php aceite a action 'reset' ou similar
+    // Caso não tenha implementado no backend, será necessário criar a lógica lá.
+    const res = await apiRequest('categorias.php?action=reset', 'POST', {});
+
+    if (res && res.success) {
+        showToast("Categorias restauradas para o padrão.");
+        carregarCategoriasSistema(); // Atualiza os selects e a lista visual
+    } else {
+        showToast(res?.message || "Erro ao resetar categorias.", "error");
+    }
+}
+
+async function verDetalhes(tipo, titulo) {
+    // 1. Configura a UI do Modal
+    document.getElementById('modal-titulo').innerText = titulo;
+    document.getElementById('modal-detalhes').classList.remove('hidden');
+
+    const tbody = document.querySelector('#tabela-modal tbody');
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4"><div class="loader-spinner"></div> Buscando dados...</td></tr>';
+
+    // 2. Prepara os filtros para a API financeiro.php
+    const hoje = new Date().toISOString().split('T')[0];
+    let url = 'financeiro.php?pagina=1&limite=50'; // Traz até 50 registros para o detalhe
+
+    if (tipo === 'proximos') {
+        // Calcula data daqui a 7 dias
+        const futuro = new Date();
+        futuro.setDate(futuro.getDate() + 7);
+        const dataFim = futuro.toISOString().split('T')[0];
+
+        url += `&status=Pendente&data_inicio=${hoje}&data_fim=${dataFim}`;
+    } else if (tipo === 'vencidos') {
+        url += `&status=Vencido`; // O backend já filtra vencidos históricos
+    }
+
+    // 3. Requisição
+    const res = await apiRequest(url);
+    tbody.innerHTML = '';
+
+    // 4. Renderização
+    if (res && res.registros && res.registros.length > 0) {
+        res.registros.forEach(r => {
+            const tr = document.createElement('tr');
+
+            // Define classe de cor baseada no status
+            let badgeClass = 'status-Pendente';
+            if(r.status === 'Pago') badgeClass = 'status-Pago';
+            if(r.status === 'Vencido') badgeClass = 'status-Vencido';
+
+            tr.innerHTML = `
+                <td>${formatarDataBR(r.vencimento)}</td>
+                <td>${r.descricao}</td>
+                <td>${formatarMoedaBRL(r.valor)}</td>
+                <td><span class="status-badge ${badgeClass}">${r.status}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } else {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum registro encontrado para este período.</td></tr>';
+    }
+}
+
+function preFiltrarLista(status) {
+    // 1. Altera o valor do select de filtro na tela de Registros
+    const selectStatus = document.getElementById('filtro-status');
+    if (selectStatus) {
+        selectStatus.value = status;
+    }
+
+    // 2. Dispara o carregamento da lista com o novo filtro aplicado
+    // O parâmetro 1 indica para carregar a primeira página
+    carregarFinanceiro(1);
+}
+
 async function salvarNovoFornecedor() {
     const nome = document.getElementById('novo-forn-nome').value;
     const cnpj = document.getElementById('novo-forn-cnpj').value;
@@ -1056,6 +1202,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme) document.body.setAttribute('data-theme', savedTheme);
+
+        const inputCNPJ = document.getElementById('novo-forn-cnpj');
+        if (inputCNPJ) {
+            inputCNPJ.addEventListener('input', () => mascaraCNPJ(inputCNPJ));
+        }
+
+        const inputTel = document.getElementById('novo-forn-tel');
+        if (inputTel) {
+            inputTel.addEventListener('input', () => mascaraTelefone(inputTel));
+        }
 
         // Listeners de Teclado para Enter
         document.addEventListener('keydown', function (event) {

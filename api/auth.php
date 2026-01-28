@@ -81,8 +81,8 @@ try {
     }
 
 } catch (Exception $e) {
-    $httpCode = 500;
-    $response = ["success" => false, "message" => $e->getMessage()];
+    http_response_code(500); // Internal Server Error
+    $response = ["success" => false, "message" => "Erro Interno: " . $e->getMessage()];
 }
 
 // LIMPEZA FINAL E RESPOSTA
