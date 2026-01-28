@@ -1,31 +1,27 @@
 <?php
-// Desativa a exibição de erros na tela (vai apenas para o log)
+// api/auth.php
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Erros vão para o log, não para o navegador
+ini_set('display_errors', 0);
 header("Content-Type: application/json; charset=UTF-8");
 
-// Inicia sessão apenas se não existir
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
+if (session_status() === PHP_SESSION_NONE) session_start();
 include_once '../config/database.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
-// --- LOGOUT ---
+// Logout
 if ($action === 'logout') {
     session_destroy();
     echo json_encode(["success" => true]);
     exit;
 }
 
-// --- VERIFICAR SESSÃO (CHECK) ---
+// Check Sessão
 if ($action === 'check') {
-    if (isset($_SESSION['user_id'])) { // Alterado de $_SESSION['id'] para 'user_id'
+    if (isset($_SESSION['user_id'])) {
         echo json_encode([
-            "id" => $_SESSION['user_id'],   // Front-end espera "id"
+            "id" => $_SESSION['user_id'],
             "nome" => $_SESSION['user_nome'],
             "funcao" => $_SESSION['user_funcao']
         ]);
@@ -36,51 +32,42 @@ if ($action === 'check') {
     exit;
 }
 
-// --- LOGIN (POST) ---
+// Login
 if ($method === 'POST') {
     $data = json_decode(file_get_contents("php://input"));
-
-    if (!isset($data->usuario) || !isset($data->senha)) {
-        echo json_encode(["success" => false, "message" => "Dados incompletos"]);
-        exit;
-    }
-
-    $database = new Database();
-    $db = $database->getConnection();
+    $db = (new Database())->getConnection();
 
     if (!$db) {
-        // Retorna erro JSON válido em vez de texto
-        echo json_encode(["success" => false, "message" => "Erro conexão banco"]);
+        echo json_encode(["success" => false, "message" => "Erro conexão DB"]);
         exit;
     }
 
-    // Busca usuário
-    $query = "SELECT id, nome, senha, funcao FROM Usuario WHERE usuario = :usuario LIMIT 1";
-    $stmt = $db->prepare($query);
-    $stmt->bindParam(":usuario", $data->usuario);
-    $stmt->execute();
+    $stmt = $db->prepare("SELECT id, nome, senha, funcao FROM Usuario WHERE usuario = :u LIMIT 1");
+    $stmt->execute([':u' => $data->usuario ?? '']);
 
     if ($stmt->rowCount() > 0) {
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // Verifica senha (texto puro conforme seu banco atual)
-        if ($data->senha === $row['senha']) {
-            $_SESSION['user_id'] = $row['id']; // Padronizado para user_id
+        // VERIFICAÇÃO SEGURA (HASH)
+        if (password_verify($data->senha, $row['senha'])) {
+            $_SESSION['user_id'] = $row['id'];
             $_SESSION['user_nome'] = $row['nome'];
             $_SESSION['user_funcao'] = $row['funcao'];
 
+            // Log de acesso (opcional)
+            registrarLog($db, $row['nome'], "Login", "Sucesso via Web");
+
             echo json_encode([
                 "success" => true,
-                "id" => $row['id'],           // Garantindo que retorne "id" para o script.js
+                "id" => $row['id'],
                 "nome" => $row['nome'],
                 "funcao" => $row['funcao']
             ]);
-        } else {
-            echo json_encode(["success" => false, "message" => "Senha incorreta"]);
+            exit;
         }
-    } else {
-        echo json_encode(["success" => false, "message" => "Usuário não encontrado"]);
     }
+
+    echo json_encode(["success" => false, "message" => "Usuário ou senha incorretos"]);
     exit;
 }
 ?>

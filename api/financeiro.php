@@ -7,7 +7,7 @@ header("Content-Type: application/json; charset=UTF-8");
 session_start();
 require_once '../config/database.php';
 
-// Verifica sessão (Segurança básica)
+// Verificação de Segurança da Sessão
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Não autorizado']);
@@ -16,98 +16,148 @@ if (!isset($_SESSION['user_id'])) {
 
 $database = new Database();
 $db = $database->getConnection();
+$userNome = $_SESSION['user_nome'] ?? 'Usuário';
 
 $method = $_SERVER['REQUEST_METHOD'];
-$action = $_GET['action'] ?? ''; // Captura a ação da URL
+$action = $_GET['action'] ?? '';
+$id = $_GET['id'] ?? null;
 
-// --- AÇÃO: SALVAR (CRIAR NOVO BOLETO) ---
-if ($method === 'POST' && $action === 'salvar') {
+// --- LISTAGEM (GET) ---
+if ($method === 'GET') {
+    try {
+        // Filtros
+        $busca = $_GET['busca'] ?? '';
+        $status = $_GET['status'] ?? 'Todos';
+        $cat = $_GET['categoria'] ?? 'Todas';
+        $dInicio = $_GET['data_inicio'] ?? '';
+        $dFim = $_GET['data_fim'] ?? '';
+
+        // Paginação
+        $pagina = isset($_GET['pagina']) ? (int)$_GET['pagina'] : 1;
+        $limite = 20;
+        $offset = ($pagina - 1) * $limite;
+
+        // Construção da Query
+        $sql = "SELECT * FROM Financeiro WHERE 1=1";
+        $params = [];
+
+        if (!empty($busca)) {
+            $sql .= " AND (descricao LIKE :busca OR codigo_barras LIKE :busca)";
+            $params[':busca'] = "%$busca%";
+        }
+        if ($status !== 'Todos') {
+            $sql .= " AND status = :status";
+            $params[':status'] = $status;
+        }
+        if ($cat !== 'Todas') {
+            $sql .= " AND categoria = :cat";
+            $params[':cat'] = $cat;
+        }
+        if (!empty($dInicio) && !empty($dFim)) {
+            $sql .= " AND vencimento BETWEEN :dini AND :dfim";
+            $params[':dini'] = $dInicio;
+            $params[':dfim'] = $dFim;
+        }
+
+        // Count Total para Paginação
+        $sqlCount = str_replace("SELECT *", "SELECT COUNT(*) as total", $sql);
+        $stmtCount = $db->prepare($sqlCount);
+        $stmtCount->execute($params);
+        $totalRegs = $stmtCount->fetch(PDO::FETCH_ASSOC)['total'];
+        $totalPgs = ceil($totalRegs / $limite);
+
+        // Executa Query Final
+        $sql .= " ORDER BY vencimento ASC LIMIT $limite OFFSET $offset";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'registros' => $registros,
+            'total_paginas' => $totalPgs,
+            'pagina_atual' => $pagina
+        ]);
+
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// --- SALVAR / EDITAR (POST) ---
+if ($method === 'POST' && ($action === 'salvar' || empty($action))) {
     $data = json_decode(file_get_contents("php://input"));
 
+    // Validação Básica
     if (empty($data->descricao) || empty($data->valor) || empty($data->vencimento)) {
         echo json_encode(['success' => false, 'message' => 'Dados incompletos']);
         exit;
     }
 
     try {
-        // Insere na tabela Financeiro
-        // Nota: Status padrão é 'Pendente' (definido no banco)
-        $query = "INSERT INTO Financeiro (descricao, valor, vencimento, categoria, codigo_barras, status) 
-                  VALUES (:descricao, :valor, :vencimento, :categoria, :codigo, 'Pendente')";
+        if (!empty($data->id)) {
+            // EDITAR
+            $query = "UPDATE Financeiro SET descricao=:d, valor=:v, vencimento=:ve, categoria=:c, status=:s, codigo_barras=:cb WHERE id=:id";
+            $stmt = $db->prepare($query);
+            $stmt->bindValue(':id', $data->id);
+            $acaoLog = "Editar Registro";
+        } else {
+            // NOVO
+            $query = "INSERT INTO Financeiro (descricao, valor, vencimento, categoria, status, codigo_barras) VALUES (:d, :v, :ve, :c, :s, :cb)";
+            $stmt = $db->prepare($query);
+            $acaoLog = "Criar Registro";
+        }
 
-        $stmt = $db->prepare($query);
-
-        $stmt->bindParam(':descricao', $data->descricao);
-        $stmt->bindParam(':valor', $data->valor);
-        $stmt->bindParam(':vencimento', $data->vencimento);
-        $stmt->bindParam(':categoria', $data->categoria);     // Espera String (ex: "Água")
-        $stmt->bindParam(':codigo', $data->codigo_barras);
+        $stmt->bindValue(':d', $data->descricao);
+        $stmt->bindValue(':v', $data->valor);
+        $stmt->bindValue(':ve', $data->vencimento);
+        $stmt->bindValue(':c', $data->categoria);
+        $stmt->bindValue(':s', $data->status ?? 'Pendente');
+        $stmt->bindValue(':cb', $data->codigo_barras ?? '');
 
         if ($stmt->execute()) {
+            registrarLog($db, $userNome, $acaoLog, "Desc: {$data->descricao} | Val: {$data->valor}");
             echo json_encode(['success' => true]);
         } else {
-            echo json_encode(['success' => false, 'message' => 'Erro ao inserir no banco']);
+            echo json_encode(['success' => false, 'message' => 'Erro SQL']);
         }
     } catch (PDOException $e) {
-        echo json_encode(['success' => false, 'message' => 'Erro SQL: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
     exit;
 }
 
-// --- AÇÃO: LISTAR (PARA O DASHBOARD) ---
-if ($method === 'GET') {
-    $status = $_GET['status'] ?? null; // Opcional: filtrar por 'Pendente' ou 'Pago'
+// --- BAIXAR/PAGAR (POST) ---
+if ($method === 'POST' && $action === 'baixar') {
+    if (!$id) { echo json_encode(['success' => false]); exit; }
 
-    try {
-        $sql = "SELECT * FROM Financeiro";
-        if ($status) {
-            $sql .= " WHERE status = :status";
-        }
-        $sql .= " ORDER BY vencimento ASC";
-
-        $stmt = $db->prepare($sql);
-        if ($status) {
-            $stmt->bindParam(':status', $status);
-        }
-        $stmt->execute();
-
-        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        // Formatar valores para o front
-        foreach ($result as &$row) {
-            $row['valor_fmt'] = "R$ " . number_format((float)$row['valor'], 2, ',', '.');
-            $row['vencimento_fmt'] = date('d/m/Y', strtotime($row['vencimento']));
-        }
-
-        echo json_encode($result);
-
-    } catch (PDOException $e) {
-        echo json_encode(['error' => $e->getMessage()]);
+    $stmt = $db->prepare("UPDATE Financeiro SET status='Pago', data_processamento=NOW() WHERE id=:id");
+    if ($stmt->execute([':id' => $id])) {
+        registrarLog($db, $userNome, "Baixar Boleto", "ID: $id");
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Erro ao baixar']);
     }
     exit;
 }
 
-// --- AÇÃO: PAGAR (DAR BAIXA) ---
-if ($method === 'POST' && $action === 'pagar') {
-    $data = json_decode(file_get_contents("php://input"));
+// --- EXCLUIR (POST ou DELETE) ---
+if (($method === 'POST' && $action === 'excluir') || $method === 'DELETE') {
+    $idDel = $id ?? $_GET['id'] ?? null;
+    if (!$idDel) { echo json_encode(['success' => false]); exit; }
 
-    if (empty($data->id)) {
-        echo json_encode(['success' => false, 'message' => 'ID não informado']);
-        exit;
-    }
+    // Busca dados antes de apagar para o log
+    $stmtBusca = $db->prepare("SELECT descricao, valor FROM Financeiro WHERE id=:id");
+    $stmtBusca->execute([':id' => $idDel]);
+    $reg = $stmtBusca->fetch(PDO::FETCH_ASSOC);
 
-    try {
-        $query = "UPDATE Financeiro SET status = 'Pago', data_processamento = NOW() WHERE id = :id";
-        $stmt = $db->prepare($query);
-        $stmt->bindParam(':id', $data->id);
-
-        if ($stmt->execute()) {
-            echo json_encode(['success' => true]);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Erro ao atualizar']);
-        }
-    } catch (PDOException $e) {
-        echo json_encode(['success' => false, 'message' => 'Erro SQL: ' . $e->getMessage()]);
+    $stmt = $db->prepare("DELETE FROM Financeiro WHERE id=:id");
+    if ($stmt->execute([':id' => $idDel])) {
+        registrarLog($db, $userNome, "Excluir Registro", "ID: $idDel | {$reg['descricao']}");
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Erro ao excluir']);
     }
     exit;
 }

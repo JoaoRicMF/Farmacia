@@ -5,34 +5,44 @@ header("Content-Type: application/json; charset=UTF-8");
 session_start();
 include_once '../config/database.php';
 
-if (!isset($_SESSION['user_id'])) { http_response_code(401); exit; }
-
-$db = (new Database())->getConnection();
-$method = $_SERVER['REQUEST_METHOD'];
-
-// Listar categorias
-if ($method === 'GET') {
-    $stmt = $db->query("SELECT * FROM Categorias ORDER BY nome ");
-    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401); // Unauthorized
+    echo json_encode(["success" => false, "message" => "Não autorizado"]);
     exit;
 }
 
-// Salvar nova categoria
-if ($method === 'POST') {
-    $data = json_decode(file_get_contents("php://input"));
-    if (empty($data->nome)) {
-        echo json_encode(["success" => false, "message" => "Nome obrigatório"]);
-        exit;
+$database = new Database();
+$db = $database->getConnection();
+$method = $_SERVER['REQUEST_METHOD'];
+
+// Listar categorias
+try {
+    if ($method === 'GET') {
+        $stmt = $db->query("SELECT * FROM Categorias ORDER BY nome ASC");
+        $categorias = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($categorias);
     }
 
-    $stmt = $db->prepare("INSERT INTO Categorias (nome, cor) VALUES (:nome, :cor)");
-    $success = $stmt->execute([
-        ':nome' => $data->nome,
-        ':cor' => $data->cor ?? '#3b82f6'
-    ]);
+// Salvar nova categoria
+    if ($method === 'POST') {
+        $data = json_decode(file_get_contents("php://input"));
+        if (empty($data->nome)) {
+            echo json_encode(["success" => false, "message" => "Nome obrigatório"]);
+            exit;
+        }
 
-    echo json_encode(["success" => $success]);
-    exit;
+        $stmt = $db->prepare("INSERT INTO Categorias (nome, cor) VALUES (:nome, :cor)");
+        $success = $stmt->execute([
+            ':nome' => $data->nome,
+            ':cor' => $data->cor ?? '#3b82f6'
+        ]);
+
+        echo json_encode(["success" => $success]);
+        exit;
+    }
+}catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(["success" => false, "message" => "Erro no banco de dados"]);
 }
 
 // Excluir categoria

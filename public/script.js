@@ -31,29 +31,73 @@ const LOADER_HTML = `
    ========================================================================== */
 
 // Wrapper para Fetch (Trata Erros e JSON)
-async function apiRequest(endpoint, method = 'GET', body = null) {
+async function apiRequest(url, method = 'GET', body = null) {
     const options = {
-        method,
-        headers: { 'Content-Type': 'application/json' }
+        method: method,
+        headers: {}
     };
-    if (body) options.body = JSON.stringify(body);
+
+    if (body) {
+        options.headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(body);
+    }
 
     try {
-        const response = await fetch(`${CONFIG.API_URL}${endpoint}`, options);
-        const text = await response.text(); // Lê como texto primeiro para validar
+        const response = await fetch(url, options);
+
+        // Se for erro de autenticação (401), força logout visual e retorna null
+        if (response.status === 401) {
+            console.warn("Sessão expirada ou não iniciada.");
+            alternarTelas('login');
+            return null;
+        }
+
+        const text = await response.text();
 
         try {
-            const data = JSON.parse(text);
-            if (!response.ok) throw new Error(data.error || data.message || `Erro ${response.status}`);
-            return data;
+            return text ? JSON.parse(text) : {}; // Tenta parsear JSON
         } catch (e) {
-            console.error("Resposta inválida do servidor:", text);
+            console.error("Erro ao processar JSON:", text);
             throw new Error("O servidor não retornou um JSON válido.");
         }
+
     } catch (error) {
-        console.error(`Erro em ${endpoint}:`, error);
-        showToast(error.message, "error"); // Mostra o erro real na tela
+        console.error("Erro na requisição:", error);
+        showToast(error.message, true);
         return null;
+    }
+}
+async function checkSession() {
+    // Chama a API para ver se está logado
+    const data = await apiRequest('/api/auth.php?action=check');
+
+    if (data && data.id) {
+        // Sucesso: Configura UI e carrega dados
+        document.getElementById('user-name').textContent = data.nome;
+        alternarTelas('dashboard');
+
+        // SÓ carrega os dados se estiver logado
+        await carregarDashboard();
+        // Carrega categorias em background
+        carregarCategoriasSistema();
+        return true;
+    } else {
+        // Falha: Mostra login
+        alternarTelas('login');
+        return false;
+    }
+}
+
+function alternarTelas(tela) {
+    // Esconde tudo
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('app-screen').classList.add('hidden');
+
+    // Mostra o desejado
+    if (tela === 'login') {
+        document.getElementById('login-screen').classList.remove('hidden');
+    } else {
+        document.getElementById('app-screen').classList.remove('hidden');
     }
 }
 
@@ -603,82 +647,77 @@ function mudarPagina(delta) {
    7. AUTOMAÇÃO (LEITOR DE CÓDIGO E AUTO-COMPLETE)
    ========================================================================== */
 
-function lerCodigoBarras(codigo) {
-    // Remove qualquer caractere que não seja número
-    const numerico = codigo.replace(/[^0-9]/g, '');
-    const tam = numerico.length;
+function lerCodigoBarras() {
+    const inputCod = document.getElementById('boleto-cod');
+    const codigo = inputCod.value.replace(/[^0-9]/g, ''); // Apenas números
 
-    let resultado = {
-        valor: 0.0,
-        vencimento: null,
-        tipo: "Desconhecido",
-        valido: false
-    };
+    if (codigo.length < 44) return; // Ignora se for muito curto
 
-    // 1. BOLETOS DE CONCESSIONÁRIA / TRIBUTOS (48 DÍGITOS)
-    // Ex: Água, Luz, Telefone, IPTU, DARF
-    if (numerico.startsWith('8') && (tam === 48 || tam === 44)) {
-        resultado.tipo = "Concessionária/Tributo";
+    let valor = 0.0;
+    let dataVencimento = null;
+    let ehBoletoBancario = false;
 
-        let linhaLimpa = numerico;
-        if (tam === 48) {
-            // Remove os dígitos verificadores das posições 12, 24, 36 e 48
-            linhaLimpa = numerico.substring(0, 11) +
-                numerico.substring(12, 23) +
-                numerico.substring(24, 35) +
-                numerico.substring(36, 47);
-        }
-
-        // O valor começa na posição 4 e tem 11 dígitos
-        const valorStr = linhaLimpa.substring(4, 15);
-        resultado.valor = parseFloat(valorStr) / 100;
-        resultado.valido = true;
+    // --- TIPO 1: Arrecadação (Começa com 8) ---
+    if (codigo.startsWith('8')) {
+        // Lógica de 48 dígitos (Concessionárias)
+        // Valor geralmente está nas posições 4 a 15 (11 digitos) ignorando verificadores se for linha digitável
+        // Simples aproximação para demonstração:
+        let blocoValor = codigo.substring(4, 15);
+        valor = parseFloat(blocoValor) / 100;
     }
+    // --- TIPO 2: Bancário (Começa com outros, padrão 47 ou 44) ---
+    else {
+        ehBoletoBancario = true;
+        let fator = '';
+        let valorStr = '';
 
-    // 2. BOLETOS BANCÁRIOS (47 DÍGITOS OU 44 DO CÓDIGO DE BARRAS)
-    else if (tam === 47 || tam === 44) {
-        resultado.tipo = "Bancário";
-
-        let fator = "";
-        let valorStr = "";
-
-        if (tam === 47) {
-            // Linha Digitável: Fator (33-37), Valor (37-47)
-            fator = numerico.substring(33, 37);
-            valorStr = numerico.substring(37);
-        } else {
-            // Código de Barras: Fator (5-9), Valor (9-19)
-            fator = numerico.substring(5, 9);
-            valorStr = numerico.substring(9, 19);
+        if (codigo.length === 47) {
+            // Linha digitável: Fator pos 33-37 (4 digitos), Valor pos 37-fim
+            fator = codigo.substring(33, 37);
+            valorStr = codigo.substring(37);
+        } else if (codigo.length === 44) {
+            // Código de barras puro: Fator pos 5-9, Valor pos 9-19
+            fator = codigo.substring(5, 9);
+            valorStr = codigo.substring(9, 19);
         }
 
-        resultado.valor = parseFloat(valorStr) / 100;
+        valor = parseFloat(valorStr) / 100;
 
-        // Cálculo da Data com regra de 2026
-        if (fator && fator !== "0000") {
+        // CÁLCULO DE DATA (Fator de Vencimento)
+        if (fator && parseInt(fator) > 0) {
             const dataBase = new Date(1997, 9, 7); // 07/10/1997
-            let dataVencimento = new Date(dataBase);
-            dataVencimento.setDate(dataBase.getDate() + parseInt(fator));
+            const diasFator = parseInt(fator);
 
-            // Regra de Ouro: O fator resetou em 22/02/2022 (virou 1000 novamente)
-            // Para boletos de 2025/2026, se a data calculada for antiga, somamos 9000 dias.
-            const dataCorte = new Date(2022, 1, 22); // Fevereiro é mês 1 no JS
-            if (dataVencimento < dataCorte) {
-                dataVencimento.setDate(dataVencimento.getDate() + 9000);
+            // Adiciona os dias do fator à data base
+            let venc = new Date(dataBase);
+            venc.setDate(dataBase.getDate() + diasFator);
+
+            // REGRA DE 2025/2026 (Pós-Reset de Fev/2022)
+            // Se a data calculada for anterior ao reset (21/02/2022), significa que estamos no novo ciclo
+            // Devemos somar 9000 dias (tamanho aproximado do ciclo do fator)
+            const dataReset = new Date(2022, 1, 21);
+            if (venc < dataReset) {
+                venc.setDate(venc.getDate() + 9000); // Avança o ciclo
             }
 
-            resultado.vencimento = dataVencimento.toISOString().split('T')[0];
+            dataVencimento = venc.toISOString().split('T')[0];
         }
-        resultado.valido = true;
     }
 
-    // 3. DETECÇÃO DE PIX (BR Code)
-    if (codigo.startsWith('000201')) {
-        resultado.tipo = "PIX Copia e Cola";
-        resultado.valido = true;
+    // Preenchimento Automático
+    if (valor > 0) {
+        const campoValor = document.getElementById('boleto-valor');
+        campoValor.value = valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        // Aciona formatação manual para remover o simbolo R$ se o input for do tipo text simples com mascara
+        mascaraMoedaInput(campoValor);
+        showToast("Valor identificado: R$ " + valor.toFixed(2));
     }
 
-    return resultado;
+    if (dataVencimento) {
+        document.getElementById('boleto-venc').value = dataVencimento;
+        showToast("Vencimento identificado: " + formatarDataBR(dataVencimento));
+        verificarVencimento(); // Atualiza alerta visual
+    }
 }
 
 function verificarFornecedorPreenchido() {
@@ -844,15 +883,19 @@ async function carregarCategoriasSistema() {
     const categorias = await apiRequest('/categorias.php');
     if (!categorias || !Array.isArray(categorias)) return;
 
-    // 1. Atualiza todos os Dropdowns (Selects)
-    const selects = ['filtro-cat', 'boleto-cat', 'edit-cat', 'novo-forn-cat'];
-    selects.forEach(id => {
+    // Lista de IDs de selects que precisam ser populados
+    const selectsAlvo = ['filtro-cat', 'boleto-cat', 'edit-cat', 'novo-forn-cat'];
+
+    selectsAlvo.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
 
-        const valorAtual = el.value; // Mantém seleção se houver
-        const temTodas = el.querySelector('option[value="Todas"]');
-        el.innerHTML = temTodas ? '<option value="Todas">Todas as Categorias</option>' : '';
+        const valorSelecionado = el.value; // Tenta preservar seleção
+
+        // Mantém a opção padrão inicial (Ex: "Todas" ou "Selecione...")
+        const opcaoPadrao = el.firstElementChild ? el.firstElementChild.cloneNode(true) : null;
+        el.innerHTML = '';
+        if (opcaoPadrao) el.appendChild(opcaoPadrao);
 
         categorias.forEach(cat => {
             const opt = document.createElement('option');
@@ -860,10 +903,12 @@ async function carregarCategoriasSistema() {
             opt.textContent = cat.nome;
             el.appendChild(opt);
         });
-        el.value = valorAtual;
+
+        // Restaura valor se ainda existir na lista
+        if (valorSelecionado) el.value = valorSelecionado;
     });
 
-    // 2. Renderiza a lista na aba de Configurações para maior dinamicidade
+    // Atualiza lista visual na config
     renderizarListaCategoriasConfig(categorias);
 }
 
