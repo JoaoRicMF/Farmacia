@@ -1,5 +1,10 @@
+# .htaccess na raiz do projeto
 RewriteEngine On
-RewriteBase /api/
+RewriteBase /
+
+# Se o arquivo ou diretório solicitado existir fisicamente (como /api/auth.php), use-o diretamente
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
 
 # --- Autenticação ---
 RewriteRule ^login$ auth.php?action=login [L,QSA]
@@ -29,3 +34,6 @@ RewriteRule ^exportar$ exportar.php [L,QSA]
 # --- Admin (Logs e Usuários) ---
 RewriteRule ^logs$ admin.php?resource=logs [L,QSA]
 RewriteRule ^usuarios$ admin.php?resource=usuarios [L,QSA]
+
+# Caso contrário, redirecione para o index.html (Suporte para SPA)
+RewriteRule ^ index.html [L]

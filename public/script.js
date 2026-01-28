@@ -6,7 +6,7 @@
    1. CONFIGURAÇÕES E ESTADO GLOBAL
    ========================================================================== */
 const CONFIG = {
-    API_URL: '/api', // Caminho relativo para funcionar com php -S
+    API_URL: '/api', // Se o index.html estiver na raiz, /api é o caminho correto
     ANIMATION_SPEED: 300
 };
 
@@ -30,8 +30,10 @@ const LOADER_HTML = `
    2. UTILITÁRIOS (HELPERS)
    ========================================================================== */
 
-// Wrapper para Fetch (Trata Erros e JSON)
+// 2. Blindagem da função apiRequest
 async function apiRequest(url, method = 'GET', body = null) {
+    const fullUrl = url.startsWith('http') ? url : `${CONFIG.API_URL}${url.startsWith('/') ? url : '/' + url}`;
+
     const options = {
         method: method,
         headers: { 'Accept': 'application/json' }
@@ -43,32 +45,23 @@ async function apiRequest(url, method = 'GET', body = null) {
     }
 
     try {
-        const response = await fetch(url, options);
+        const response = await fetch(fullUrl, options);
+        const contentType = response.headers.get('content-type');
+
+        // Validação crucial: impede que o JS tente ler o index.html como se fosse JSON
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error("O servidor retornou HTML em vez de JSON. Verifique as rotas do servidor.");
+        }
 
         if (response.status === 401) {
-            alternarTelas('login');
+            window.location.reload(); // Ou redirecionar para login
             return null;
         }
 
-        const rawText = await response.text();
-
-        try {
-            // Tenta converter o texto puro em Objeto JS
-            return JSON.parse(rawText);
-        } catch (parseError) {
-            // DEBUG DA API: Mostra exatamente o que quebrou o JSON
-            console.group("⚠️ ERRO DE RESPOSTA DA API ⚠️");
-            console.error("URL:", url);
-            console.error("Erro no JSON.parse:", parseError);
-            console.log("Conteúdo bruto recebido do servidor:", rawText);
-            console.groupEnd();
-
-            showToast("Erro no servidor. Veja o console (F12).", "error");
-            return null;
-        }
-
+        return await response.json();
     } catch (error) {
-        console.error("Erro de Rede:", error);
+        console.error("Erro na requisição:", error.message);
+        alert(error.message);
         return null;
     }
 }
@@ -173,13 +166,15 @@ async function login(event) {
     const user = document.getElementById('login-user').value;
     const pass = document.getElementById('login-pass').value;
     const btn = document.getElementById('btn-entrar');
+    const formData = new FormData(event.target);
+    const data = Object.fromEntries(formData.entries());
 
     if (!user || !pass) return showToast("Preencha usuário e senha.", "error");
 
     btn.disabled = true;
     btn.innerText = "Entrando...";
 
-    const res = await apiRequest('/auth.php', 'POST', {
+    const res = await apiRequest('auth.php', 'POST', {
         usuario: user,
         senha: pass
     });
