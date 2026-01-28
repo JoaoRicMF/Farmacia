@@ -2,42 +2,46 @@
 // api/fluxo.php
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
+
+// Inicia buffer para evitar output indesejado antes do JSON
+ob_start();
+
 header("Content-Type: application/json; charset=UTF-8");
 session_start();
-include_once '../config/database.php';
 
-// CORREÇÃO: Verifica 'user_id' em vez de 'id' (conforme padronizado no auth.php)
+require_once '../config/database.php';
+
+// 1. VERIFICAÇÃO DE SEGURANÇA (Centralizada)
 if (!isset($_SESSION['user_id'])) {
+    ob_clean(); // Limpa buffer
     http_response_code(401);
     echo json_encode(["message" => "Não autorizado"]);
     exit;
 }
 
-$database = new Database();
-$db = $database->getConnection();
-
-if (!$db) {
-    echo json_encode(["error" => "Erro de conexão"]);
+// 2. CONEXÃO SEGURA COM O BANCO
+$db = null;
+try {
+    $database = new Database();
+    $db = $database->getConnection();
+} catch (Exception $e) {
+    ob_clean();
+    http_response_code(500);
+    echo json_encode(["error" => "Erro crítico ao conectar no banco: " . $e->getMessage()]);
     exit;
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
+$userId = $_SESSION['user_id']; // Já garantido pela verificação do topo
 
-// --- SALVAR MOVIMENTAÇÃO ---
+// --- AÇÃO: SALVAR MOVIMENTAÇÃO (POST) ---
 if ($method === 'POST' && $action === 'salvar') {
-    $data = json_decode(file_get_contents("php://input"));
+    $rawInput = file_get_contents("php://input");
+    $data = json_decode($rawInput);
 
-    if (!$data->tipo || !$data->valor || !$data->data_registro) {
-        echo json_encode(["success" => false, "message" => "Dados incompletos"]);
-        exit;
-    }
-
-    // CORREÇÃO: Recupera o ID correto da sessão
-    $userId = $_SESSION['user_id'] ?? null;
-
-    if (!$userId) {
-        echo json_encode(["success" => false, "message" => "Usuário não autenticado"]);
+    if (!$data || !isset($data->tipo) || !isset($data->valor) || !isset($data->data_registro)) {
+        echo json_encode(["success" => false, "message" => "Dados incompletos ou JSON inválido"]);
         exit;
     }
 
@@ -48,11 +52,12 @@ if ($method === 'POST' && $action === 'salvar') {
             $stmt = $db->prepare($sql);
             $params = [
                 ":data"  => $data->data_registro,
-                ":forma" => $data->descricao, // Front envia 'descricao', mapeamos para 'formaPagamento'
+                ":forma" => $data->descricao,
                 ":valor" => $data->valor,
                 ":user"  => $userId
             ];
         } else {
+            // SAÍDA
             $sql = "INSERT INTO SaidaCaixa (dataRegistro, descricao, valor, id) 
                     VALUES (:data, :desc, :valor, :user)";
             $stmt = $db->prepare($sql);
@@ -75,34 +80,55 @@ if ($method === 'POST' && $action === 'salvar') {
     exit;
 }
 
-// --- LISTAR FLUXO ---
+// --- AÇÃO: LISTAR FLUXO (GET) ---
 if ($method === 'GET') {
     $mes = $_GET['mes'] ?? date('Y-m');
 
-    if (strpos($mes, '-') === false) {
+    // Validação básica do formato YYYY-MM
+    if (!preg_match('/^\d{4}-\d{2}$/', $mes)) {
         $mes = date('Y-m');
     }
 
     list($ano, $mesNum) = explode('-', $mes);
 
     try {
-        // Entradas
-        $stmt = $db->prepare("SELECT id as id, dataRegistro as data, formaPagamento as descricao, valor, 'ENTRADA' as tipo, 'Vendas' as categoria FROM EntradaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
+        // 1. Entradas de Caixa
+        $stmt = $db->prepare("
+            SELECT id, dataRegistro as data, formaPagamento as descricao, valor, 
+            'ENTRADA' as tipo, 'Vendas' as categoria 
+            FROM EntradaCaixa 
+            WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a
+        ");
         $stmt->execute([':m' => $mesNum, ':a' => $ano]);
         $entradas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Saídas
-        $stmt = $db->prepare("SELECT id as id, dataRegistro as data, descricao, valor, 'SAIDA' as tipo, 'Sangria/Despesa' as categoria FROM SaidaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
+        // 2. Saídas de Caixa
+        $stmt = $db->prepare("
+            SELECT id, dataRegistro as data, descricao, valor, 
+            'SAIDA' as tipo, 'Sangria/Despesa' as categoria 
+            FROM SaidaCaixa 
+            WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a
+        ");
         $stmt->execute([':m' => $mesNum, ':a' => $ano]);
         $saidas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Pagamentos (Financeiro)
-        $stmt = $db->prepare("SELECT id, COALESCE(data_processamento, vencimento) as data, descricao, valor, 'SAIDA' as tipo, categoria FROM Financeiro WHERE status = 'Pago' AND MONTH(COALESCE(data_processamento, vencimento)) = :m AND YEAR(COALESCE(data_processamento, vencimento)) = :a");
+        // 3. Contas Pagas (Tabela Financeiro)
+        // Usa COALESCE para pegar data_processamento se existir, senão usa vencimento
+        $stmt = $db->prepare("
+            SELECT id, COALESCE(data_processamento, vencimento) as data, descricao, valor, 
+            'SAIDA' as tipo, categoria 
+            FROM Financeiro 
+            WHERE status = 'Pago' 
+            AND MONTH(COALESCE(data_processamento, vencimento)) = :m 
+            AND YEAR(COALESCE(data_processamento, vencimento)) = :a
+        ");
         $stmt->execute([':m' => $mesNum, ':a' => $ano]);
         $pagos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Mescla tudo
         $movimentacoes = array_merge($entradas, $saidas, $pagos);
 
+        // Ordena por data (mais recente primeiro)
         usort($movimentacoes, function($a, $b) {
             return strtotime($b['data']) - strtotime($a['data']);
         });
@@ -110,9 +136,13 @@ if ($method === 'GET') {
         $totalEnt = 0;
         $totalSai = 0;
 
+        // Formata valores
         foreach ($movimentacoes as &$mov) {
             $val = floatval($mov['valor']);
             $mov['valor_fmt'] = "R$ " . number_format($val, 2, ',', '.');
+
+            // Garante data no formato BR para o front
+            $mov['data_fmt']  = date('d/m/Y', strtotime($mov['data']));
 
             if ($mov['tipo'] == 'ENTRADA') {
                 $totalEnt += $val;
@@ -129,6 +159,7 @@ if ($method === 'GET') {
         ]);
 
     } catch (PDOException $e) {
+        http_response_code(500);
         echo json_encode(["error" => "Erro ao buscar dados: " . $e->getMessage()]);
     }
 }

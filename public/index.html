@@ -5,18 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="">
-    <link rel="stylesheet" href="style.css">
-    <title>Financeiro Farmácia Nova Farma</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="script.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+    <title>Financeiro Farmácia Nova Farma</title>
 </head>
 
 <body>
 
 <div id="mobile-overlay" onclick="toggleSidebar()"></div>
-
 <div id="toast-container"></div>
 
 <div id="login-screen" class="view-section">
@@ -26,12 +25,14 @@
 
         <form onsubmit="event.preventDefault(); fazerLogin();">
             <div class="input-wrapper">
-                <input type="text" id="login-user" name="usuario" placeholder="Usuário" aria-label="Nome de Usuário" autocomplete="username" required>
+                <label for="login-user" class="sr-only">Usuário</label>
+                <input type="text" id="login-user" name="usuario" placeholder="Usuário" autocomplete="username" required>
             </div>
 
             <div class="input-wrapper">
-                <input type="password" id="login-pass" name="senha" placeholder="Senha" aria-label="Senha" autocomplete="current-password" required>
-                <span class="toggle-pass" onclick="toggleSenha()" role="button" tabindex="0">👁️</span>
+                <label for="login-pass" class="sr-only">Senha</label>
+                <input type="password" id="login-pass" name="senha" placeholder="Senha" autocomplete="current-password" required>
+                <span class="toggle-pass" onclick="toggleSenha()" role="button" tabindex="0" aria-label="Mostrar senha">👁️</span>
             </div>
 
             <button type="submit" class="btn-login" id="btn-entrar">Acessar Painel</button>
@@ -59,7 +60,6 @@
 
         <nav class="sidebar-menu">
             <div class="menu-label">Módulos</div>
-
             <div class="menu-item active" onclick="nav('dashboard', this)">
                 <i data-lucide="layout-dashboard"></i> <span>Dashboard</span>
             </div>
@@ -82,7 +82,6 @@
 
         <div class="sidebar-footer" style="padding: 10px 12px; margin-top: auto;">
             <div class="menu-label">Sistema</div>
-
             <div class="menu-item" onclick="toggleDarkMode()">
                 <i data-lucide="moon"></i> <span id="text-theme">Tema</span>
             </div>
@@ -97,7 +96,7 @@
         <div id="view-dashboard" class="view-section">
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Abrir Menu">☰</button>
                     <h1>Dashboard</h1>
                 </div>
             </div>
@@ -193,7 +192,7 @@
         <div id="view-fluxo" class="view-section hidden">
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Abrir Menu">☰</button>
                     <h1>Fluxo de Caixa</h1>
                 </div>
 
@@ -323,7 +322,7 @@
             <input type="hidden" id="boleto-id-hidden">
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Abrir Menu">☰</button>
                     <h1 id="form-titulo">Novo Lançamento</h1>
                 </div>
                 <small class="no-print" style="color: var(--text-light);">
@@ -331,7 +330,7 @@
                 </small>
             </div>
 
-            <form id="form-boleto" class="card" style="max-width: 800px;">
+            <form id="form-boleto" class="card" style="max-width: 800px;" onsubmit="event.preventDefault()">
 
                 <div class="form-row">
                     <div class="full-width">
@@ -400,7 +399,7 @@
         <div id="view-lista" class="view-section hidden">
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Abrir Menu">☰</button>
                     <h1>Registros</h1>
                 </div>
 
@@ -413,19 +412,26 @@
             <div class="card">
                 <div class="toolbar" style="margin-bottom: 10px;">
                     <div class="search-box">
+                        <label for="filtro-busca" class="sr-only">Buscar Registros</label>
                         <input type="text" id="filtro-busca" placeholder="🔍 Buscar por descrição..." oninput="debounceCarregarLista()" aria-label="Buscar Registros">
                     </div>
                     <div class="filters">
-                        <input type="date" id="filtro-data-inicio" onchange="carregarLista(1)" aria-label="Data Início" title="De">
-                        <input type="date" id="filtro-data-fim" onchange="carregarLista(1)" aria-label="Data Fim" title="Até">
+                        <label for="filtro-data-inicio" class="sr-only">Data Início</label>
+                        <input type="date" id="filtro-data-inicio" onchange="carregarLista(1)" title="De">
 
-                        <select id="filtro-status" onchange="carregarLista(1)" aria-label="Filtrar por Status">
+                        <label for="filtro-data-fim" class="sr-only">Data Fim</label>
+                        <input type="date" id="filtro-data-fim" onchange="carregarLista(1)" title="Até">
+
+                        <label for="filtro-status" class="sr-only">Status</label>
+                        <select id="filtro-status" onchange="carregarLista(1)">
                             <option value="Todos">Status: Todos</option>
                             <option value="Pendente">Pendente</option>
                             <option value="Vencido">Vencido</option>
                             <option value="Pago">Pago</option>
                         </select>
-                        <select id="filtro-cat" onchange="carregarLista(1)" aria-label="Filtrar por Categoria">
+
+                        <label for="filtro-cat" class="sr-only">Categoria</label>
+                        <select id="filtro-cat" onchange="carregarLista(1)">
                             <option value="Todas">Categoria: Todas</option>
                             <option>Medicamentos (Estoque)</option>
                             <option>Materiais de Consumo</option>
@@ -469,7 +475,7 @@
         <div id="view-logs" class="view-section hidden">
             <div class="header-flex">
                 <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+                    <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Abrir Menu">☰</button>
                     <h1>Auditoria</h1>
                 </div>
             </div>
@@ -500,9 +506,11 @@
 
                 <div class="form-row">
                     <div class="half-width">
+                        <label for="novo-forn-nome" class="sr-only">Nome da Empresa</label>
                         <input type="text" id="novo-forn-nome" placeholder="Nome da Empresa (Ex: Cimed)">
                     </div>
                     <div class="half-width" style="display:flex; gap:10px;">
+                        <label for="novo-forn-cat" class="sr-only">Categoria Padrão</label>
                         <select id="novo-forn-cat">
                             <option value="">Categoria Padrão (Opcional)</option>
                         </select>
@@ -512,8 +520,7 @@
 
                 <div style="max-height: 200px; overflow-y: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px;">
                     <table style="width:100%; font-size: 0.9rem;">
-                        <tbody id="tbody-fornecedores"> </tbody>
-                        </tbody>
+                        <tbody id="tbody-fornecedores"></tbody>
                     </table>
                 </div>
             </div>
@@ -556,8 +563,7 @@
                             <th style="padding:10px; text-align:right;">Ações</th>
                         </tr>
                         </thead>
-                        <tbody id="tabela-usuarios-config">
-                        </tbody>
+                        <tbody id="tabela-usuarios-config"></tbody>
                     </table>
                 </div>
 
@@ -566,22 +572,22 @@
                 <h4>➕ Cadastrar Novo</h4>
                 <div class="form-row">
                     <div class="half-width">
-                        <label>Nome Completo</label>
+                        <label for="novo-user-nome">Nome Completo</label>
                         <input type="text" id="novo-user-nome" placeholder="Ex: Maria Silva">
                     </div>
                     <div class="half-width">
-                        <label>Usuário de Login</label>
+                        <label for="novo-user-login">Usuário de Login</label>
                         <input type="text" id="novo-user-login" placeholder="Ex: maria.silva">
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="half-width">
-                        <label>Senha Inicial</label>
+                        <label for="novo-user-senha">Senha Inicial</label>
                         <input type="password" id="novo-user-senha" placeholder="******">
                     </div>
                     <div class="half-width">
-                        <label>Função</label>
+                        <label for="novo-user-funcao">Função</label>
                         <select id="novo-user-funcao">
                             <option value="Operador">Operador (Acesso padrão)</option>
                             <option value="Admin">Administrador (Acesso total)</option>
@@ -593,32 +599,33 @@
                     <button class="btn btn-primary" onclick="criarNovoUsuario()">Cadastrar Usuário</button>
                 </div>
             </div>
-
             <div class="card" style="margin-top: 20px;">
                 <h3>👤 Perfil de Acesso</h3>
                 <div class="form-row">
                     <div class="half-width">
-                        <label>Login Atual</label>
+                        <label for="conf-login">Login Atual</label>
                         <input type="text" id="conf-login" readonly style="background: var(--bg-body); opacity: 0.7;">
                     </div>
                     <div class="half-width">
-                        <label>Nome de Exibição</label>
+                        <label for="conf-nome">Nome de Exibição</label>
                         <input type="text" id="conf-nome">
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="full-width">
-                        <label>Nova Senha (deixe em branco para manter)</label>
+                        <label for="conf-senha">Nova Senha (deixe em branco para manter)</label>
                         <input type="password" id="conf-senha">
                     </div>
                 </div>
                 <button class="btn btn-primary" onclick="salvarConfiguracoes()">💾 Salvar Perfil</button>
             </div>
-        </div> </div> </div> <div id="modal-detalhes" class="modal-overlay hidden">
+        </div>
+    </div>
+</div> <div id="modal-detalhes" class="modal-overlay hidden">
     <div class="modal-content">
         <div class="modal-header">
             <h2 id="modal-titulo">Detalhes</h2>
-            <button class="close-btn" onclick="fecharModal()">×</button>
+            <button class="close-btn" onclick="fecharModal()" aria-label="Fechar Modal">×</button>
         </div>
         <div class="modal-body">
             <div style="overflow-x: auto;">
@@ -642,7 +649,7 @@
     <div class="modal-content" style="max-width: 600px;">
         <div class="modal-header">
             <h2>✏️ Editar Registro</h2>
-            <button class="close-btn" onclick="fecharModalEdicao()">×</button>
+            <button class="close-btn" onclick="fecharModalEdicao()" aria-label="Fechar Modal">×</button>
         </div>
         <div class="modal-body">
             <input type="hidden" id="edit-id">
@@ -711,7 +718,7 @@
     <div class="modal-content" style="max-width: 350px; text-align: center;">
         <div class="modal-header" style="justify-content: center;">
             <h2>📱 QR Code</h2>
-            <button class="close-btn" style="position:absolute; right:20px;" onclick="fecharModalQR()">×</button>
+            <button class="close-btn" style="position:absolute; right:20px;" onclick="fecharModalQR()" aria-label="Fechar">×</button>
         </div>
         <div class="modal-body">
             <img id="img-qrcode" src="" alt="QR Code" style="width: 200px; height: 200px; margin-bottom: 15px; border: 1px solid #ddd; padding: 10px; border-radius: 8px;">
@@ -727,14 +734,14 @@
     <div class="modal-content" style="max-width: 400px;">
         <div class="modal-header">
             <h2>🔐 Resetar Senha</h2>
-            <button class="close-btn" onclick="fecharModalReset()">×</button>
+            <button class="close-btn" onclick="fecharModalReset()" aria-label="Fechar">×</button>
         </div>
         <div class="modal-body">
             <p style="margin-bottom: 15px;">Defina a nova senha para <b id="reset-nome-user">...</b>:</p>
             <input type="hidden" id="reset-id-user">
 
             <div class="form-group">
-                <label>Nova Senha</label>
+                <label for="reset-nova-senha">Nova Senha</label>
                 <input type="password" id="reset-nova-senha" placeholder="Digite a nova senha...">
             </div>
 
@@ -747,9 +754,9 @@
 </div>
 
 <script>
-    // Inicializa ícones Lucide após o carregamento do DOM
+    // Inicializa ícones Lucide
     document.addEventListener("DOMContentLoaded", () => {
-        if (typeof lucide !== 'undefined') {
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
             lucide.createIcons();
         }
     });

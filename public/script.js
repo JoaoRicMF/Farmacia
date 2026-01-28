@@ -32,6 +32,7 @@ const LOADER_HTML = `
 
 // 2. Blindagem da função apiRequest
 async function apiRequest(url, method = 'GET', body = null) {
+    // Garante que o caminho comece com /api conforme definido na CONFIG
     const fullUrl = url.startsWith('http') ? url : `${CONFIG.API_URL}${url.startsWith('/') ? url : '/' + url}`;
 
     const options = {
@@ -48,20 +49,22 @@ async function apiRequest(url, method = 'GET', body = null) {
         const response = await fetch(fullUrl, options);
         const contentType = response.headers.get('content-type');
 
-        // Validação crucial: impede que o JS tente ler o index.html como se fosse JSON
+        // Proteção contra retornos de erro do servidor em HTML (Error 500)
         if (!contentType || !contentType.includes('application/json')) {
-            throw new Error("O servidor retornou HTML em vez de JSON. Verifique as rotas do servidor.");
+            console.error("O servidor não retornou JSON. Status:", response.status);
+            return null;
         }
 
+        // Redirecionamento automático em caso de deslogado (401)
         if (response.status === 401) {
-            window.location.reload(); // Ou redirecionar para login
+            showToast("Sessão expirada. Redirecionando...", "error");
+            setTimeout(() => window.location.reload(), 2000);
             return null;
         }
 
         return await response.json();
     } catch (error) {
-        console.error("Erro na requisição:", error.message);
-        alert(error.message);
+        console.error("Erro na comunicação com a API:", error.message);
         return null;
     }
 }

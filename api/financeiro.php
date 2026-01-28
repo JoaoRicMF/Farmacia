@@ -32,7 +32,7 @@ try {
         // ... (Sua lógica de GET existente) ...
         // Vou resumir para o exemplo:
         $busca = $_GET['busca'] ?? '';
-        $sql = "SELECT * FROM Financeiro WHERE descricao LIKE :b OR codigo_barras LIKE :b ORDER BY vencimento ASC LIMIT 50";
+        $sql = "SELECT * FROM Financeiro WHERE descricao LIKE :b OR codigo_barras LIKE :b ORDER BY vencimento LIMIT 50";
         $stmt = $db->prepare($sql);
         $stmt->execute([':b' => "%$busca%"]);
         $dados = $stmt->fetchAll();
@@ -73,7 +73,7 @@ try {
         $stmt->bindValue(':cb', $input->codigo_barras ?? '');
 
         $stmt->execute();
-        registrarLog($db, $userNome, $logAction, "R$ {$input->valor} - {$input->descricao}");
+        registrarLog($db, $userNome, $logAction, "R$ $input->valor - $input->descricao");
 
         $response = ['success' => true, 'message' => 'Registro salvo com sucesso'];
     }

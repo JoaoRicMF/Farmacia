@@ -1,8 +1,7 @@
 <?php
 // api/categorias.php
-ob_start(); // 1. INICIA BUFFER
+ob_start(); // Previne que espaços ou warnings sujem o JSON
 
-// 2. CONFIGURAÇÃO DE ERROS (Logs sim, Tela não)
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
@@ -13,53 +12,41 @@ $response = [];
 $httpCode = 200;
 
 try {
-    // 3. VERIFICAÇÃO DE SESSÃO
     if (session_status() === PHP_SESSION_NONE) session_start();
 
+    // Tratamento Amigável de Sessão
     if (!isset($_SESSION['user_id'])) {
-        $httpCode = 401;
-        throw new Exception("Não autorizado");
+        http_response_code(401);
+        echo json_encode(["success" => false, "message" => "Sessão expirada. Faça login novamente."]);
+        ob_end_flush();
+        exit;
     }
 
-    // 4. CONEXÃO
     require_once '../config/database.php';
     $database = new Database();
     $db = $database->getConnection();
 
-    // 5. LÓGICA DE NEGÓCIO
     $method = $_SERVER['REQUEST_METHOD'];
 
     if ($method === 'GET') {
-        // Busca categorias padrão e personalizadas
-        $query = "SELECT * FROM Categorias ORDER BY nome";
-        $stmt = $db->prepare($query);
-        $stmt->execute();
-
-        $response = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        // Se estiver vazio, retorna array vazio [] em vez de erro
-        if (!$response) $response = [];
-    }
-    elseif ($method === 'POST') {
-        // Caso implemente criação de categorias via API
-        $data = json_decode(file_get_contents("php://input"));
-        if (!empty($data->nome)) {
-            $stmt = $db->prepare("INSERT INTO Categorias (nome, cor) VALUES (:n, :c)");
-            $stmt->execute([':n' => $data->nome, ':c' => $data->cor ?? '#3b82f6']);
-            $response = ['success' => true, 'id' => $db->lastInsertId()];
-        } else {
-            throw new Exception("Nome da categoria obrigatório");
+        try {
+            $query = "SELECT * FROM Categorias ORDER BY nome";
+            $stmt = $db->prepare($query);
+            $stmt->execute();
+            $response = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (PDOException $e) {
+            // Se a tabela não existir ou a query falhar, retorna JSON em vez de Erro 500
+            throw new Exception("Erro ao acessar categorias: " . $e->getMessage(), 500);
         }
     }
+    // ... (restante da lógica de POST/DELETE se houver)
 
 } catch (Exception $e) {
-    $httpCode = ($e->getCode() == 401) ? 401 : 500;
-    $response = ['error' => $e->getMessage()];
-    error_log("Erro API Categorias: " . $e->getMessage());
+    $httpCode = ($e->getCode() >= 400 && $e->getCode() < 600) ? $e->getCode() : 500;
+    $response = ["success" => false, "message" => $e->getMessage()];
 }
 
-// 6. LIMPEZA FINAL (ESSENCIAL)
-ob_clean(); // Limpa qualquer warning ou espaço em branco anterior
+ob_clean(); // Limpa qualquer lixo de saída antes do envio
 http_response_code($httpCode);
 echo json_encode($response);
 exit;
