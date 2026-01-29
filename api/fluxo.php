@@ -102,7 +102,7 @@ if ($method === 'GET') {
             GROUP BY formaPagamento
         ");
         $stmtTotais->execute([':m' => $mesNum, ':a' => $ano]);
-        $formas = $stmtTotais->fetchAll(PDO::FETCH_KEY_PAIR); // Retorna array ['Dinheiro' => 100, 'PIX' => 50]
+        $formas = $stmtTotais->fetchAll(PDO::FETCH_KEY_PAIR);
 
         // Mescla movimentos para tabela
         $movimentacoes = array_merge($entradas, $saidas, $pagos);

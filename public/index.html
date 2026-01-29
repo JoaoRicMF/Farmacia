@@ -406,7 +406,6 @@
                 <div style="display:flex; gap:10px">
                     <button class="btn btn-secondary" onclick="window.print()">🖨️ PDF</button>
                     <button class="btn btn-success" onclick="baixarExcelFluxo()">📊 Exportar CSV</button>
-                    <button class="btn btn-success" onclick="window.location.href='/api/exportar'">📊 Exportar CSV</button>
                 </div>
             </div>
 
@@ -414,7 +413,7 @@
                 <div class="toolbar" style="margin-bottom: 10px;">
                     <div class="search-box">
                         <label for="filtro-busca" class="sr-only">Buscar Registros</label>
-                        <input type="text" id="filtro-busca" placeholder="🔍 Buscar por descrição..." oninput="debounceCarregarLista()" aria-label="Buscar Registros">
+                        <input type="text" id="filtro-busca" placeholder="🔍 Buscar..." oninput="debounceCarregarLista()">
                     </div>
                     <div class="filters">
                         <label for="filtro-data-inicio" class="sr-only">Data Início</label>

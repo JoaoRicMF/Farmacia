@@ -176,8 +176,8 @@ async function login(event) {
 
         // 3. Validação da Resposta
         if (!res) {
-            // Se res for null, provavelmente houve erro 500 ou falha de rede capturada pelo apiRequest
-            throw new Error("Falha na comunicação com o servidor. Verifique o banco de dados.");
+            showToast("Falha na comunicação com o servidor. Verifique o banco de dados.", "error");
+            return; // Encerra a função sem precisar do throw
         }
 
         if (res.success) {
@@ -445,9 +445,6 @@ async function carregarFinanceiro(pagina = 1) {
     const res = await apiRequest(url);
     tbody.innerHTML = '';
 
-    const corCategoria = (typeof estadoApp.categoriasCache !== 'undefined')
-        ? estadoApp.categoriasCache.find(c => c.nome === r.categoria)?.cor || '#2563eb'
-        : '#2563eb';
     if (!res || !res.registros || res.registros.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum registro encontrado.</td></tr>';
         return;
@@ -713,10 +710,14 @@ function mascaraTelefone(input) {
 }
 
 function debounceCarregarLista() {
+    // 1. Limpa o agendamento anterior se o usuário continuar digitando
     clearTimeout(buscaTimeout);
+
+    // 2. Agenda a execução para 500ms após a última tecla
     buscaTimeout = setTimeout(() => {
+        // Reseta para a página 1 ao realizar nova busca
         carregarFinanceiro(1);
-    }, 500); // Aguarda 500ms
+    }, 500);
 }
 
 function verificarFornecedorPreenchido() {
@@ -772,8 +773,10 @@ async function carregarFluxo() {
 
     if (res) {
         const atualizarTexto = (id, valor) => {
-            const el = document.getElementById(id);
-            if (el) el.innerText = valor || 'R$ 0,00';
+            const detalheEl = document.getElementById('detalhe-entradas');
+            if (detalheEl) {
+                detalheEl.innerText = `Din: ${res.total_dinheiro} | Pix: ${res.total_pix} | Cart: ${res.total_cartao}`;
+            }
         };
 
         atualizarTexto('fluxo-entradas', res.total_entradas_fmt);
@@ -994,13 +997,11 @@ async function excluirUsuario(id) {
 async function resetarCategorias() {
     if (!confirm("Isso apagará todas as categorias personalizadas e restaurará as padrões. Continuar?")) return;
 
-    // Assume-se que o endpoint categorias.php aceite a action 'reset' ou similar
-    // Caso não tenha implementado no backend, será necessário criar a lógica lá.
     const res = await apiRequest('categorias.php?action=reset', 'POST', {});
 
     if (res && res.success) {
         showToast("Categorias restauradas para o padrão.");
-        carregarCategoriasSistema(); // Atualiza os selects e a lista visual
+        await carregarCategoriasSistema();
     } else {
         showToast(res?.message || "Erro ao resetar categorias.", "error");
     }
@@ -1057,15 +1058,14 @@ async function verDetalhes(tipo, titulo) {
 }
 
 function preFiltrarLista(status) {
-    // 1. Altera o valor do select de filtro na tela de Registros
+    // 1. Define o valor no elemento de UI
     const selectStatus = document.getElementById('filtro-status');
     if (selectStatus) {
         selectStatus.value = status;
     }
 
-    // 2. Dispara o carregamento da lista com o novo filtro aplicado
-    // O parâmetro 1 indica para carregar a primeira página
-    carregarFinanceiro(1);
+    // 2. Navega para a tela de lista (que já limpa as outras views)
+    navegar('lista');
 }
 
 async function salvarNovoFornecedor() {
