@@ -95,13 +95,13 @@ const UI = {
         document.getElementById('app-screen').classList.toggle('hidden', tela === 'login');
     },
 
-    navegar(telaId) {
+    navegar(telaId, elementoBtn = null) {
         document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
 
         const viewAlvo = document.getElementById(`view-${telaId}`);
         if (viewAlvo) {
             viewAlvo.classList.remove('hidden');
-            // Roteamento simples
+
             const rotas = {
                 'dashboard': () => Dashboard.carregar(),
                 'lista': () => Financeiro.carregar(1),
@@ -115,10 +115,17 @@ const UI = {
 
         // Atualiza Menu
         document.querySelectorAll('.menu-item').forEach(btn => btn.classList.remove('active'));
-        const btnAtivo = document.querySelector(`.menu-item[onclick*="'${telaId}'"]`);
-        if (btnAtivo) btnAtivo.classList.add('active');
 
-        // Fecha sidebar mobile se aberta
+        if (elementoBtn) {
+            // Se o elemento foi passado pelo 'this', usa-o diretamente (MUITO MAIS RÁPIDO)
+            elementoBtn.classList.add('active');
+        } else {
+            // Fallback: Se a navegação foi via código (ex: redirecionamento), busca no DOM
+            const btnAtivo = document.querySelector(`.menu-item[onclick*="'${telaId}'"]`);
+            if (btnAtivo) btnAtivo.classList.add('active');
+        }
+
+        // Fecha sidebar mobile (mantido)
         const sidebar = document.getElementById('sidebar');
         if (window.innerWidth < 768 && sidebar.classList.contains('active')) {
             UI.toggleSidebar();
@@ -1082,9 +1089,13 @@ async function verDetalhes(tipo, titulo) {
 }
 
 function preFiltrarLista(status) {
+    // Define o valor no select
     const el = document.getElementById('filtro-status');
     if (el) el.value = status;
-    UI.navegar('lista');
+
+    // Navega para a lista (isso já dispara o carregamento da tabela)
+    // Nota: Passamos null no segundo argumento pois não há botão de menu clicado aqui
+    UI.navegar('lista', null);
 }
 
 /* ==========================================================================
