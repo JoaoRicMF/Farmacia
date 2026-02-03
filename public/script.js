@@ -1174,17 +1174,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (!inp.value && !inp.id.startsWith('filtro-')) inp.value = hoje;
         });
 
-        // 4. Listeners Globais
-        document.querySelectorAll('.input-money').forEach(inp => {
-            inp.addEventListener('input', () => UI.Masks.moeda(inp));
-        });
-
-        const inputCNPJ = document.getElementById('novo-forn-cnpj');
-        if (inputCNPJ) inputCNPJ.addEventListener('input', () => UI.Masks.cnpj(inputCNPJ));
-
-        const inputTel = document.getElementById('novo-forn-tel');
-        if (inputTel) inputTel.addEventListener('input', () => UI.Masks.telefone(inputTel));
-
         // Atalhos de Teclado
         document.addEventListener('keydown', function (event) {
             const telaNovo = document.getElementById('view-novo');
