@@ -697,8 +697,20 @@ const Fluxo = {
 
     baixarExcel() {
         const mesInput = document.getElementById('filtro-mes-fluxo');
-        let url = `${CONFIG.API_URL}/exportar.php`;
-        if (mesInput && mesInput.value) url += `?mes=${mesInput.value}`;
+        let periodo = mesInput ? mesInput.value : '';
+
+        // 1. Fallback Explícito: Se vazio, força o mês atual (consistente com carregarFluxo)
+        if (!periodo) {
+            const hoje = new Date();
+            periodo = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+
+            // Opcional: Feedback visual preenchendo o input se ele existir
+            if (mesInput) mesInput.value = periodo;
+        }
+
+        // 2. Construção da URL com o parâmetro 'tipo=fluxo' obrigatório
+        const url = `${CONFIG.API_URL}/exportar.php?tipo=fluxo&mes=${periodo}`;
+
         window.location.href = url;
     }
 };
