@@ -113,8 +113,20 @@ try {
         }
 
         if (!empty($input->id)) {
-            // UPDATE
-            $sql = "UPDATE Financeiro SET descricao=:d, valor=:v, vencimento=:ve, categoria=:c, status=:s, codigo_barras=:cb WHERE id=:id";
+            $sql = "UPDATE Financeiro SET 
+                    descricao=:d, 
+                    valor=:v, 
+                    vencimento=:ve, 
+                    categoria=:c, 
+                    status=:s, 
+                    codigo_barras=:cb,
+                    data_processamento = CASE 
+                        WHEN :s = 'Pago' AND data_processamento IS NULL THEN NOW() -- Se virou Pago, marca data de hoje
+                        WHEN :s != 'Pago' THEN NULL -- Se voltou a Pendente, limpa a data
+                        ELSE data_processamento -- Se só mudou descrição, mantém a data original
+                    END
+                    WHERE id=:id";
+
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':id', $input->id);
             $logAction = "Editar Financeiro";

@@ -591,13 +591,43 @@ const Financeiro = {
     verificarFornecedor() {
         const descInput = document.getElementById('boleto-desc');
         const catSelect = document.getElementById('boleto-cat');
-        if (!descInput || !catSelect || !State.fornecedoresCache) return;
 
-        const termo = descInput.value.toLowerCase();
-        const encontrado = State.fornecedoresCache.find(f => termo.includes(f.nome.toLowerCase()));
+        if (!descInput || !catSelect) return;
 
+        // Segurança: Se o cache estiver vazio (ex: reload da página), tenta recarregar
+        if (!State.fornecedoresCache || State.fornecedoresCache.length === 0) {
+            Config.carregarFornecedores();
+            return;
+        }
+
+        const termo = descInput.value.trim().toLowerCase();
+        if (!termo) return;
+
+        // LÓGICA DE MATCH (SINCRONIZAÇÃO CACHE <-> DATALIST)
+
+        // 1. Prioridade Total: Match Exato (Usuário clicou no Datalist)
+        let encontrado = State.fornecedoresCache.find(f => f.nome.toLowerCase() === termo);
+
+        // 2. Fallback: Match Parcial Inteligente
+        // Ordenamos por tamanho do nome (decrescente) para evitar que "Cimed" (curto)
+        // seja detectado dentro de "Pagamento Cimed Distribuidora" antes de "Cimed Distribuidora" (longo).
+        if (!encontrado) {
+            const cacheOrdenado = [...State.fornecedoresCache].sort((a, b) => b.nome.length - a.nome.length);
+            encontrado = cacheOrdenado.find(f => termo.includes(f.nome.toLowerCase()));
+        }
+
+        // 3. Aplicação
         if (encontrado && encontrado.categoriaPadrao) {
-            catSelect.value = encontrado.categoriaPadrao;
+            // Só altera se for diferente para permitir que o usuário mude manualmente depois sem ser sobrescrito
+            if (catSelect.value !== encontrado.categoriaPadrao) {
+                catSelect.value = encontrado.categoriaPadrao;
+
+                // Feedback visual: Pisca a borda do select em verde
+                catSelect.style.transition = "border-color 0.3s";
+                const bordaOriginal = catSelect.style.borderColor;
+                catSelect.style.borderColor = "var(--success)";
+                setTimeout(() => catSelect.style.borderColor = bordaOriginal, 800);
+            }
         }
     },
 
@@ -1024,11 +1054,9 @@ async function criarNovoUsuario() {
 
     // 2. Validação Básica
     if (!nomeInput.value || !loginInput.value || !senhaInput.value) {
-        return showToast("Preencha nome, login e senha.", "error");
+        return UI.showToast("Preencha nome, login e senha.", "error"); // CORRIGIDO: UI.showToast
     }
 
-    // 3. Monta o payload conforme esperado por api/admin.php
-    // O backend espera: { nome, login, password, nivel }
     const payload = {
         nome: nomeInput.value,
         login: loginInput.value,
@@ -1036,20 +1064,21 @@ async function criarNovoUsuario() {
         nivel: funcaoInput.value
     };
 
-    // 4. Envia para a API
+    // 3. Feedback visual no botão
     const btn = document.querySelector('button[onclick="criarNovoUsuario()"]');
     const textoOriginal = btn.innerText;
     btn.innerText = "Salvando...";
     btn.disabled = true;
 
-    const res = await apiRequest('admin.php?action=criarUsuario', 'POST', payload);
+    // 4. Envia para a API (CORRIGIDO: API.request)
+    const res = await API.request('admin.php?action=criarUsuario', 'POST', payload);
 
     btn.innerText = textoOriginal;
     btn.disabled = false;
 
     // 5. Tratamento da Resposta
     if (res && res.success) {
-        showToast("Usuário cadastrado com sucesso!");
+        UI.showToast("Usuário cadastrado com sucesso!"); // CORRIGIDO: UI.showToast
 
         // Limpa os campos
         nomeInput.value = '';
@@ -1057,10 +1086,10 @@ async function criarNovoUsuario() {
         senhaInput.value = '';
         funcaoInput.value = 'Operador';
 
-        // Recarrega a lista de usuários
-        carregarConfiguracoes();
+        // Recarrega a lista de usuários (CORRIGIDO: Admin.carregarUsuarios)
+        Admin.carregarUsuarios();
     } else {
-        showToast(res?.message || "Erro ao criar usuário.", "error");
+        UI.showToast(res?.message || "Erro ao criar usuário.", "error"); // CORRIGIDO: UI.showToast
     }
 }
 
@@ -1128,7 +1157,7 @@ window.verDetalhes = verDetalhes; // Função helper solta
 window.preFiltrarLista = preFiltrarLista; // Função helper solta
 window.carregarFluxo = Fluxo.carregar;
 window.baixarExcelFluxo = Fluxo.baixarExcel;
-window.filtrarFluxo = () => {}; // Não implementada no original, placeholder
+window.filtrarFluxo = filtrarFluxo;
 window.salvarEntradaCaixa = () => Fluxo.salvarMovimento('entrada');
 window.salvarSaidaCaixa = () => Fluxo.salvarMovimento('saida');
 window.lerCodigoBarras = Financeiro.lerCodigoBarras;
@@ -1154,7 +1183,7 @@ window.excluirFornecedor = Config.excluirFornecedor;
 window.adicionarCategoriaPersonalizada = Config.adicionarCategoria;
 window.resetarCategorias = Config.resetarCategorias;
 window.excluirCategoria = Config.excluirCategoria;
-window.criarNovoUsuario = () => alert('Funcionalidade não implementada no código original.');
+window.criarNovoUsuario = criarNovoUsuario;
 window.abrirModalReset = Admin.modalReset;
 window.fecharModalReset = Admin.fecharModalReset;
 window.confirmarResetSenha = Admin.confirmarResetSenha;

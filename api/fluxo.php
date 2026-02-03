@@ -33,6 +33,7 @@ $action = $_GET['action'] ?? '';
 $userId = $_SESSION['user_id'];
 
 // --- POST: SALVAR MOVIMENTAÇÃO ---
+// --- POST: SALVAR MOVIMENTAÇÃO ---
 if ($method === 'POST' && $action === 'salvar') {
     $rawInput = file_get_contents("php://input");
     $data = json_decode($rawInput);
@@ -43,15 +44,46 @@ if ($method === 'POST' && $action === 'salvar') {
     }
 
     try {
+        // [NOVO] Validação de Saldo para Saídas
+        if ($data->tipo !== 'ENTRADA') {
+            $mesAtual = date('m', strtotime($data->data_registro));
+            $anoAtual = date('Y', strtotime($data->data_registro));
+
+            // 1. Total Entradas (Dinheiro entrou)
+            $stmt = $db->prepare("SELECT SUM(valor) FROM EntradaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
+            $stmt->execute([':m' => $mesAtual, ':a' => $anoAtual]);
+            $entradas = $stmt->fetchColumn() ?: 0;
+
+            // 2. Total Saídas Manuais (Dinheiro saiu)
+            $stmt = $db->prepare("SELECT SUM(valor) FROM SaidaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
+            $stmt->execute([':m' => $mesAtual, ':a' => $anoAtual]);
+            $saidasManuais = $stmt->fetchColumn() ?: 0;
+
+            // 3. Total Boletos Pagos (Dinheiro saiu via Banco/Caixa) - INTEGRAÇÃO AQUI
+            $stmt = $db->prepare("SELECT SUM(valor) FROM Financeiro WHERE status = 'Pago' AND MONTH(COALESCE(data_processamento, vencimento)) = :m AND YEAR(COALESCE(data_processamento, vencimento)) = :a");
+            $stmt->execute([':m' => $mesAtual, ':a' => $anoAtual]);
+            $boletosPagos = $stmt->fetchColumn() ?: 0;
+
+            $saldoDisponivel = $entradas - ($saidasManuais + $boletosPagos);
+
+            if ($data->valor > $saldoDisponivel) {
+                echo json_encode([
+                    "success" => false,
+                    "message" => "Saldo insuficiente! Disponível: R$ " . number_format($saldoDisponivel, 2, ',', '.')
+                ]);
+                exit;
+            }
+        }
+
+        // Se passou na validação, prossegue com o INSERT normal
         if ($data->tipo === 'ENTRADA') {
-            // Altere a query para incluir a coluna descricao
             $sql = "INSERT INTO EntradaCaixa (dataRegistro, formaPagamento, descricao, valor, id) 
             VALUES (:data, :forma, :desc, :valor, :user)";
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 ":data"  => $data->data_registro,
                 ":forma" => $data->forma_pagamento ?? 'Dinheiro',
-                ":desc"  => $data->descricao, // Agora grava a descrição enviada pelo front
+                ":desc"  => $data->descricao,
                 ":valor" => $data->valor,
                 ":user"  => $userId
             ]);

@@ -135,14 +135,10 @@ class Database {
             ) ENGINE=InnoDB;");
 
             // Categorias Padrão
-            // CORREÇÃO LINHA 158: Usamos INSERT IGNORE para evitar o try-catch vazio
             $checkCat = $this->conn->query("SELECT id FROM Categorias LIMIT 1");
             if ($checkCat->rowCount() == 0) {
                 $padroes = ['Medicamentos (Estoque)', 'Água/Luz/Internet', 'Aluguel & Condomínio', 'Impostos & Taxas', 'Folha de Pagamento', 'Marketing', 'Manutenção', 'Outros'];
-
-                // INSERT IGNORE faz o MySQL ignorar silenciosamente se a chave UNIQUE (nome) já existir
                 $stmtCat = $this->conn->prepare("INSERT IGNORE INTO Categorias (nome) VALUES (:nome)");
-
                 foreach ($padroes as $p) {
                     $stmtCat->execute([':nome' => $p]);
                 }
@@ -162,7 +158,7 @@ class Database {
                 id_entrada INT AUTO_INCREMENT PRIMARY KEY,
                 dataRegistro DATETIME DEFAULT CURRENT_TIMESTAMP,
                 formaPagamento VARCHAR(50),
-                descricao VARCHAR(255), -- Adicione esta linha
+                descricao VARCHAR(255),
                 valor DECIMAL(10, 2) NOT NULL,
                 id INT,
                 FOREIGN KEY (id) REFERENCES Usuario(id) ON DELETE SET NULL
@@ -188,6 +184,8 @@ class Database {
 
         } catch (PDOException $e) {
             error_log("Erro na criação de tabelas: " . $e->getMessage());
+            // [ALTERAÇÃO AQUI] Lança o erro para a API capturar e mostrar no frontend
+            throw new Exception("Falha na Instalação: O usuário do banco não tem permissão para criar tabelas ou houve erro de sintaxe. Detalhes: " . $e->getMessage());
         }
     }
 }
