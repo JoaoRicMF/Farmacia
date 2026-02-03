@@ -32,7 +32,7 @@
             <div class="input-wrapper">
                 <label for="login-pass" class="sr-only">Senha</label>
                 <input type="password" id="login-pass" name="senha" placeholder="Senha" autocomplete="current-password" required>
-                <span class="toggle-pass" onclick="toggleSenha()" role="button" tabindex="0" aria-label="Mostrar senha">👁️</span>
+                <span class="toggle-pass" onclick="toggleSenha()" role="button" tabindex="0" aria-label="Mostrar senha"><i data-lucide="eye" style="width: 20px; height: 20px;"></i></span>
             </div>
 
             <button type="submit" class="btn-login" id="btn-entrar">Acessar Painel</button>
@@ -111,7 +111,7 @@
 
             <div class="dashboard-cards">
                 <div class="summary-card card-blue" onclick="nav('lista', null); preFiltrarLista('Pendente')" role="button" tabindex="0">
-                    <div class="card-icon">💸</div>
+                    <div class="card-icon"><i data-lucide="banknote"></i></div>
                     <div class="card-info">
                         <h3>A Pagar (Total)</h3>
                         <div class="card-value-row">
@@ -122,7 +122,7 @@
                 </div>
 
                 <div class="summary-card card-red" onclick="nav('lista', null); preFiltrarLista('Pendente')" role="button" tabindex="0">
-                    <div class="card-icon">🚨</div>
+                    <div class="card-icon"><i data-lucide="alert-circle"></i></div>
                     <div class="card-info">
                         <h3>Vencidos</h3>
                         <div class="card-value-row">
@@ -135,7 +135,7 @@
                 </div>
 
                 <div class="summary-card card-yellow" onclick="verDetalhes('proximos', 'Vencendo em 7 Dias')" role="button" tabindex="0">
-                    <div class="card-icon">⏳</div>
+                    <div class="card-icon"><i data-lucide="hourglass"></i></div>
                     <div class="card-info">
                         <h3>Próximos (7 dias)</h3>
                         <div class="card-value-row">
@@ -148,7 +148,7 @@
                 </div>
 
                 <div class="summary-card card-green" onclick="nav('lista', null); preFiltrarLista('Pago')" role="button" tabindex="0">
-                    <div class="card-icon">✅</div>
+                    <div class="card-icon"><i data-lucide="check-circle-2"></i></div>
                     <div class="card-info">
                         <h3>Pagos (Mês)</h3>
                         <p id="card-pago-mes">R$ 0,00</p>
@@ -158,10 +158,11 @@
             </div>
 
             <div id="dashboard-empty-state" class="hidden" style="text-align: center; padding: 40px; background: var(--bg-card); border-radius: 16px; border: 1px dashed var(--border);">
-                <div style="font-size: 3rem; margin-bottom: 10px;">📉</div>
+                <div style="margin-bottom: 10px; color: var(--text-light);">
+                    <i data-lucide="bar-chart-big" style="width: 64px; height: 64px;"></i> </div>
                 <h3 style="color: var(--text-main); margin-bottom: 10px;">Sem dados neste período</h3>
                 <p style="color: var(--text-light); margin-bottom: 20px;">Não encontramos lançamentos para os filtros selecionados.</p>
-                <button class="btn btn-primary" onclick="nav('novo', null)">➕ Criar Novo Lançamento</button>
+                <button class="btn btn-primary" onclick="nav('novo', null)"><i data-lucide="plus"></i> Criar Novo Lançamento</button></button>
             </div>
 
             <div class="charts-row" id="charts-container">
@@ -170,7 +171,7 @@
                     <div class="chart-container"><canvas id="chartMes"></canvas></div>
                 </div>
                 <div class="chart-box">
-                    <h3>🥧 Gastos por Categoria</h3>
+                    <h3><i data-lucide="trending-up" style="width:20px; vertical-align:middle"></i> Evolução</h3> <h3><i data-lucide="pie-chart" style="width:20px; vertical-align:middle"></i> Gastos por Categoria</h3>
                     <div class="chart-container"><canvas id="chartCat"></canvas></div>
                 </div>
             </div>
@@ -178,8 +179,7 @@
             <div class="card" style="padding: 0; overflow: hidden; margin-top: 30px;">
                 <div class="toggle-header" onclick="toggleCalendarSection()" role="button" tabindex="0">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.2rem;">📅</span>
-                        <h3 style="margin:0; font-size: 1rem;">Calendário de Vencimentos</h3>
+                        <i data-lucide="calendar-days"></i> <h3 style="margin:0; font-size: 1rem;">Calendário de Vencimentos</h3>
                     </div>
                     <span class="arrow-icon">▼</span>
                 </div>
