@@ -298,12 +298,32 @@ input:focus, select:focus {
 
 /* Ícones dentro dos cards */
 .card-icon {
-    width: 64px; /* Levemente maior */
+    /* Dimensões fixas */
+    width: 64px;
     height: 64px;
-    border-radius: 16px; /* Mais arredondado */
-    /* ... cores mantidas ... */
+    flex-shrink: 0; /* Impede que o ícone esmague se o texto for longo */
+    border-radius: 16px;
+
+    /* Centralização Absoluta (Flexbox) */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    /* Tipografia para Emojis (Correção da imagem 2) */
+    font-size: 2rem; /* Define tamanho grande para emojis */
+    line-height: 1;  /* Remove espaçamento extra acima/abaixo do emoji */
+
+    background: var(--bg-body);
+    color: var(--text-main);
 }
-.card-icon svg { width: 32px; height: 32px; stroke-width: 2px; }
+
+/* Correção específica para ícones SVG (Lucide - Imagem 1) */
+.card-icon svg {
+    width: 32px;
+    height: 32px;
+    stroke-width: 2px;
+    display: block; /* Remove "ghost space" de elementos inline */
+}
 
 /* Temas de ícones */
 .card-blue .card-icon { color: var(--primary); background: rgba(37, 99, 235, 0.1); }
