@@ -21,8 +21,6 @@ try {
         session_start();
     }
 
-    require_once '../config/database.php';
-
     $method = $_SERVER['REQUEST_METHOD'];
     $action = $_GET['action'] ?? '';
 

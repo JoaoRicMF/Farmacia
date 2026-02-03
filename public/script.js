@@ -504,7 +504,9 @@ function prepararNovoRegistro() {
 
 // Função unificada para salvar boletos
 async function salvarBoleto(event) {
-    if (event) event.preventDefault();
+    if (parametro && typeof parametro.preventDefault === 'function') {
+        parametro.preventDefault();
+    }
 
     // Mapeamento correto dos IDs do index.html
     const descInput = document.getElementById('boleto-desc');
