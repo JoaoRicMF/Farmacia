@@ -30,7 +30,7 @@ class Database {
     public function __construct() {
         $this->host     = getenv('DB_HOST') ?: "127.0.0.1";
         $this->username = getenv('DB_USER') ?: "root";
-        $this->password = getenv('DB_PASS') ?: "150406";
+        $this->password = getenv('DB_PASS') ?: "1504";
         $this->port     = getenv('DB_PORT') ?: "3306";
     }
 

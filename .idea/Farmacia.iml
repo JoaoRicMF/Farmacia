@@ -1,19 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module type="PYTHON_MODULE" version="4">
-  <component name="FacetManager">
-    <facet type="Python" name="Python facet">
-      <configuration sdkName="Python 3.14 (Farmacia)" />
-    </facet>
-  </component>
+<module type="WEB_MODULE" version="4">
   <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$">
-      <excludeFolder url="file://$MODULE_DIR$/.idea/dataSources" />
-      <excludeFolder url="file://$MODULE_DIR$/.venv" />
-      <excludeFolder url="file://$MODULE_DIR$/backups" />
-      <excludeFolder url="file://$MODULE_DIR$/venv" />
-    </content>
-    <orderEntry type="jdk" jdkName="Python 3.14 (Farmacia)" jdkType="Python SDK" />
+    <content url="file://$MODULE_DIR$" />
+    <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="Python 3.14 (Farmacia) interpreter library" level="application" />
   </component>
 </module>
