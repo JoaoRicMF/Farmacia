@@ -206,10 +206,7 @@ input:focus, select:focus {
     border-radius: var(--border-radius);
 
     /* MUDANÇA PRINCIPAL: Remover borda sólida e usar sombra */
-    border: 1px solid transparent; /* Transparente para manter o box-model */
-    box-shadow: var(--shadow-md); /* Sombra difusa */
-
-    /* Opcional: Uma borda extremamente sutil apenas para telas ruins de contraste */
+    border: 1px solid rgba(226, 232, 240, 0.6);
     border-color: rgba(226, 232, 240, 0.6);
 
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
