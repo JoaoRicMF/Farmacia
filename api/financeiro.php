@@ -132,6 +132,21 @@ try {
             $logAction = "Editar Financeiro";
         } else {
             // INSERT
+
+            // --- VALIDAÇÃO DE DUPLICIDADE (CÓDIGO DE BARRAS) ---
+            $codigoBarras = $input->codigo_barras ?? '';
+
+            // Apenas valida se o código de barras não estiver vazio
+            if (!empty($codigoBarras)) {
+                $checkDup = $db->prepare("SELECT id FROM Financeiro WHERE codigo_barras = :cb LIMIT 1");
+                $checkDup->execute([':cb' => $codigoBarras]);
+
+                if ($checkDup->rowCount() > 0) {
+                    // O código 409 (Conflict) é o padrão REST para duplicidade
+                    throw new Exception("Este boleto já foi cadastrado anteriormente", 409);
+                }
+            }
+
             $sql = "INSERT INTO Financeiro (descricao, valor, vencimento, categoria, status, codigo_barras) VALUES (:d, :v, :ve, :c, :s, :cb)";
             $stmt = $db->prepare($sql);
             $logAction = "Novo Financeiro";

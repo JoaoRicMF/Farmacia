@@ -478,17 +478,26 @@ const Financeiro = {
             codigo_barras: campos.cod.value
         };
 
+        // UI Feedback: Desabilita botão temporariamente para evitar duplo clique
+        const btnSalvar = document.querySelector('#view-novo button[onclick*="salvarBoleto"]');
+        if(btnSalvar) btnSalvar.disabled = true;
+
         const res = await API.request('financeiro.php?action=salvar', 'POST', payload);
+
+        if(btnSalvar) btnSalvar.disabled = false;
 
         if (res && res.success) {
             UI.showToast('Salvo com sucesso!');
-            // Se evento não existe ou é submit simples, reseta. Se for botão específico (true), não reseta ou faz lógica custom.
+            // Só limpa o formulário se foi SUCESSO.
+            // Se for erro (como duplicidade), mantém os dados na tela.
             if (!event || event.type === 'submit') {
                 Financeiro.prepararNovo();
             }
             Dashboard.carregar();
         } else {
-            UI.showToast('Erro ao salvar: ' + (res?.message || 'Erro desconhecido'), 'error');
+            // AQUI EXIBIMOS O ERRO 409 VINDO DO PHP
+            // A API.request retorna o JSON mesmo com status de erro
+            UI.showToast(res?.message || 'Erro desconhecido ao salvar.', 'error');
         }
     },
 
