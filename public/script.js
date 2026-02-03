@@ -772,19 +772,21 @@ async function carregarFluxo() {
     tbody.innerHTML = '';
 
     if (res) {
+        // CORREÇÃO: Função atualizarTexto agora utiliza os parâmetros corretamente
         const atualizarTexto = (id, valor) => {
-            const detalheEl = document.getElementById('detalhe-entradas');
-            if (detalheEl) {
-                detalheEl.innerText = `Din: ${res.total_dinheiro} | Pix: ${res.total_pix} | Cart: ${res.total_cartao}`;
-            }
+            const el = document.getElementById(id);
+            if (el) el.innerText = valor;
         };
 
         atualizarTexto('fluxo-entradas', res.total_entradas_fmt);
         atualizarTexto('fluxo-saidas', res.total_saidas_fmt);
         atualizarTexto('fluxo-saldo', res.saldo_fmt);
-        atualizarTexto('total-entradas', res.total_entradas_fmt);
-        atualizarTexto('total-saidas', res.total_saidas_fmt);
-        atualizarTexto('total-saldo', res.saldo_fmt);
+
+        // Atualiza a legenda de detalhes (Din/Pix/Cartão)
+        const detalheEl = document.getElementById('detalhe-entradas');
+        if (detalheEl) {
+            detalheEl.innerText = `Din: ${res.total_dinheiro} | Pix: ${res.total_pix} | Cart: ${res.total_cartao}`;
+        }
 
         if (res.movimentacoes && res.movimentacoes.length > 0) {
             res.movimentacoes.forEach(mov => {
@@ -796,18 +798,17 @@ async function carregarFluxo() {
                 tr.innerHTML = `
                     <td>${formatarDataBR(mov.data)}</td>
                     <td>${mov.descricao}</td>
-                    <td>${mov.categoria_nome || mov.categoria || '-'}</td>
+                    <td><span class="category-badge">${mov.categoria || '-'}</span></td>
                     <td class="text-right font-weight-bold ${corClass}">
                         ${sinal} ${formatarMoedaBRL(mov.valor)}
                     </td>
+                    <td class="no-print"></td>
                 `;
                 tbody.appendChild(tr);
             });
         } else {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center">Nenhuma movimentação.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nenhuma movimentação neste mês.</td></tr>';
         }
-    } else {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao carregar.</td></tr>';
     }
 }
 
@@ -816,24 +817,30 @@ async function handleSalvarMovimentoRapido(tipo) {
     const elDesc = document.getElementById(`${prefixo}-desc`);
     const elValor = document.getElementById(`${prefixo}-valor`);
     const elData = document.getElementById(`${prefixo}-data`);
+    const elForma = document.getElementById(`${prefixo}-forma`); // Para capturar a forma de pagamento
 
-    if (!elDesc.value || !elValor.value || !elData.value) return showToast("Preencha todos os campos.", "error");
+    if (!elDesc.value || !elValor.value || !elData.value) {
+        return showToast("Preencha todos os campos.", "error");
+    }
 
     const payload = {
+        // CORREÇÃO: Usando a descrição do novo campo e a chave data_registro esperada pelo PHP
         descricao: elDesc.value,
         valor: converterMoedaParaFloat(elValor.value),
-        data: elData.value,
-        tipo: tipo.toUpperCase()
+        data_registro: elData.value,
+        tipo: tipo.toUpperCase(),
+        forma_pagamento: elForma ? elForma.value : null
     };
 
     const res = await apiRequest('fluxo.php?action=salvar', 'POST', payload);
 
     if (res && res.success) {
         showToast("Registrado com sucesso!");
-        elDesc.value = ''; elValor.value = '';
+        elDesc.value = '';
+        elValor.value = '';
         carregarFluxo();
     } else {
-        showToast(res.message || "Erro ao salvar.", "error");
+        showToast(res?.message || "Erro ao salvar.", "error");
     }
 }
 

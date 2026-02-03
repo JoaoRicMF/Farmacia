@@ -44,11 +44,14 @@ if ($method === 'POST' && $action === 'salvar') {
 
     try {
         if ($data->tipo === 'ENTRADA') {
-            $sql = "INSERT INTO EntradaCaixa (dataRegistro, formaPagamento, valor, id) VALUES (:data, :forma, :valor, :user)";
+            // Altere a query para incluir a coluna descricao
+            $sql = "INSERT INTO EntradaCaixa (dataRegistro, formaPagamento, descricao, valor, id) 
+            VALUES (:data, :forma, :desc, :valor, :user)";
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 ":data"  => $data->data_registro,
-                ":forma" => $data->descricao, // No front, descricao é enviada como formaPagamento para entradas
+                ":forma" => $data->forma_pagamento ?? 'Dinheiro',
+                ":desc"  => $data->descricao, // Agora grava a descrição enviada pelo front
                 ":valor" => $data->valor,
                 ":user"  => $userId
             ]);
@@ -79,7 +82,7 @@ if ($method === 'GET') {
 
     try {
         // 1. Entradas de Caixa
-        $stmt = $db->prepare("SELECT id, dataRegistro as data, formaPagamento as descricao, valor, 'ENTRADA' as tipo, 'Vendas' as categoria FROM EntradaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
+        $stmt = $db->prepare("SELECT id as id, dataRegistro as data, descricao, valor, 'ENTRADA' as tipo, 'Vendas' as categoria FROM EntradaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
         $stmt->execute([':m' => $mesNum, ':a' => $ano]);
         $entradas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

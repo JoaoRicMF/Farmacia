@@ -162,6 +162,7 @@ class Database {
                 id_entrada INT AUTO_INCREMENT PRIMARY KEY,
                 dataRegistro DATETIME DEFAULT CURRENT_TIMESTAMP,
                 formaPagamento VARCHAR(50),
+                descricao VARCHAR(255), -- Adicione esta linha
                 valor DECIMAL(10, 2) NOT NULL,
                 id INT,
                 FOREIGN KEY (id) REFERENCES Usuario(id) ON DELETE SET NULL
