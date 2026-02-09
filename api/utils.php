@@ -1,6 +1,6 @@
 <?php
 // api/utils.php
-require_once __DIR__ . '/Lib/MoneyUtils.php'; // Inclua se criou o arquivo separado
+require_once __DIR__ . '/MoneyUtils.php'; // Inclua se criou o arquivo separado
 
 // Configurações Globais
 ini_set('display_errors', 0);

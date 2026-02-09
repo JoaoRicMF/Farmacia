@@ -11,15 +11,6 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-function inicializarApi(): void {
-    // Garante que a sessão também respeite o horário se houver cookies de expiração
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    header("Access-Control-Allow-Origin: *");
-    header("Content-Type: application/json; charset=UTF-8");
-}
-
 try {
     $db = (new Database())->getConnection();
     $method = $_SERVER['REQUEST_METHOD'];

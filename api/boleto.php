@@ -1,6 +1,6 @@
 <?php
 require_once 'utils.php';
-require_once 'Lib/MoneyUtils.php';
+require_once 'MoneyUtils.php';
 
 inicializarApi(); // Apenas headers, boleto pode ser público ou privado dependendo da regra
 
@@ -55,10 +55,13 @@ function calcularVencimentoBancario($fator) {
     try {
         $base = new DateTime('1997-10-07');
         $base->modify("+$fator days");
-        // Ajuste 2025 (Rollback do fator)
-        if ($base < new DateTime('2025-02-22')) {
+        
+        $corte = new DateTime('2015-01-01'); // Data de segurança
+
+        if ($base < $corte) {
             $base->modify('+9000 days');
         }
+        
         return $base->format('Y-m-d');
     } catch (Throwable $e) {
         return null;
