@@ -139,6 +139,55 @@ html { scrollbar-width: thin; scrollbar-color: var(--text-light) var(--bg-body);
 }
 .action-btn:hover { background: var(--bg-body); color: var(--primary); transform: scale(1.1); }
 
+.btn-icon {
+    width: 38px;                 /* Maior área de clique */
+    height: 38px;
+    border-radius: 8px;          /* Bordas arredondadas modernas */
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text-light);    /* Cor padrão cinza */
+    margin-left: 4px;            /* Espaçamento entre botões */
+}
+
+/* Tamanho do ícone SVG interno */
+.btn-icon svg {
+    width: 20px;
+    height: 20px;
+    stroke-width: 2px;
+}
+
+/* Hover Específico por Tipo de Ação */
+.btn-copy:hover { 
+    color: var(--primary); 
+    background-color: rgba(37, 99, 235, 0.1); 
+    transform: translateY(-2px);
+}
+.btn-link:hover { 
+    color: #8b5cf6; /* Roxo */
+    background-color: rgba(139, 92, 246, 0.1);
+    transform: translateY(-2px);
+}
+.btn-check:hover { 
+    color: var(--success); 
+    background-color: rgba(16, 185, 129, 0.1); 
+    transform: translateY(-2px);
+}
+.btn-edit:hover { 
+    color: var(--warning); 
+    background-color: rgba(245, 158, 11, 0.1); 
+    transform: translateY(-2px);
+}
+.btn-trash:hover { 
+    color: var(--danger); 
+    background-color: rgba(239, 68, 68, 0.1); 
+    transform: translateY(-2px);
+}
+
 /* ==========================================================================
    5. COMPONENTES: FORMULÁRIOS & INPUTS
    ========================================================================== */

@@ -440,26 +440,46 @@ const Financeiro = {
             }
 
             const temCodigo = r.codigo_barras && r.codigo_barras.length > 5;
-            const btnCopy = temCodigo ? `<button class="btn-icon btn-copy" onclick="Financeiro.copiarCodigo('${r.codigo_barras}')" title="Copiar">📋</button>` : '';
+            const btnCopy = temCodigo ? 
+                `<button class="btn-icon btn-copy" onclick="Financeiro.copiarCodigo('${r.codigo_barras}')" title="Copiar Código">
+                    <i data-lucide="copy"></i>
+                </button>` : '';
+            
             const tr = document.createElement('tr');
             if (statusTexto === 'Vencido') tr.classList.add('row-vencido');
 
             tr.innerHTML = `
                 <td>${Utils.formatarDataBR(r.vencimento)}</td>
-                <td>${r.descricao} ${temCodigo ? '<br><small style="color:#aaa; font-size:0.75rem;">'+r.codigo_barras+'</small>' : ''}</td>
+                <td>
+                    ${r.descricao} 
+                    ${temCodigo ? '<br><small style="color:#aaa; font-size:0.75rem;">'+r.codigo_barras+'</small>' : ''}
+                </td>
                 <td><span class="category-badge">${r.categoria}</span></td>
                 <td style="font-weight: 500;">${Utils.formatarMoedaBRL(r.valor)}</td>
                 <td><span class="status-badge ${statusClass}">${statusTexto}</span></td>
-                <td class="text-right">
+    
+                <td class="text-right" style="white-space: nowrap;">
                     ${btnCopy}
-                    <button class="btn-icon btn-link" onclick="Financeiro.abrirBanco()" title="Banco">🏦</button>
-                    ${r.status !== 'Pago' ? `<button class="btn-icon btn-check" onclick="Financeiro.baixar(${r.id})" title="Pagar">✓</button>` : ''}
-                    <button class="btn-icon btn-edit" onclick="Financeiro.editar(${r.id})" title="Editar">✎</button>
-                    <button class="btn-icon btn-trash" onclick="Financeiro.excluir(${r.id})" title="Excluir">🗑</button>
+                    <button class="btn-icon btn-link" onclick="Financeiro.abrirBanco()" title="Acessar Banco">
+                        <i data-lucide="landmark"></i>
+                    </button>
+                    ${r.status !== 'Pago' ? 
+                        `<button class="btn-icon btn-check" onclick="Financeiro.baixar(${r.id})" title="Confirmar Pagamento">
+                            <i data-lucide="check-circle-2"></i>
+                        </button>` : ''}
+                    <button class="btn-icon btn-edit" onclick="Financeiro.editar(${r.id})" title="Editar">
+                        <i data-lucide="pencil"></i>
+                    </button>
+                    <button class="btn-icon btn-trash" onclick="Financeiro.excluir(${r.id})" title="Excluir">
+                        <i data-lucide="trash-2"></i>
+                    </button>
                 </td>
             `;
             tbody.appendChild(tr);
         });
+
+        // CORREÇÃO: Renderizar os ícones APÓS inserir todos os elementos na tela
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     },
 
     prepararNovo() {
@@ -494,7 +514,6 @@ const Financeiro = {
             codigo_barras: campos.cod.value
         };
 
-        // UI Feedback: Desabilita botão temporariamente para evitar duplo clique
         const btnSalvar = document.querySelector('#view-novo button[onclick*="salvarBoleto"]');
         if(btnSalvar) btnSalvar.disabled = true;
 
@@ -504,15 +523,11 @@ const Financeiro = {
 
         if (res && res.success) {
             UI.showToast('Salvo com sucesso!');
-            // Só limpa o formulário se foi SUCESSO.
-            // Se for erro (como duplicidade), mantém os dados na tela.
             if (!event || event.type === 'submit') {
                 Financeiro.prepararNovo();
             }
             Dashboard.carregar();
         } else {
-            // AQUI EXIBIMOS O ERRO 409 VINDO DO PHP
-            // A API.request retorna o JSON mesmo com status de erro
             UI.showToast(res?.message || 'Erro desconhecido ao salvar.', 'error');
         }
     },
@@ -551,7 +566,7 @@ const Financeiro = {
         if (res && res.success) {
             UI.showToast("Atualizado!");
             Financeiro.fecharModalEdicao();
-            Financeiro.carregar(State.paginaAtualFinanceiro);
+            Financeiro.carregar(State.paginaAtualFinanceiro); // Isso já vai recarregar os ícones corretamente
         } else {
             UI.showToast(res?.message || "Erro.", "error");
         }
