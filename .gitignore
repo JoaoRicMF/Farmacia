@@ -1,51 +1,40 @@
-# --- Java & Maven (Essencial) ---
-target/
-*.class
-*.jar
-*.war
-*.ear
-*.nar
-
-# Wrapper do Maven (Opcional - deixe se quiser versionar o wrapper)
-!.mvn/wrapper/maven-wrapper.jar
-
-# --- Logs & Arquivos Temporários ---
-*.log
-logs/
-temp/
-/routes/app.log
-hs_err_pid*
-
-# --- IDEs (IntelliJ, Eclipse, VS Code) ---
-.idea/
-*.iml
-*.iws
-*.ipr
-.vscode/
-.classpath
-.project
-.settings/
-.springBeans
-bin/
-
 # --- Sistema Operacional ---
 .DS_Store
 Thumbs.db
 ehthumbs.db
+Desktop.ini
 
-# --- Segurança & Ambiente Local (CRÍTICO) ---
+# --- IDEs (Configurações Locais) ---
+# Ignorar configurações específicas do utilizador
+.idea/
+.vscode/
+*.swp
+*.swo
+*.iws
+*.iml
+
+# --- PHP & Dependências ---
+/vendor/
+composer.phar
+composer.lock  # Opcional: Geralmente comita-se em apps, ignora-se em libs. Mantenha ignorado se quiser gerir versões manualmente.
+.phpunit.result.cache
+
+# --- Logs & Debug ---
+# Logs de erro do PHP e Apache
+error_log
+access.log
+*.log
+logs/
+temp/
+
+# --- Segurança & Ambiente (CRÍTICO) ---
+# Nunca versione credenciais reais
 .env
-application-local.properties
-/routes/src/main/resources/application-local.properties
+.env.local
+.env.backup
+.env.*.local
 
-# --- Docker (Se não quiser versionar builds locais) ---
-# Se gerar imagens localmente ou usar volumes temporários
-.docker/
-
-# --- Legado Python (Caso ainda tenha arquivos antigos) ---
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-env/
-.venv/
+# --- Uploads & Arquivos Gerados ---
+# Se o sistema permitir upload de imagens no futuro
+public/uploads/
+public/cache/
