@@ -22,7 +22,6 @@ try {
 
     // --- ROTINA DE AUTO-UPDATE (VENCIDOS) ---
     // Executa antes de qualquer ação para garantir dados atualizados
-    // Atualiza status para 'Vencido' se estiver 'Pendente' e a data for anterior a hoje
     $sqlAutoUpdate = "UPDATE Financeiro 
                       SET status = 'Vencido' 
                       WHERE status = 'Pendente' 
@@ -34,8 +33,23 @@ try {
     $action = $_GET['action'] ?? '';
     $id = $_GET['id'] ?? null;
 
-    // --- LISTAGEM (GET) ---
+    // --- LISTAGEM E LEITURA (GET) ---
     if ($method === 'GET') {
+        
+        // [CORREÇÃO] Se vier um ID, retorna apenas o registro específico (Para Edição)
+        if ($id) {
+            $stmt = $db->prepare("SELECT * FROM Financeiro WHERE id = :id");
+            $stmt->execute([':id' => $id]);
+            $registro = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($registro) {
+                enviarResponse($registro); // Encerra aqui retornando o objeto {id: 1, ...}
+            } else {
+                throw new Exception("Registro não encontrado.", 404);
+            }
+        }
+
+        // --- Lógica Padrão de Listagem (Se não houver ID) ---
         $busca = $_GET['busca'] ?? '';
         $status = $_GET['status'] ?? 'Todos';
         $cat = $_GET['categoria'] ?? 'Todas';
@@ -121,9 +135,9 @@ try {
                     status=:s, 
                     codigo_barras=:cb,
                     data_processamento = CASE 
-                        WHEN :s = 'Pago' AND data_processamento IS NULL THEN NOW() -- Se virou Pago, marca data de hoje
-                        WHEN :s != 'Pago' THEN NULL -- Se voltou a Pendente, limpa a data
-                        ELSE data_processamento -- Se só mudou descrição, mantém a data original
+                        WHEN :s = 'Pago' AND data_processamento IS NULL THEN NOW() 
+                        WHEN :s != 'Pago' THEN NULL 
+                        ELSE data_processamento 
                     END
                     WHERE id=:id";
 
@@ -132,17 +146,13 @@ try {
             $logAction = "Editar Financeiro";
         } else {
             // INSERT
-
-            // --- VALIDAÇÃO DE DUPLICIDADE (CÓDIGO DE BARRAS) ---
             $codigoBarras = $input->codigo_barras ?? '';
 
-            // Apenas valida se o código de barras não estiver vazio
             if (!empty($codigoBarras)) {
                 $checkDup = $db->prepare("SELECT id FROM Financeiro WHERE codigo_barras = :cb LIMIT 1");
                 $checkDup->execute([':cb' => $codigoBarras]);
 
                 if ($checkDup->rowCount() > 0) {
-                    // O código 409 (Conflict) é o padrão REST para duplicidade
                     throw new Exception("Este boleto já foi cadastrado anteriormente", 409);
                 }
             }
@@ -178,8 +188,12 @@ try {
     }
 
 } catch (Exception $e) {
-    $httpCode = ($e->getCode() === 401) ? 401 : 500;
+    $httpCode = ($e->getCode() >= 400 && $e->getCode() < 600) ? $e->getCode() : 500;
+    // Ajuste para 401 específico se necessário
+    if($e->getCode() === 401) $httpCode = 401; 
+    
     $response = ['success' => false, 'message' => $e->getMessage()];
 }
 
 enviarResponse($response, $httpCode);
+?>
