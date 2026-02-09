@@ -25,20 +25,37 @@ const State = {
    MÓDULO: UTILS (Formatadores e Helpers Puros)
    ========================================================================== */
 const Utils = {
+    /**
+     * Formata float para BRL.
+     * Ex: 10.5 -> "R$ 10,50"
+     */
     formatarMoedaBRL(valor) {
-        return parseFloat(valor).toLocaleString('pt-BR', {
+        // Garante que é número, trata possíveis strings vindas da API
+        const numero = parseFloat(valor);
+        if (isNaN(numero)) return 'R$ 0,00';
+        
+        return numero.toLocaleString('pt-BR', {
             style: 'currency',
             currency: 'BRL'
         });
     },
 
+    /**
+     * Converte Input mascarado (R$ 1.234,56) para float (1234.56).
+     * Essencial para enviar JSON limpo para o PHP.
+     */
     converterMoedaParaFloat(valorString) {
         if (!valorString) return 0.00;
-        return parseFloat(valorString.replace(/[^\d,]/g, '').replace(',', '.'));
+        if (typeof valorString === 'number') return valorString;
+        
+        // Remove tudo que não for dígito ou vírgula decimal
+        const limpo = valorString.replace(/[^\d,]/g, '').replace(',', '.');
+        return parseFloat(limpo) || 0.00;
     },
 
     formatarDataBR(dataISO) {
         if (!dataISO) return '-';
+        // Previne erro de fuso horário convertendo string direta
         const [ano, mes, dia] = dataISO.split(' ')[0].split('-');
         return `${dia}/${mes}/${ano}`;
     },
@@ -48,7 +65,6 @@ const Utils = {
         State.buscaTimeout = setTimeout(func, delay);
     }
 };
-
 /* ==========================================================================
    MÓDULO: UI (Interação com DOM e Feedback)
    ========================================================================== */

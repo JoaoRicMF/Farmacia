@@ -1,36 +1,37 @@
-# 🏥 Farmácia - Sistema Financeiro (Spring Boot Edition)
+# 🏥 Farmácia - Sistema de Gestão Financeira
 
-Sistema de gestão financeira completo, originalmente concebido em Python e **migrado para Java com Spring Boot**, focado no controlo de contas a pagar, fluxo de caixa e auditoria para farmácias.
+![Java](https://img.shields.io/badge/Java-17%2B-orange?style=for-the-badge&logo=openjdk)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2.2-brightgreen?style=for-the-badge&logo=springboot)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-blue?style=for-the-badge&logo=mysql)
+![PHP](https://img.shields.io/badge/PHP-8.1-777BB4?style=for-the-badge&logo=php)
 
-O sistema foi modernizado para arquitetura **MVC** com **Spring Data JPA** e **MySQL**, pronto para execução em containers Docker.
+Sistema robusto de controlo financeiro e auditoria para farmácias. Originalmente concebido para ambientes PHP/Apache, o núcleo do sistema foi migrado para **Spring Boot (Java)**, oferecendo maior escalabilidade e segurança.
 
 ## 🚀 Funcionalidades
 
-- **Dashboard Interativo**: Gráficos de despesas mensais, divisão por categorias e indicadores de vencimento.
-- **Fluxo de Caixa Otimizado**: Entradas e saídas com cálculo de saldo em tempo real.
-- **Leitura de Boletos**: Decodificação de linha digitável e código de barras.
-- **Calendário Visual**: Visualização de vencimentos (integração FullCalendar).
-- **Auditoria (Logs)**: Rastreio completo de ações dos utilizadores (quem fez o quê e quando).
-- **Relatórios**: Exportação de dados para Excel (.xlsx) usando Apache POI.
-- **Segurança**: Autenticação customizada com BCrypt e Sessão HTTP.
+- **📈 Dashboard em Tempo Real**: Indicadores de contas a pagar, vencidos e próximos vencimentos com gráficos interativos (Chart.js).
+- **💸 Fluxo de Caixa**: Gestão de entradas (vendas) e saídas (sangrias/despesas) com cálculo automático de saldo líquido.
+- **📄 Leitura de Boletos**: Descodificação inteligente de linha digitável e códigos de barras bancários e de concessionárias.
+- **🛡️ Auditoria Completa**: Rastreio de ações de utilizadores (Logs) para garantir a integridade dos dados.
+- **📅 Calendário Visual**: Visualização mensal de compromissos financeiros integrada com FullCalendar.
+- **📊 Exportação de Dados**: Geração de relatórios em formato CSV/Excel para análise externa.
 
 ## 🛠️ Tecnologias Utilizadas
 
-- **Backend**: Java 17, Spring Boot 3.2.2.
-- **Base de Dados**: MySQL 8.0 (JPA / Hibernate).
-- **Build Tool**: Maven.
-- **Frontend**: HTML5, CSS3, JavaScript Vanilla (servidos via recursos estáticos do Spring).
-- **Infraestrutura**: Docker (Dockerfile incluído).
+### Backend
+- **Java 17 & Spring Boot 3**: Arquitetura moderna e segura.
+- **PHP 8**: Utilizado para módulos legados e APIs utilitárias.
+- **Spring Data JPA**: Abstração de persistência de dados.
+- **MySQL 8**: Base de dados relacional fiável.
 
-## 📦 Como Rodar Localmente (Via Maven)
+### Frontend
+- **Interface**: HTML5, CSS3 (Modern UI com suporte a Tema Escuro).
+- **Componentes**: JavaScript Vanilla, Lucide Icons e Chart.js.
 
-Pré-requisitos: Java JDK 17, Maven e MySQL instalado.
+## 📂 Estrutura do Projeto
 
-1. **Configurar a Base de Dados**
-   Crie um esquema no MySQL chamado `farmacia_db` e ajuste as credenciais no ficheiro `routes/src/main/resources/application.properties` (ou use variáveis de ambiente).
-
-2. **Compilar e Executar**
-   Navegue até à pasta do projeto Java:
-   ```bash
-   cd routes
-   mvn spring-boot:run
+```text
+├── api/                # Endpoints PHP para lógica de negócio legada
+├── config/             # Configurações de base de dados e auditoria
+├── public/             # Interface web (HTML, CSS, JS)
+└── routes/             # Núcleo da aplicação Spring Boot (Java)
