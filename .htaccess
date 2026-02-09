@@ -1,39 +1,39 @@
-# .htaccess na raiz do projeto
 RewriteEngine On
 RewriteBase /
 
-# Se o arquivo ou diretório solicitado existir fisicamente (como /api/auth.php), use-o diretamente
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
+# 1. Ignora regras se o arquivo ou diretório real existir
+# Isso permite que chamadas diretas como /api/dashboard.php ou /public/style.css continuem funcionando
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
 
-# --- Autenticação ---
-RewriteRule ^login$ auth.php?action=login [L,QSA]
-RewriteRule ^logout$ auth.php?action=logout [L,QSA]
-RewriteRule ^dados_usuario$ auth.php?action=check [L,QSA]
+# 2. Rotas da API (Apontando para a pasta api/)
+# Autenticação
+RewriteRule ^login$ api/auth.php?action=login [L,QSA]
+RewriteRule ^logout$ api/auth.php?action=logout [L,QSA]
+RewriteRule ^dados_usuario$ api/auth.php?action=check [L,QSA]
 
-# --- Financeiro (Boletos e Contas) ---
-# Baixar (Pagar)
-RewriteRule ^registros/([0-9]+)/baixar$ financeiro.php?id=$1&action=baixar [L,QSA]
-# CRUD Individual (GET um, DELETE, PUT)
-RewriteRule ^registros/([0-9]+)$ financeiro.php?id=$1 [L,QSA]
-# Listagem e Criação
-RewriteRule ^registros$ financeiro.php [L,QSA]
-RewriteRule ^novo_boleto$ financeiro.php [L,QSA]
+# Financeiro
+RewriteRule ^registros/([0-9]+)/baixar$ api/financeiro.php?id=$1&action=baixar [L,QSA]
+RewriteRule ^registros/([0-9]+)$ api/financeiro.php?id=$1 [L,QSA]
+RewriteRule ^registros$ api/financeiro.php [L,QSA]
+RewriteRule ^novo_boleto$ api/financeiro.php [L,QSA]
 
-# --- Dashboard & Fluxo ---
-RewriteRule ^dashboard$ dashboard.php [L,QSA]
-RewriteRule ^fluxo/movimento$ fluxo.php?action=salvar [L,QSA]
-RewriteRule ^fluxo$ fluxo.php [L,QSA]
+# Dashboard & Fluxo
+RewriteRule ^dashboard$ api/dashboard.php [L,QSA]
+RewriteRule ^fluxo/movimento$ api/fluxo.php?action=salvar [L,QSA]
+RewriteRule ^fluxo$ api/fluxo.php [L,QSA]
 
-# --- Utilitários e Cadastros ---
-RewriteRule ^ler_codigo$ boleto.php [L,QSA]
-RewriteRule ^fornecedores/([0-9]+)$ fornecedores.php?id=$1 [L,QSA]
-RewriteRule ^fornecedores$ fornecedores.php [L,QSA]
-RewriteRule ^exportar$ exportar.php [L,QSA]
+# Utilitários
+RewriteRule ^ler_codigo$ api/boleto.php [L,QSA]
+RewriteRule ^fornecedores/([0-9]+)$ api/fornecedores.php?id=$1 [L,QSA]
+RewriteRule ^fornecedores$ api/fornecedores.php [L,QSA]
+RewriteRule ^exportar$ api/exportar.php [L,QSA]
 
-# --- Admin (Logs e Usuários) ---
-RewriteRule ^logs$ admin.php?resource=logs [L,QSA]
-RewriteRule ^usuarios$ admin.php?resource=usuarios [L,QSA]
+# Admin
+RewriteRule ^logs$ api/admin.php?resource=logs [L,QSA]
+RewriteRule ^usuarios$ api/admin.php?resource=usuarios [L,QSA]
 
-# Caso contrário, redirecione para o index.html (Suporte para SPA)
-RewriteRule ^ index.html [L]
+# 3. Fallback para SPA (Frontend)
+# Qualquer rota não encontrada acima será enviada para o index.html na pasta public
+RewriteRule ^ public/index.html [L]

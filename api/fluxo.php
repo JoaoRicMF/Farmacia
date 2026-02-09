@@ -2,9 +2,23 @@
 // api/fluxo.php
 require_once 'utils.php';
 require_once '../config/database.php';
+date_default_timezone_set('America/Sao_Paulo');
 
 // Inicializa API, Sessão e Verifica Login
 verificarAuth();
+
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+error_reporting(E_ALL);
+
+function inicializarApi(): void {
+    // Garante que a sessão também respeite o horário se houver cookies de expiração
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    header("Access-Control-Allow-Origin: *");
+    header("Content-Type: application/json; charset=UTF-8");
+}
 
 try {
     $db = (new Database())->getConnection();
@@ -17,66 +31,99 @@ try {
     }
     $userId = $_SESSION['user_id'];
 
-    // --- POST: SALVAR MOVIMENTAÇÃO ---
+    // --- POST: SALVAR MOVIMENTAÇÃO (CORRIGIDO COM LOCK) ---
     if ($method === 'POST' && $action === 'salvar') {
         $data = getJsonInput(); // Helper do utils.php
+        $lockName = 'trava_fluxo_caixa';
+        $lockAcquired = false;
 
-        // Validação de Saldo para Saídas (exceto se for ENTRADA)
-        if (($data->tipo ?? '') !== 'ENTRADA') {
-            $mes = date('m', strtotime($data->data_registro));
-            $ano = date('Y', strtotime($data->data_registro));
+        try {
+            // 1. Inicia Transação
+            $db->beginTransaction();
 
-            // Helper local para buscar soma em Centavos
-            $getSumCents = function($sql) use ($db, $mes, $ano) {
-                $stmt = $db->prepare($sql);
-                $stmt->execute([':m' => $mes, ':a' => $ano]);
-                return MoneyUtils::toCents($stmt->fetchColumn() ?? 0);
-            };
-
-            // Cálculos precisos em Centavos
-            $entradasCents = $getSumCents("SELECT SUM(valor) FROM EntradaCaixa WHERE MONTH(dataRegistro)=:m AND YEAR(dataRegistro)=:a");
-            $saidasManuaisCents = $getSumCents("SELECT SUM(valor) FROM SaidaCaixa WHERE MONTH(dataRegistro)=:m AND YEAR(dataRegistro)=:a");
-            $pagamentosCents = $getSumCents("SELECT SUM(valor) FROM Financeiro WHERE status='Pago' AND MONTH(COALESCE(data_processamento, vencimento))=:m AND YEAR(COALESCE(data_processamento, vencimento))=:a");
-
-            $saldoDisponivelCents = $entradasCents - ($saidasManuaisCents + $pagamentosCents);
-            $valorSaidaCents = MoneyUtils::toCents($data->valor);
-
-            if ($valorSaidaCents > $saldoDisponivelCents) {
-                enviarResponse([
-                    "success" => false, 
-                    "message" => "Saldo insuficiente! Disponível: R$ " . number_format(MoneyUtils::fromCents($saldoDisponivelCents), 2, ',', '.')
-                ]);
-                exit; // Importante parar a execução aqui se o saldo for insuficiente
+            // 2. Adquire Lock Exclusivo (Serialização)
+            // Aguarda até 10 segundos para pegar a vez
+            $stmtLock = $db->query("SELECT GET_LOCK('$lockName', 10)");
+            if ($stmtLock->fetchColumn() != 1) {
+                throw new Exception("O sistema está processando outra transação. Tente novamente.");
             }
-        }
+            $lockAcquired = true;
 
-        // Persistência
-        if (($data->tipo ?? '') === 'ENTRADA') {
-            $sql = "INSERT INTO EntradaCaixa (dataRegistro, formaPagamento, descricao, valor, id) VALUES (:data, :forma, :desc, :valor, :user)";
-            $params = [
-                ":data"  => $data->data_registro,
-                ":forma" => $data->forma_pagamento ?? 'Dinheiro',
-                ":desc"  => $data->descricao,
-                ":valor" => $data->valor,
-                ":user"  => $userId
-            ];
-        } else {
-            $sql = "INSERT INTO SaidaCaixa (dataRegistro, descricao, valor, id) VALUES (:data, :desc, :valor, :user)";
-            $params = [
-                ":data"  => $data->data_registro,
-                ":desc"  => $data->descricao,
-                ":valor" => $data->valor,
-                ":user"  => $userId
-            ];
-        }
+            // --- LÓGICA ORIGINAL DENTRO DA ÁREA SEGURA ---
 
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        
-        enviarResponse(["success" => true]);
+            // Validação de Saldo para Saídas (exceto se for ENTRADA)
+            if (($data->tipo ?? '') !== 'ENTRADA') {
+                $mes = date('m', strtotime($data->data_registro));
+                $ano = date('Y', strtotime($data->data_registro));
+
+                // Helper local para buscar soma em Centavos
+                $getSumCents = function($sql) use ($db, $mes, $ano) {
+                    $stmt = $db->prepare($sql);
+                    $stmt->execute([':m' => $mes, ':a' => $ano]);
+                    return MoneyUtils::toCents($stmt->fetchColumn() ?? 0);
+                };
+
+                // Cálculos precisos em Centavos
+                $entradasCents = $getSumCents("SELECT SUM(valor) FROM EntradaCaixa WHERE MONTH(dataRegistro)=:m AND YEAR(dataRegistro)=:a");
+                $saidasManuaisCents = $getSumCents("SELECT SUM(valor) FROM SaidaCaixa WHERE MONTH(dataRegistro)=:m AND YEAR(dataRegistro)=:a");
+                $pagamentosCents = $getSumCents("SELECT SUM(valor) FROM Financeiro WHERE status='Pago' AND MONTH(COALESCE(data_processamento, vencimento))=:m AND YEAR(COALESCE(data_processamento, vencimento))=:a");
+
+                $saldoDisponivelCents = $entradasCents - ($saidasManuaisCents + $pagamentosCents);
+                $valorSaidaCents = MoneyUtils::toCents($data->valor);
+
+                if ($valorSaidaCents > $saldoDisponivelCents) {
+                    // Libera lock antes de responder erro
+                    $db->query("DO RELEASE_LOCK('$lockName')");
+                    $db->commit(); // Commit vazio apenas para fechar a transação limpa
+                    
+                    enviarResponse([
+                        "success" => false, 
+                        "message" => "Saldo insuficiente! Disponível: R$ " . number_format(MoneyUtils::fromCents($saldoDisponivelCents), 2, ',', '.')
+                    ]);
+                    exit; 
+                }
+            }
+
+            // Persistência
+            if (($data->tipo ?? '') === 'ENTRADA') {
+                $sql = "INSERT INTO EntradaCaixa (dataRegistro, formaPagamento, descricao, valor, id) VALUES (:data, :forma, :desc, :valor, :user)";
+                $params = [
+                    ":data"  => $data->data_registro,
+                    ":forma" => $data->forma_pagamento ?? 'Dinheiro',
+                    ":desc"  => $data->descricao,
+                    ":valor" => $data->valor,
+                    ":user"  => $userId
+                ];
+            } else {
+                $sql = "INSERT INTO SaidaCaixa (dataRegistro, descricao, valor, id) VALUES (:data, :desc, :valor, :user)";
+                $params = [
+                    ":data"  => $data->data_registro,
+                    ":desc"  => $data->descricao,
+                    ":valor" => $data->valor,
+                    ":user"  => $userId
+                ];
+            }
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+
+            // 3. Finalização
+            $db->query("DO RELEASE_LOCK('$lockName')");
+            $db->commit();
+            
+            enviarResponse(["success" => true]);
+
+        } catch (Exception $e) {
+            // Rollback e Liberação em caso de erro
+            if ($db->inTransaction()) $db->rollBack();
+            if ($lockAcquired) $db->query("DO RELEASE_LOCK('$lockName')");
+            
+            // Repassa o erro para o catch principal ou responde aqui
+            throw $e;
+        }
     } // Fim do if POST
 
-    // --- GET: LISTAR FLUXO ---
+    // --- GET: LISTAR FLUXO (Sem alterações na lógica de leitura) ---
     if ($method === 'GET') {
         $mes = $_GET['mes'] ?? date('Y-m');
         if (!preg_match('/^\d{4}-\d{2}$/', $mes)) {
@@ -97,10 +144,9 @@ try {
         $stmt->execute([':m' => $mesNum, ':a' => $ano]);
         $pagos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // 2. Consolidação e Cálculo (Usando Centavos)
+        // 2. Consolidação e Cálculo
         $movimentacoes = array_merge($entradas, $saidas, $pagos);
         
-        // Ordenação por data decrescente
         usort($movimentacoes, function($a, $b) {
             return strtotime($b['data']) - strtotime($a['data']);
         });
@@ -109,10 +155,7 @@ try {
         $totalSaiCents = 0;
 
         foreach ($movimentacoes as &$mov) {
-            // Converte para centavos para somar corretamente
             $valCents = MoneyUtils::toCents($mov['valor']);
-            
-            // Formata para exibição
             $mov['valor_fmt'] = "R$ " . number_format(MoneyUtils::fromCents($valCents), 2, ',', '.');
             $mov['data_fmt']  = date('d/m/Y', strtotime($mov['data']));
 
@@ -122,13 +165,11 @@ try {
                 $totalSaiCents += $valCents;
             }
         }
-        unset($mov); // Boa prática ao usar referência em foreach
+        unset($mov); 
 
         // 3. Totais por Forma de Pagamento
         $stmtTotais = $db->prepare("SELECT formaPagamento, SUM(valor) as total FROM EntradaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a GROUP BY formaPagamento");
         $stmtTotais->execute([':m' => $mesNum, ':a' => $ano]);
-        
-        // Correção para fetchAll: garante array mesmo se vazio
         $formas = $stmtTotais->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 
         $totalDinheiroCents = MoneyUtils::toCents($formas['Dinheiro'] ?? 0);
@@ -143,19 +184,16 @@ try {
             "total_entradas_fmt" => "R$ " . number_format(MoneyUtils::fromCents($totalEntCents), 2, ',', '.'),
             "total_saidas_fmt"   => "R$ " . number_format(MoneyUtils::fromCents($totalSaiCents), 2, ',', '.'),
             "saldo_fmt"          => "R$ " . number_format(MoneyUtils::fromCents($saldoCents), 2, ',', '.'),
-            // Totais Específicos
             "total_dinheiro" => "R$ " . number_format(MoneyUtils::fromCents($totalDinheiroCents), 2, ',', '.'),
             "total_pix"      => "R$ " . number_format(MoneyUtils::fromCents($totalPixCents), 2, ',', '.'),
             "total_cartao"   => "R$ " . number_format(MoneyUtils::fromCents($totalCartaoCents), 2, ',', '.')
         ]);
-    } // Fim do if GET
+    } 
 
-} catch (Exception $e) { // Fim do try
-    // Se entrar aqui, é erro de execução (Banco de dados, lógica, etc)
+} catch (Exception $e) { 
     if (function_exists('enviarResponse')) {
-        enviarResponse(["error" => "Erro ao processar fluxo: " . $e->getMessage()], 500);
+        enviarResponse(["success" => false, "message" => "Erro: " . $e->getMessage()], 200);
     } else {
-        // Fallback caso a função enviarResponse não esteja disponível
         header('Content-Type: application/json');
         http_response_code(500);
         echo json_encode(["error" => $e->getMessage()]);
