@@ -52,19 +52,30 @@ enviarResponse($response);
 
 function calcularVencimentoBancario($fator) {
     if (!$fator || $fator === '0000') return null;
-    try {
-        $base = new DateTime('1997-10-07');
-        $base->modify("+$fator days");
-        
-        $corte = new DateTime('2015-01-01'); // Data de segurança
 
-        if ($base < $corte) {
-            $base->modify('+9000 days');
-        }
+    try {
+        // 1. Define Timezone UTC para evitar bugs de horário de verão/fuso
+        $timezone = new DateTimeZone('UTC');
+        $dataBase = new DateTime('1997-10-07', $timezone);
         
-        return $base->format('Y-m-d');
+        // 2. Calcula a data "bruta" (no ciclo de 1997)
+        $dataBase->modify("+$fator days");
+
+        // 3. Lógica da Janela Deslizante (Rolling Window)
+        // Define uma data de corte dinâmica (Hoje - 5 anos aprox/1800 dias)
+        // Se a data calculada for mais antiga que isso, ela pertence ao novo ciclo.
+        $hoje = new DateTime('now', $timezone);
+        $dataCorte = clone $hoje;
+        $dataCorte->modify('-1800 days'); // Janela de ~5 anos atrás
+
+        // Se a data calculada (ex: 2001) for menor que o corte (ex: 2021), soma 9000 dias
+        if ($dataBase < $dataCorte) {
+            $dataBase->modify('+9000 days');
+        }
+
+        return $dataBase->format('Y-m-d');
     } catch (Throwable $e) {
-        return null;
+        return null; // Retorna null em caso de erro crítico
     }
 }
 ?>
