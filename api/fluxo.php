@@ -6,33 +6,25 @@ date_default_timezone_set('America/Sao_Paulo');
 
 // --- FUNÇÃO REUTILIZÁVEL (SHARED LOGIC) ---
 function obterMovimentacoesFluxo(PDO $db, string $ano, string $mesNum): array {
-    // 1. Entradas
+    // 1. Entradas (Vendas/Ingressos)
     $stmt = $db->prepare("SELECT id, dataRegistro as data, descricao, valor, 'ENTRADA' as tipo, 'Vendas' as categoria, formaPagamento 
                           FROM EntradaCaixa 
                           WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
     $stmt->execute([':m' => $mesNum, ':a' => $ano]);
     $entradas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 2. Saídas Manuais
-    $stmt = $db->prepare("SELECT id, dataRegistro as data, descricao, valor, 'SAIDA' as tipo, 'Sangria/Despesa' as categoria, NULL as formaPagamento 
+    // 2. Saídas (Todas: Manuais + Baixas de Boletos)
+    // Nota: Como a baixa agora insere aqui, não precisamos mais ler a tabela Financeiro!
+    $stmt = $db->prepare("SELECT id, dataRegistro as data, descricao, valor, 'SAIDA' as tipo, 'Despesa' as categoria, NULL as formaPagamento 
                           FROM SaidaCaixa 
                           WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
     $stmt->execute([':m' => $mesNum, ':a' => $ano]);
     $saidas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 3. Contas Pagas (Financeiro)
-    $stmt = $db->prepare("SELECT id, COALESCE(data_processamento, vencimento) as data, descricao, valor, 'SAIDA' as tipo, categoria, NULL as formaPagamento 
-                          FROM Financeiro 
-                          WHERE status = 'Pago' 
-                          AND MONTH(COALESCE(data_processamento, vencimento)) = :m 
-                          AND YEAR(COALESCE(data_processamento, vencimento)) = :a");
-    $stmt->execute([':m' => $mesNum, ':a' => $ano]);
-    $pagos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // 4. Consolidação
-    $movimentacoes = array_merge($entradas, $saidas, $pagos);
+    // 3. Consolidação
+    $movimentacoes = array_merge($entradas, $saidas);
     
-    // Ordenação por Data (Decrescente)
+    // Ordenação
     usort($movimentacoes, function($a, $b) {
         return strtotime($b['data']) - strtotime($a['data']);
     });

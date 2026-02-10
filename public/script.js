@@ -19,7 +19,8 @@ const State = {
     chartCat: null,
     fornecedoresCache: [],
     buscaTimeout: null,
-    fluxoCache: null
+    fluxoCache: null,
+    ordenacao: { campo: 'vencimento', dir: 'ASC' }
 };
 
 /* ==========================================================================
@@ -424,6 +425,7 @@ const Financeiro = {
         const dFim = document.getElementById('filtro-data-fim')?.value || '';
 
         let url = `financeiro.php?pagina=${pagina}&busca=${encodeURIComponent(busca)}&status=${status}&categoria=${encodeURIComponent(cat)}`;
+        url += `&ordem=${State.ordenacao.campo}&dir=${State.ordenacao.dir}`;
         if (dIni) url += `&data_inicio=${dIni}`;
         if (dFim) url += `&data_fim=${dFim}`;
 
@@ -591,12 +593,53 @@ const Financeiro = {
         }
     },
 
-    async baixar(id) {
-        if (!confirm("Confirmar baixa?")) return;
-        const res = await API.request(`financeiro.php?action=baixar&id=${id}`, 'POST');
+    baixar(id) {
+        // 1. Abre o modal em vez de dar baixa direta
+        document.getElementById('baixa-id').value = id;
+        
+        // Define a data padrão como HOJE
+        const hoje = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+        document.getElementById('baixa-data').value = hoje;
+        
+        // Reseta o select para o padrão
+        document.getElementById('baixa-forma').value = 'Bancário';
+
+        document.getElementById('modal-baixa').classList.remove('hidden');
+    },
+    fecharModalBaixa() {
+        document.getElementById('modal-baixa').classList.add('hidden');
+    },
+
+    async confirmarBaixa() {
+        const id = document.getElementById('baixa-id').value;
+        const dataPagamento = document.getElementById('baixa-data').value;
+        const formaPagamento = document.getElementById('baixa-forma').value;
+
+        if (!dataPagamento) return UI.showToast("Informe a data.", "error");
+
+        const btn = document.querySelector('#modal-baixa .btn-success');
+        const txtOriginal = btn.innerText;
+        btn.innerText = "Processando...";
+        btn.disabled = true;
+
+        const payload = { 
+            id: id, 
+            data_baixa: dataPagamento,
+            forma_pagamento: formaPagamento 
+        };
+
+        const res = await API.request('financeiro.php?action=baixar', 'POST', payload);
+
+        btn.innerText = txtOriginal;
+        btn.disabled = false;
+
         if (res && res.success) {
-            UI.showToast("Baixa realizada!");
+            UI.showToast("Pagamento registrado!");
+            Financeiro.fecharModalBaixa();
             Financeiro.carregar(State.paginaAtualFinanceiro);
+            Dashboard.carregar(); // Atualiza dashboard com os novos dados
+        } else {
+            UI.showToast(res?.message || "Erro ao baixar.", "error");
         }
     },
 

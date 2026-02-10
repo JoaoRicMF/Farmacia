@@ -28,9 +28,9 @@ try {
 
     // --- CÁLCULOS DO MÊS ATUAL (Sincronização com Fluxo) ---
     // 1. Total Entradas (EntradaCaixa) Mês Atual
-    $stmt = $db->prepare("SELECT SUM(valor) as total FROM EntradaCaixa WHERE MONTH(dataRegistro) = MONTH(CURRENT_DATE()) AND YEAR(dataRegistro) = YEAR(CURRENT_DATE())");
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM SaidaCaixa WHERE MONTH(dataRegistro) = MONTH(CURRENT_DATE()) AND YEAR(dataRegistro) = YEAR(CURRENT_DATE())");
     $stmt->execute();
-    $entradasMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+    $saidasCaixaMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
     // 2. Total Saídas Caixa (SaidaCaixa) Mês Atual
     $stmt = $db->prepare("SELECT SUM(valor) as total FROM SaidaCaixa WHERE MONTH(dataRegistro) = MONTH(CURRENT_DATE()) AND YEAR(dataRegistro) = YEAR(CURRENT_DATE())");
@@ -38,12 +38,12 @@ try {
     $saidasCaixaMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
     // 3. Total Financeiro Pago (Contas) Mês Atual
-    $stmt = $db->prepare("SELECT SUM(valor) as total FROM Financeiro WHERE status = 'Pago' AND MONTH(COALESCE(data_processamento, vencimento)) = MONTH(CURRENT_DATE()) AND YEAR(COALESCE(data_processamento, vencimento)) = YEAR(CURRENT_DATE())");
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM Financeiro WHERE status = 'Pago' AND MONTH(data_processamento) = MONTH(CURRENT_DATE()) AND YEAR(data_processamento) = YEAR(CURRENT_DATE())");
     $stmt->execute();
     $contasPagasMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
     // Totais Consolidados
-    $totalSaidasMes = $saidasCaixaMes + $contasPagasMes;
+    $totalSaidasMes = $saidasCaixaMes; 
     $saldoMes = $entradasMes - $totalSaidasMes;
 
     // --- CARDS ORIGINAIS (Ajustados) ---

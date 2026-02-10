@@ -84,8 +84,20 @@ try {
         $totalRegistros = $stmtCount->fetchColumn();
         $totalPaginas = ceil($totalRegistros / $limite);
 
-        // 2. Busca Paginada
-        $sql .= " ORDER BY vencimento ASC LIMIT $limite OFFSET $offset";
+        // --- ORDENAÇÃO DINÂMICA SEGURA ---
+        $colunasPermitidas = ['vencimento', 'descricao', 'valor', 'categoria', 'status'];
+        
+        // Captura parâmetros ou usa padrão
+        $ordemInput = $_GET['ordem'] ?? 'vencimento';
+        $dirInput   = strtoupper($_GET['dir'] ?? 'ASC');
+
+        // Validação (Whitelist): Se tentar injetar SQL, volta para o padrão
+        $ordem = in_array($ordemInput, $colunasPermitidas) ? $ordemInput : 'vencimento';
+        $direcao = ($dirInput === 'DESC') ? 'DESC' : 'ASC';
+
+        // 2. Busca Paginada (Query Final)
+        $sql .= " ORDER BY $ordem $direcao LIMIT $limite OFFSET $offset";
+        
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $dados = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -98,22 +110,56 @@ try {
         ];
     }
 
-    // --- BAIXA DE REGISTRO (POST action=baixar) ---
+    // --- BAIXA DE REGISTRO (INTEGRADA AO CAIXA) ---
+    // --- BAIXA DE REGISTRO (ATUALIZADO COM DATA E FORMA) ---
     elseif ($method === 'POST' && $action === 'baixar') {
-        $idBaixa = $id ?? json_decode(file_get_contents("php://input"))->id ?? null;
+        $input = json_decode(file_get_contents("php://input"));
+        $idBaixa = $input->id ?? null;
+        $dataBaixa = $input->data_baixa ?? date('Y-m-d'); // Usa a data informada ou Hoje
+        $formaPgto = $input->forma_pagamento ?? 'Bancário';
+
+        // Adiciona a hora atual à data para manter precisão de ordenação
+        $dataCompleta = $dataBaixa . ' ' . date('H:i:s');
 
         if (!$idBaixa) throw new Exception("ID inválido para baixa.");
 
-        // Atualiza status e define data de processamento
-        $sql = "UPDATE Financeiro SET status = 'Pago', data_processamento = NOW() WHERE id = :id";
-        $stmt = $db->prepare($sql);
-        $stmt->execute([':id' => $idBaixa]);
+        try {
+            $db->beginTransaction();
 
-        if ($stmt->rowCount() > 0) {
-            registrarLog($db, $userNome, "Baixar Título", "ID: $idBaixa - Status alterado para Pago");
-            $response = ['success' => true, 'message' => 'Título baixado com sucesso!'];
-        } else {
-            throw new Exception("Registro não encontrado ou já pago.");
+            // 1. Busca dados do título
+            $stmtGet = $db->prepare("SELECT descricao, valor FROM Financeiro WHERE id = :id AND status != 'Pago'");
+            $stmtGet->execute([':id' => $idBaixa]);
+            $titulo = $stmtGet->fetch(PDO::FETCH_ASSOC);
+
+            if (!$titulo) throw new Exception("Título não encontrado ou já pago.");
+
+            // 2. Registra a Saída no Caixa com a DATA RETROATIVA CORRETA
+            // Concatenamos a forma de pagamento na descrição
+            $descCaixa = "Pgto ($formaPgto): " . $titulo['descricao'];
+
+            $stmtCaixa = $db->prepare("INSERT INTO SaidaCaixa (dataRegistro, descricao, valor, id) VALUES (:data, :desc, :val, :user)");
+            $stmtCaixa->execute([
+                ':data'  => $dataCompleta,
+                ':desc'  => $descCaixa,
+                ':val'   => $titulo['valor'],
+                ':user'  => $_SESSION['user_id'] ?? null
+            ]);
+
+            // 3. Atualiza o Financeiro com a DATA DO PAGAMENTO REAL
+            $stmtUp = $db->prepare("UPDATE Financeiro SET status = 'Pago', data_processamento = :data WHERE id = :id");
+            $stmtUp->execute([
+                ':data' => $dataCompleta,
+                ':id'   => $idBaixa
+            ]);
+
+            registrarLog($db, $userNome, "Baixar Título", "ID: $idBaixa - $formaPgto - Data: $dataBaixa");
+            
+            $db->commit();
+            $response = ['success' => true, 'message' => 'Baixa realizada com sucesso!'];
+
+        } catch (Exception $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            throw $e;
         }
     }
 

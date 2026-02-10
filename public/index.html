@@ -450,14 +450,14 @@
                 <div style="overflow-x: auto;">
                     <table id="tabela-registros">
                         <thead>
-                        <tr>
-                            <th>Vencimento</th>
-                            <th>Descrição</th>
-                            <th>Categoria</th>
-                            <th>Valor</th>
-                            <th>Status</th>
-                            <th style="text-align: right;">Ações Rápidas</th>
-                        </tr>
+                            <tr>
+                                <th style="cursor: pointer;" onclick="Financeiro.ordenarPor('vencimento')">Vencimento ↕</th>
+                                <th style="cursor: pointer;" onclick="Financeiro.ordenarPor('descricao')">Descrição ↕</th>
+                                <th style="cursor: pointer;" onclick="Financeiro.ordenarPor('categoria')">Categoria ↕</th>
+                                <th style="cursor: pointer;" onclick="Financeiro.ordenarPor('valor')">Valor ↕</th>
+                                <th style="cursor: pointer;" onclick="Financeiro.ordenarPor('status')">Status ↕</th>
+                                <th style="text-align: right;">Ações Rápidas</th>
+                            </tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -797,6 +797,42 @@
             <div class="form-actions">
                 <button class="btn btn-secondary" onclick="fecharModalReset()">Cancelar</button>
                 <button class="btn btn-primary" onclick="confirmarResetSenha()">Salvar Nova Senha</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-baixa" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2>💰 Confirmar Pagamento</h2>
+            <button class="close-btn" onclick="Financeiro.fecharModalBaixa()" aria-label="Fechar">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="baixa-id">
+            
+            <p style="margin-bottom: 15px; color: var(--text-light);">
+                Confirme os detalhes do pagamento para conciliação:
+            </p>
+
+            <div class="form-group">
+                <label for="baixa-data">Data do Pagamento</label>
+                <input type="date" id="baixa-data">
+            </div>
+
+            <div class="form-group" style="margin-top: 15px;">
+                <label for="baixa-forma">Meio de Pagamento</label>
+                <select id="baixa-forma">
+                    <option value="Bancário">Bancário (Transferência/Boleto)</option>
+                    <option value="PIX">PIX</option>
+                    <option value="Dinheiro">Dinheiro (Caixa Local)</option>
+                    <option value="Cartão">Cartão Corporativo</option>
+                </select>
+            </div>
+
+            <div class="form-actions" style="margin-top: 25px;">
+                <button class="btn btn-secondary" onclick="Financeiro.fecharModalBaixa()">Cancelar</button>
+                <button class="btn btn-success" onclick="Financeiro.confirmarBaixa()">✅ Confirmar Baixa</button>
             </div>
         </div>
     </div>
