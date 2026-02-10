@@ -540,7 +540,11 @@
             <div class="card" style="margin-bottom: 20px;">
                 <h3>🎨 Aparência</h3>
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 15px;">
-                    <span>Tema do Sistema</span>
+                    <span>Tema Escuro</span>
+                    <label class="switch">
+                        <input type="checkbox" id="theme-switch" onchange="toggleDarkMode()">
+                        <span class="slider round"></span>
+                    </label>
                 </div>
             </div>
 
@@ -624,10 +628,13 @@
                         <input type="text" id="conf-nome">
                     </div>
                 </div>
-                <div class="form-row">
-                    <div class="full-width">
+                <div class="full-width">
+                    <div class="input-wrapper">
                         <label for="conf-senha">Nova Senha (deixe em branco para manter)</label>
                         <input type="password" id="conf-senha">
+                        <span class="toggle-pass" onclick="toggleSenhaPerfil()" role="button" tabindex="0" title="Mostrar/Ocultar Senha">
+                            <i data-lucide="eye" style="width: 20px; height: 20px;"></i>
+                        </span>
                     </div>
                 </div>
                 <button class="btn btn-primary" onclick="salvarConfiguracoes()">💾 Salvar Perfil</button>
@@ -708,6 +715,34 @@
             <div class="form-actions">
                 <button class="btn btn-secondary" onclick="fecharModalEdicao()">Cancelar</button>
                 <button class="btn btn-success" onclick="salvarEdicao()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-nova-categoria" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h2>📂 Nova Categoria</h2>
+            <button class="close-btn" onclick="Config.fecharModalCategoria()" aria-label="Fechar">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="new-cat-nome">Nome da Categoria</label>
+                <input type="text" id="new-cat-nome" placeholder="Ex: Investimentos, Empréstimos...">
+            </div>
+            
+            <div class="form-group" style="margin-top: 15px;">
+                <label for="new-cat-cor">Cor da Etiqueta</label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="color" id="new-cat-cor" value="#3b82f6" style="width: 50px; height: 40px; padding: 0; border: 1px solid var(--border); border-radius: 8px; cursor: pointer;">
+                    <small style="color: var(--text-light);">Escolha uma cor para identificar</small>
+                </div>
+            </div>
+
+            <div class="form-actions" style="margin-top: 25px;">
+                <button class="btn btn-secondary" onclick="Config.fecharModalCategoria()">Cancelar</button>
+                <button class="btn btn-primary" onclick="Config.salvarNovaCategoria()">Salvar Categoria</button>
             </div>
         </div>
     </div>

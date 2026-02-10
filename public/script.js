@@ -99,10 +99,18 @@ const UI = {
         const newTheme = isDark ? 'light' : 'dark';
         document.body.setAttribute('data-theme', newTheme);
         localStorage.setItem(CONFIG.THEME_KEY, newTheme);
+
+        // Sincroniza o switch se ele existir na tela
+        const switchEl = document.getElementById('theme-switch');
+        if (switchEl) switchEl.checked = (newTheme === 'dark');
     },
 
     toggleSenha() {
         const x = document.getElementById('login-pass');
+        x.type = x.type === 'password' ? 'text' : 'password';
+    },
+    toggleSenhaPerfil() {
+        const x = document.getElementById('conf-senha');
         x.type = x.type === 'password' ? 'text' : 'password';
     },
 
@@ -701,6 +709,13 @@ const Fluxo = {
             mesInput.value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
         }
 
+        const themeSwitch = document.getElementById('theme-switch');
+        if (themeSwitch) {
+            // Verifica se o body tem o atributo data-theme="dark"
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            themeSwitch.checked = isDark;
+        }
+
         const tbody = document.querySelector('#tabela-fluxo tbody');
         tbody.innerHTML = UI.LoaderHTML;
 
@@ -876,13 +891,47 @@ const Config = {
         }
     },
 
-    async adicionarCategoria() {
-        const nome = prompt("Nome da nova categoria:");
-        if (!nome || nome.trim() === "") return;
-        const res = await API.request('categorias.php', 'POST', { nome: nome.trim() });
+    adicionarCategoria() {
+        const nomeInput = document.getElementById('new-cat-nome');
+        const corInput = document.getElementById('new-cat-cor');
+        
+        // Reseta o formulário
+        if (nomeInput) nomeInput.value = '';
+        if (corInput) corInput.value = '#3b82f6'; // Azul padrão
+
+        // Exibe o modal
+        const modal = document.getElementById('modal-nova-categoria');
+        if (modal) {
+            modal.classList.remove('hidden');
+            setTimeout(() => nomeInput.focus(), 100);
+        }
+    },
+
+    // 2. Fecha o Modal
+    fecharModalCategoria() {
+        document.getElementById('modal-nova-categoria').classList.add('hidden');
+    },
+    async salvarNovaCategoria() {
+        const nomeVal = document.getElementById('new-cat-nome').value.trim();
+        const corVal = document.getElementById('new-cat-cor').value;
+
+        if (!nomeVal) {
+            return UI.showToast("O nome da categoria é obrigatório.", "error");
+        }
+
+        const payload = { 
+            nome: nomeVal,
+            cor: corVal 
+        };
+
+        const res = await API.request('categorias.php', 'POST', payload);
+
         if (res?.success) {
-            UI.showToast("Adicionada!");
-            Config.carregarCategorias();
+            UI.showToast("Categoria criada com sucesso!", "success");
+            Config.fecharModalCategoria();
+            Config.carregarCategorias(); // Atualiza a lista na tela
+        } else {
+            UI.showToast(res?.message || "Erro ao criar categoria.", "error");
         }
     },
 
@@ -938,19 +987,37 @@ const Config = {
     },
 
     async salvarFornecedor() {
+        // Referências aos elementos para capturar valores e limpar posteriormente
+        const elNome = document.getElementById('novo-forn-nome');
+        const elCnpj = document.getElementById('novo-forn-cnpj');
+        const elTel = document.getElementById('novo-forn-tel');
+        const elCat = document.getElementById('novo-forn-cat');
+
         const dados = {
-            nome: document.getElementById('novo-forn-nome').value,
-            cnpj: document.getElementById('novo-forn-cnpj').value,
-            telefone: document.getElementById('novo-forn-tel').value,
-            categoriaPadrao: document.getElementById('novo-forn-cat').value
+            nome: elNome.value,
+            cnpj: elCnpj.value,
+            telefone: elTel.value,
+            categoriaPadrao: elCat.value
         };
 
         const res = await API.request('fornecedores.php', 'POST', dados);
+        
         if (res?.success) {
-            alert('Cadastrado!');
+            // Feedback visual elegante
+            UI.showToast("Cadastrado!", "success");
+            
+            // Limpa os campos para permitir novo registro imediato
+            elNome.value = '';
+            elCnpj.value = '';
+            elTel.value = '';
+            elCat.value = ''; // Reseta a seleção de categoria
+
+            // Atualiza a lista e o cache
             Config.carregarFornecedores().then(() => Config.renderizarFornecedores());
         } else {
-            alert('Erro: ' + (res?.error || 'Desconhecido'));
+            // Tratamento de erro robusto (suporta 'message' ou 'error' vindo da API)
+            const mensagem = res?.message || res?.error || 'Desconhecido';
+            UI.showToast("Erro: " + mensagem, "error");
         }
     },
 
@@ -1011,13 +1078,23 @@ const Admin = {
         if (usuarios && Array.isArray(usuarios)) {
             usuarios.forEach(u => {
                 const tr = document.createElement('tr');
+                
+                // Verifica se é o próprio usuário logado (impede auto-exclusão)
+                // Nota: == é usado propositalmente para comparar string "1" com number 1 se necessário
+                const isSelf = (State.usuario && u.id == State.usuario.id);
+                
+                // Renderização condicional do botão
+                const deleteBtn = isSelf 
+                    ? `<span class="btn-icon" style="opacity: 0.3; cursor: not-allowed;" title="Você não pode se excluir">🚫</span>` 
+                    : `<button class="btn-icon btn-trash" onclick="Admin.excluirUsuario(${u.id})" title="Excluir">🗑</button>`;
+
                 tr.innerHTML = `
                     <td>${u.nome}</td>
                     <td>${u.login}</td>
                     <td><span class="status-badge">${u.funcao}</span></td>
                     <td class="text-right">
                         <button class="btn-icon" onclick="Admin.modalReset(${u.id}, '${u.nome}')" title="Alterar Senha">🔑</button>
-                        <button class="btn-icon btn-trash" onclick="Admin.excluirUsuario(${u.id})" title="Excluir">🗑</button>
+                        ${deleteBtn}
                     </td>`;
                 tbody.appendChild(tr);
             });
@@ -1187,6 +1264,7 @@ window.nav = UI.navegar;
 window.toggleSidebar = UI.toggleSidebar;
 window.toggleDarkMode = UI.toggleDarkMode;
 window.toggleSenha = UI.toggleSenha;
+window.toggleSenhaPerfil = UI.toggleSenhaPerfil;
 window.fazerLogin = Auth.login;
 window.confirmarLogout = () => document.getElementById('modal-logout').classList.remove('hidden');
 window.fecharModalLogout = () => document.getElementById('modal-logout').classList.add('hidden');
