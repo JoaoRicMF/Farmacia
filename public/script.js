@@ -846,8 +846,11 @@ const Config = {
 
         Config.renderizarFornecedores();
 
-        if (State.usuario?.funcao === 'Admin') {
-            Admin.carregarUsuarios();
+        if (State.usuario) {
+            const iLogin = document.getElementById('conf-login');
+            const iNome = document.getElementById('conf-nome');
+            if (iLogin) iLogin.value = State.usuario.usuario || State.usuario.login || '';
+            if (iNome) iNome.value = State.usuario.nome || '';
         }
     },
 

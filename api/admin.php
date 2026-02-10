@@ -25,8 +25,6 @@ try {
 
     // --- GET (Leitura) ---
     if ($method === 'GET') {
-        if (!$isAdmin) throw new Exception("Acesso restrito a Admins.", 403);
-
         if ($resource === 'usuarios') {
             $stmt = $db->query("SELECT id, nome, usuario, funcao FROM Usuario ORDER BY nome");
             $response = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -42,8 +40,6 @@ try {
 
         // 1. CRIAR USUÁRIO (Apenas Admin)
         if ($action === 'criarUsuario') {
-            if (!$isAdmin) throw new Exception("Apenas Admins podem criar usuários.", 403);
-
             if (empty($data->nome) || empty($data->login) || empty($data->password)) {
                 throw new Exception("Dados incompletos.", 400);
             }
