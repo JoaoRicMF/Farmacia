@@ -18,7 +18,8 @@ const State = {
     chartMes: null,
     chartCat: null,
     fornecedoresCache: [],
-    buscaTimeout: null
+    buscaTimeout: null,
+    fluxoCache: null
 };
 
 /* ==========================================================================
@@ -277,6 +278,7 @@ const Auth = {
 
             if (res && res.success) {
                 UI.showToast(`Bem-vindo, ${res.nome}!`);
+                State.fluxoCache = res;
                 Auth.iniciarApp(res);
             } else {
                 UI.showToast(res?.message || "Credenciais inválidas.", "error");
@@ -801,8 +803,7 @@ const Fluxo = {
 };
 
 function filtrarFluxo(tipo) {
-    // tipo pode ser: 'entrada', 'saida', 'todos'
-
+    // 1. Filtra Tabela (Lógica Visual Existente)
     const tbody = document.querySelector('#tabela-fluxo tbody');
     const linhas = tbody.querySelectorAll('tr');
 
@@ -811,25 +812,50 @@ function filtrarFluxo(tipo) {
     }
 
     linhas.forEach(tr => {
-        // Verifica as classes que o seu script.js adiciona na coluna de valor
-        // Entradas têm a classe 'text-success', Saídas têm 'text-danger'
-        const isEntrada = tr.innerHTML.includes('text-success');
-        const isSaida = tr.innerHTML.includes('text-danger');
+        const isEntrada = tr.innerHTML.includes('text-success'); // Identifica pela cor verde
+        const isSaida = tr.innerHTML.includes('text-danger');    // Identifica pela cor vermelha
 
         if (tipo === 'todos') {
-            tr.style.display = ''; // Mostra tudo
-        }
-        else if (tipo === 'entrada') {
+            tr.style.display = '';
+        } else if (tipo === 'entrada') {
             tr.style.display = isEntrada ? '' : 'none';
-        }
-        else if (tipo === 'saida') {
+        } else if (tipo === 'saida') {
             tr.style.display = isSaida ? '' : 'none';
         }
     });
 
-    // Feedback visual opcional (Toast rápido)
-    const mapaNomes = { 'entrada': 'Entradas', 'saida': 'Saídas', 'todos': 'Tudo' };
-    // showToast(`Filtrando por: ${mapaNomes[tipo]}`, 'info');
+    // 2. Atualiza Cards (Nova Lógica de Recálculo Visual)
+    if (!State.fluxoCache) return;
+
+    // Recupera valores originais do Cache
+    const rawEnt = Utils.converterMoedaParaFloat(State.fluxoCache.total_entradas_fmt);
+    const rawSai = Utils.converterMoedaParaFloat(State.fluxoCache.total_saidas_fmt);
+    
+    let txtEnt = State.fluxoCache.total_entradas_fmt;
+    let txtSai = State.fluxoCache.total_saidas_fmt;
+    let txtSaldo = State.fluxoCache.saldo_fmt;
+    let txtStatus = "Balanço do mês";
+
+    // Aplica a lógica do filtro nos Cards
+    if (tipo === 'entrada') {
+        txtSai = "R$ 0,00"; // Zera saídas
+        txtSaldo = txtEnt;  // Saldo vira apenas o total de entradas
+        txtStatus = "Filtro: Apenas Entradas";
+    } 
+    else if (tipo === 'saida') {
+        txtEnt = "R$ 0,00"; // Zera entradas
+        // Para saídas, o saldo líquido visual é negativo
+        txtSaldo = Utils.formatarMoedaBRL(-rawSai); 
+        txtStatus = "Filtro: Apenas Saídas";
+    }
+
+    // Renderiza nos elementos
+    document.getElementById('fluxo-entradas').innerText = txtEnt;
+    document.getElementById('fluxo-saidas').innerText = txtSai;
+    document.getElementById('fluxo-saldo').innerText = txtSaldo;
+    
+    const elStatus = document.getElementById('fluxo-status-texto');
+    if(elStatus) elStatus.innerText = txtStatus;
 }
 
 /* ==========================================================================

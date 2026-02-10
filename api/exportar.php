@@ -8,6 +8,10 @@ ob_start();
 
 require_once '../config/database.php';
 
+// IMPORTANTE: Inclui o fluxo.php para ter acesso à função 'obterMovimentacoesFluxo'
+// O 'if' que colocamos lá impede que o JSON seja gerado automaticamente.
+require_once 'fluxo.php'; 
+
 if (!isset($_SESSION['user_id'])) {
     http_response_code(403);
     exit('Acesso negado');
@@ -29,7 +33,7 @@ try {
     $output = fopen('php://output', 'w');
     fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM UTF-8
 
-    // --- EXPORTAÇÃO FLUXO DE CAIXA ---
+    // --- EXPORTAÇÃO FLUXO DE CAIXA (REFATORADA) ---
     if ($tipo === 'fluxo') {
         $filename = 'fluxo_caixa_' . $mesFiltro . '.csv';
         header('Content-Disposition: attachment; filename=' . $filename);
@@ -39,28 +43,12 @@ try {
 
         list($ano, $mesNum) = explode('-', $mesFiltro);
 
-        // 1. Entradas
-        $stmt1 = $db->prepare("SELECT dataRegistro as data, formaPagamento as descricao, 'Vendas' as categoria, 'ENTRADA' as tipo, valor FROM EntradaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
-        $stmt1->execute([':m' => $mesNum, ':a' => $ano]);
+        // >>> USANDO A LÓGICA CENTRALIZADA <<<
+        // Agora, se mudarmos a regra no fluxo.php, o Excel atualiza automaticamente.
+        $dados = obterMovimentacoesFluxo($db, $ano, $mesNum);
 
-        // 2. Saídas Manuais
-        $stmt2 = $db->prepare("SELECT dataRegistro as data, descricao, 'Sangria/Despesa' as categoria, 'SAIDA' as tipo, valor FROM SaidaCaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
-        $stmt2->execute([':m' => $mesNum, ':a' => $ano]);
-
-        // 3. Contas Pagas
-        $stmt3 = $db->prepare("SELECT COALESCE(data_processamento, vencimento) as data, descricao, categoria, 'SAIDA' as tipo, valor FROM Financeiro WHERE status = 'Pago' AND MONTH(COALESCE(data_processamento, vencimento)) = :m AND YEAR(COALESCE(data_processamento, vencimento)) = :a");
-        $stmt3->execute([':m' => $mesNum, ':a' => $ano]);
-
-        $dados = array_merge(
-            $stmt1->fetchAll(PDO::FETCH_ASSOC),
-            $stmt2->fetchAll(PDO::FETCH_ASSOC),
-            $stmt3->fetchAll(PDO::FETCH_ASSOC)
-        );
-
-        // Ordenar por Data
-        usort($dados, function($a, $b) {
-            return strtotime($a['data']) - strtotime($b['data']);
-        });
+        // Como a função retorna decrescente (para UI), invertemos para o Excel (crescente) se desejar
+        // usort($dados, function($a, $b) { return strtotime($a['data']) - strtotime($b['data']); });
 
         foreach ($dados as $row) {
             $linha = [
@@ -73,8 +61,9 @@ try {
             fputcsv($output, $linha, ';');
         }
     }
-    // --- EXPORTAÇÃO FINANCEIRO (Padrão) ---
+    // --- EXPORTAÇÃO FINANCEIRO (Mantida igual) ---
     else {
+        // ... (código existente do financeiro) ...
         $filename = 'financeiro_' . $mesFiltro . '.csv';
         header('Content-Disposition: attachment; filename=' . $filename);
 
@@ -104,6 +93,7 @@ try {
 } catch (Exception $e) {
     ob_end_clean();
     http_response_code(500);
-    echo json_encode(["error" => true, "message" => "Erro ao gerar CSV."]);
+    echo "Erro ao gerar CSV: " . $e->getMessage();
     exit;
 }
+?>
