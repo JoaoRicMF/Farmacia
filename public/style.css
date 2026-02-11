@@ -696,3 +696,34 @@ input:checked + .slider {
 input:checked + .slider:before {
     transform: translateX(24px);
 }
+
+/* Isso faz com que o label "Senha" não ocupe espaço, corrigindo o alinhamento */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* --- ATUALIZE ESTA CLASSE EXISTENTE --- */
+.toggle-pass {
+    position: absolute; 
+    right: 15px; 
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer; 
+    opacity: 0.6; 
+    
+    /* Adicionado para centralizar o SVG dentro do SPAN */
+    display: flex; 
+    align-items: center;
+    justify-content: center;
+    
+    color: var(--text-main);
+    transition: opacity 0.2s;
+}

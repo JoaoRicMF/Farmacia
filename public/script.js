@@ -914,13 +914,8 @@ const Config = {
         }
 
         Config.renderizarFornecedores();
-
-        if (State.usuario) {
-            const iLogin = document.getElementById('conf-login');
-            const iNome = document.getElementById('conf-nome');
-            if (iLogin) iLogin.value = State.usuario.usuario || State.usuario.login || '';
-            if (iNome) iNome.value = State.usuario.nome || '';
-        }
+        Config.carregarCategorias();
+        Admin.carregarUsuarios();
     },
 
     async carregarCategorias() {
@@ -1151,19 +1146,23 @@ const Admin = {
             usuarios.forEach(u => {
                 const tr = document.createElement('tr');
                 
-                // Verifica se é o próprio usuário logado (impede auto-exclusão)
-                // Nota: == é usado propositalmente para comparar string "1" com number 1 se necessário
+                // Verifica se é o próprio usuário logado
                 const isSelf = (State.usuario && u.id == State.usuario.id);
+                const isTargetAdmin = (u.funcao === 'Admin'); // Verifica se o alvo também é Admin
                 
-                // Renderização condicional do botão
-                const deleteBtn = isSelf 
-                    ? `<span class="btn-icon" style="opacity: 0.3; cursor: not-allowed;" title="Você não pode se excluir">🚫</span>` 
-                    : `<button class="btn-icon btn-trash" onclick="Admin.excluirUsuario(${u.id})" title="Excluir">🗑</button>`;
+                let deleteBtn;
+
+                if (isSelf) {
+                    deleteBtn = `<span class="btn-icon" style="opacity: 0.3; cursor: not-allowed;" title="Você não pode se excluir">🚫</span>`;
+                } else if (isTargetAdmin) {
+                    deleteBtn = `<span class="btn-icon" style="opacity: 0.3; cursor: not-allowed;" title="Não é permitido excluir Administradores">🚫</span>`;
+                } else {
+                    deleteBtn = `<button class="btn-icon btn-trash" onclick="Admin.excluirUsuario(${u.id})" title="Excluir">🗑</button>`;
+                }
 
                 tr.innerHTML = `
                     <td>${u.nome}</td>
-                    <td>${u.login}</td>
-                    <td><span class="status-badge">${u.funcao}</span></td>
+                    <td>${u.usuario}</td> <td><span class="status-badge">${u.funcao}</span></td>
                     <td class="text-right">
                         <button class="btn-icon" onclick="Admin.modalReset(${u.id}, '${u.nome}')" title="Alterar Senha">🔑</button>
                         ${deleteBtn}
