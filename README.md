@@ -5,7 +5,7 @@
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6%2B-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 ![HTML5](https://img.shields.io/badge/HTML5-Modern-E34F26?style=for-the-badge&logo=html5&logoColor=white)
 
-Sistema robusto de controlo financeiro, fluxo de caixa e auditoria desenvolvido especificamente para a gestão de farmácias. O projeto utiliza uma arquitetura leve com Backend em PHP (API REST) e Frontend em JavaScript puro (Vanilla JS), garantindo desempenho e facilidade de implantação em servidores Apache/Linux padrão.
+Sistema robusto de controlo financeiro, fluxo de caixa e auditoria desenvolvido especificamente para a gestão de farmácias. O projeto utiliza uma arquitetura leve com Backend em PHP (API REST) e Frontend em JavaScript puro (Vanilla JS), garantindo desempenho e facilidade de implantação.
 
 ## 🚀 Funcionalidades Principais
 
