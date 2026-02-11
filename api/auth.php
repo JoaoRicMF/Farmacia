@@ -1,12 +1,11 @@
 <?php
 // api/auth.php
-ob_start(); // Inicia o buffer para capturar qualquer output indesejado
+ob_start();
 
-// Configurações de Erro (Logar, não exibir)
+// Configurações de Erro
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
-// Headers
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -14,7 +13,6 @@ $response = ['success' => false, 'message' => 'Erro desconhecido'];
 $httpCode = 200;
 
 try {
-    // Garante o caminho correto para a configuração
     require_once __DIR__ . '/../config/database.php';
 
     if (session_status() === PHP_SESSION_NONE) {
@@ -28,19 +26,19 @@ try {
     if ($action === 'logout') {
         session_destroy();
         $response = ["success" => true, "message" => "Logout realizado"];
-    } // --- CHECK SESSÃO ---
+    } 
+    // --- CHECK SESSÃO ---
     elseif ($action === 'check') {
         if (isset($_SESSION['user_id'])) {
             $response = [
                 "success" => true,
                 "id" => $_SESSION['user_id'],
                 "nome" => $_SESSION['user_nome'],
+                "usuario" => $_SESSION['user_login'] ?? '', // CORREÇÃO: Retorna o login
                 "funcao" => $_SESSION['user_funcao']
             ];
         } else {
-            // Retorne success false para o JS saber que deve mostrar a tela de login
             $response = ["success" => false, "message" => "Nenhuma sessão ativa"];
-            $httpCode = 200;
         }
     }
     // --- LOGIN ---
@@ -50,7 +48,7 @@ try {
         $dbClass = new Database();
         $db = $dbClass->getConnection();
 
-        $stmt = $db->prepare("SELECT id, nome, senha, funcao FROM Usuario WHERE usuario = :u LIMIT 1");
+        $stmt = $db->prepare("SELECT id, nome, usuario, senha, funcao FROM Usuario WHERE usuario = :u LIMIT 1");
         $stmt->execute([':u' => $input->usuario ?? '']);
 
         if ($stmt->rowCount() > 0) {
@@ -58,6 +56,7 @@ try {
             if (password_verify($input->senha ?? '', $row['senha'])) {
                 $_SESSION['user_id'] = $row['id'];
                 $_SESSION['user_nome'] = $row['nome'];
+                $_SESSION['user_login'] = $row['usuario']; // CORREÇÃO: Salva o login na sessão
                 $_SESSION['user_funcao'] = $row['funcao'];
 
                 registrarLog($db, $row['nome'], "Login", "Sucesso via Web");
@@ -66,6 +65,7 @@ try {
                     "success" => true,
                     "id" => $row['id'],
                     "nome" => $row['nome'],
+                    "usuario" => $row['usuario'], // CORREÇÃO: Retorna no login
                     "funcao" => $row['funcao']
                 ];
             } else {
@@ -79,12 +79,11 @@ try {
     }
 
 } catch (Exception $e) {
-    http_response_code(500); // Internal Server Error
+    http_response_code(500);
     $response = ["success" => false, "message" => "Erro Interno: " . $e->getMessage()];
 }
 
-// LIMPEZA FINAL E RESPOSTA
-ob_clean(); // Descarta warnings ou espaços em branco anteriores
+ob_clean();
 http_response_code($httpCode);
 echo json_encode($response);
 exit;
