@@ -21,7 +21,7 @@ try {
 
     // --- LISTAR (GET) ---
     if ($method === 'GET') {
-        $query = "SELECT * FROM Categorias ORDER BY nome";
+        $query = "SELECT * FROM categorias ORDER BY nome";
         $stmt = $db->prepare($query);
         $stmt->execute();
         $response = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -33,13 +33,13 @@ try {
         // --- RESET DE CATEGORIAS ---
         if ($action === 'reset') {
             // 1. Limpa tabela
-            $db->exec("DELETE FROM Categorias");
+            $db->exec("DELETE FROM categorias");
             // Reset do Auto Increment (opcional, dependendo do driver, mas DELETE já resolve o principal)
 
             // 2. Insere Padrões
             $padroes = ['Medicamentos (Estoque)', 'Água/Luz/Internet', 'Aluguel & Condomínio', 'Impostos & Taxas', 'Folha de Pagamento', 'Marketing', 'Manutenção', 'Outros'];
 
-            $stmt = $db->prepare("INSERT INTO Categorias (nome, cor) VALUES (:nome, '#3b82f6')");
+            $stmt = $db->prepare("INSERT INTO categorias (nome, cor) VALUES (:nome, '#3b82f6')");
             foreach ($padroes as $p) {
                 $stmt->execute([':nome' => $p]);
             }
@@ -56,13 +56,13 @@ try {
             }
 
             // Validação de Duplicidade
-            $check = $db->prepare("SELECT COUNT(*) FROM Categorias WHERE nome = :nome");
+            $check = $db->prepare("SELECT COUNT(*) FROM categorias WHERE nome = :nome");
             $check->execute([':nome' => $data->nome]);
             if ($check->fetchColumn() > 0) {
                 throw new Exception("Categoria já existente.", 409);
             }
 
-            $stmt = $db->prepare("INSERT INTO Categorias (nome, cor) VALUES (:nome, :cor)");
+            $stmt = $db->prepare("INSERT INTO categorias (nome, cor) VALUES (:nome, :cor)");
             $stmt->execute([
                 ':nome' => $data->nome,
                 ':cor' => $data->cor ?? '#3b82f6'
@@ -79,7 +79,7 @@ try {
         $id = $_GET['id'] ?? null;
         if (!$id) throw new Exception("ID da categoria não informado.", 400);
 
-        $stmt = $db->prepare("DELETE FROM Categorias WHERE id = :id");
+        $stmt = $db->prepare("DELETE FROM categorias WHERE id = :id");
         $stmt->execute([':id' => $id]);
 
         registrarLog($db, $userNome, "Excluir Categoria", "ID: $id");

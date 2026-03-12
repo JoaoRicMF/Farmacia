@@ -34,7 +34,7 @@ try {
                 "success" => true,
                 "id" => $_SESSION['user_id'],
                 "nome" => $_SESSION['user_nome'],
-                "usuario" => $_SESSION['user_login'] ?? '', // CORREÇÃO: Retorna o login
+                "usuario" => $_SESSION['user_login'] ?? '',
                 "funcao" => $_SESSION['user_funcao']
             ];
         } else {
@@ -48,7 +48,7 @@ try {
         $dbClass = new Database();
         $db = $dbClass->getConnection();
 
-        $stmt = $db->prepare("SELECT id, nome, usuario, senha, funcao FROM Usuario WHERE usuario = :u LIMIT 1");
+        $stmt = $db->prepare("SELECT id, nome, usuario, senha, funcao FROM usuario WHERE usuario = :u LIMIT 1");
         $stmt->execute([':u' => $input->usuario ?? '']);
 
         if ($stmt->rowCount() > 0) {

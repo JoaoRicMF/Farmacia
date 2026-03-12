@@ -35,7 +35,7 @@ $id = $_GET['id'] ?? null;
 // --- GET (Listar) ---
 if ($method === 'GET') {
     try {
-        $stmt = $db->query("SELECT * FROM Fornecedor ORDER BY nome");
+        $stmt = $db->query("SELECT * FROM fornecedor ORDER BY nome");
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($result);
     } catch (PDOException $e) {
@@ -57,7 +57,7 @@ if ($method === 'POST') {
 
     try {
         // CORREÇÃO: Inclusão de cnpj e telefone na query de INSERT
-        $stmt = $db->prepare("INSERT INTO Fornecedor (nome, cnpj, telefone, categoriaPadrao) VALUES (:n, :cnpj, :tel, :c)");
+        $stmt = $db->prepare("INSERT INTO fornecedor (nome, cnpj, telefone, categoriaPadrao) VALUES (:n, :cnpj, :tel, :c)");
 
         $params = [
             ":n"    => $data->nome,
@@ -88,7 +88,7 @@ if ($method === 'DELETE') {
     }
 
     try {
-        $stmt = $db->prepare("DELETE FROM Fornecedor WHERE id = :id");
+        $stmt = $db->prepare("DELETE FROM fornecedor WHERE id = :id");
         if ($stmt->execute([":id" => $id])) {
             echo json_encode(["success" => true]);
         } else {

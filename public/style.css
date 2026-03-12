@@ -232,13 +232,41 @@ input:focus, select:focus {
 }
 
 .toggle-pass {
-    position: absolute; right: 15px; top: 50%;
+    /* 1. Posicionamento Absoluto */
+    position: absolute;
+    top: 50%;
+    right: 10px; /* Ajuste fino da distância da borda direita */
     transform: translateY(-50%);
-    cursor: pointer; opacity: 0.6; font-size: 1.2rem;
-    color: var(--text-main);
-    transition: opacity 0.2s;
+
+    /* 2. Cria uma "caixa" fixa para o botão */
+    width: 40px;  /* Largura fixa */
+    height: 40px; /* Altura fixa */
+    
+    /* 3. Flexbox para centralizar o ícone DENTRO dessa caixa */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* 4. Estilo visual */
+    cursor: pointer;
+    color: var(--text-light);
+    border-radius: 50%; /* Deixa redondo o hover */
+    transition: all 0.2s;
+    z-index: 10; /* Garante que fique acima do input */
 }
-.toggle-pass:hover { opacity: 1; }
+
+/* Efeito ao passar o mouse */
+.toggle-pass:hover {
+    background-color: rgba(0,0,0,0.05); /* Fundo cinza suave */
+    color: var(--primary);
+}
+
+/* Garante o tamanho do desenho SVG */
+.toggle-pass svg {
+    width: 20px;
+    height: 20px;
+    display: block; /* Remove espaços fantasmas */
+}
 
 .error-msg { color: var(--danger); font-size: 0.8rem; margin-top: 5px; display: none; }
 .input-error { border-color: var(--danger) !important; background-color: rgba(239, 68, 68, 0.05) !important; }
@@ -710,20 +738,55 @@ input:checked + .slider:before {
     border-width: 0;
 }
 
-/* --- ATUALIZE ESTA CLASSE EXISTENTE --- */
-.toggle-pass {
-    position: absolute; 
-    right: 15px; 
-    top: 50%;
-    transform: translateY(-50%);
-    cursor: pointer; 
-    opacity: 0.6; 
-    
-    /* Adicionado para centralizar o SVG dentro do SPAN */
-    display: flex; 
-    align-items: center;
-    justify-content: center;
-    
-    color: var(--text-main);
-    transition: opacity 0.2s;
+
+#tabela-registros td:last-child {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 8px; /* O editor vai reclamar disso, ignore! */
+    padding: 18px 20px;
+    border-bottom: 1px solid #e2e8f0; /* Usando cor direta pra evitar erro do editor */
+}
+
+/* 2. Remove margens extras dos botões apenas nessa coluna */
+#tabela-registros td:last-child .btn-icon {
+    margin: 0 !important;
+    transform: none !important; /* Reseta posições estranhas */
+}
+
+/* 3. Ajuste fino para os ícones SVG dentro dos botões */
+#tabela-registros td:last-child .btn-icon svg {
+    display: block;
+    margin: auto;
+}
+
+
+
+table td:last-child {
+    vertical-align: middle !important;
+    text-align: right; /* Garante que fiquem à direita */
+    white-space: nowrap; /* Impede que os botões quebrem linha */
+}
+
+/* 2. Ajusta o tamanho da área de clique do botão */
+table td:last-child .btn-icon {
+    width: 40px;  /* Um pouco maior para caber o ícone */
+    height: 40px;
+    margin-left: 5px; /* Espacinho entre um botão e outro */
+}
+
+/* 3. Aumenta o desenho do ícone (SVG) dentro do botão */
+table td:last-child .btn-icon svg {
+    width: 20px;  /* Aumentei para ficar mais visível */
+    height: 20px;
+    stroke-width: 2px; /* Espessura da linha */
+    display: inline-block; /* Garante que o tamanho seja respeitado */
+    vertical-align: middle;
+}
+
+/* 4. (Opcional) Destaque extra só para a lixeira (btn-trash) */
+table td:last-child .btn-trash svg {
+    width: 24px; /* A lixeira fica levemente maior */
+    height: 24px;
+    color: var(--danger); /* Garante que fique vermelha */
 }

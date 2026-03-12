@@ -69,7 +69,7 @@ try {
 
         fputcsv($output, ['ID', 'Vencimento', 'Descrição', 'Valor', 'Categoria', 'Status', 'Código Barras'], ';');
 
-        $sql = "SELECT id, vencimento, descricao, valor, categoria, status, codigo_barras FROM Financeiro";
+        $sql = "SELECT id, vencimento, descricao, valor, categoria, status, codigo_barras FROM financeiro";
         $params = [];
         if ($mesFiltro) {
             $sql .= " WHERE DATE_FORMAT(vencimento, '%Y-%m') = :mes";

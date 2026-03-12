@@ -26,10 +26,10 @@ try {
     // --- GET (Leitura) ---
     if ($method === 'GET') {
         if ($resource === 'usuarios') {
-            $stmt = $db->query("SELECT id, nome, usuario, funcao FROM Usuario ORDER BY nome");
+            $stmt = $db->query("SELECT id, nome, usuario, funcao FROM usuario ORDER BY nome");
             $response = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } elseif ($resource === 'logs') {
-            $stmt = $db->query("SELECT DATE_FORMAT(dataHora, '%d/%m/%Y %H:%i') as dataHora, usuario, acao, detalhes FROM Log ORDER BY id DESC LIMIT 100");
+            $stmt = $db->query("SELECT DATE_FORMAT(dataHora, '%d/%m/%Y %H:%i') as dataHora, usuario, acao, detalhes FROM log ORDER BY id DESC LIMIT 100");
             $response = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
     }
@@ -47,7 +47,7 @@ try {
             $senhaHash = password_hash($data->password, PASSWORD_DEFAULT);
             $funcao = ucfirst($data->nivel ?? 'Operador');
 
-            $stmt = $db->prepare("INSERT INTO Usuario (nome, usuario, senha, funcao) VALUES (:n, :u, :s, :f)");
+            $stmt = $db->prepare("INSERT INTO usuario (nome, usuario, senha, funcao) VALUES (:n, :u, :s, :f)");
             $stmt->execute([':n' => $data->nome, ':u' => $data->login, ':s' => $senhaHash, ':f' => $funcao]);
 
             registrarLog($db, $_SESSION['user_nome'], "Criar Usuário", "User: $data->login");
@@ -68,7 +68,7 @@ try {
             }
 
             // Validação de Login Duplicado (exceto para o próprio ID)
-            $check = $db->prepare("SELECT id FROM Usuario WHERE usuario = :u AND id != :id");
+            $check = $db->prepare("SELECT id FROM usuario WHERE usuario = :u AND id != :id");
             $check->execute([':u' => $data->login, ':id' => $data->id]);
             if ($check->rowCount() > 0) throw new Exception("Este login já está em uso.", 409);
 
@@ -77,7 +77,7 @@ try {
             // Se NÃO for Admin, força a função atual (impede elevação de privilégio).
             $novaFuncao = $isAdmin ? ($data->funcao ?? 'Operador') : $currentRole;
 
-            $stmt = $db->prepare("UPDATE Usuario SET nome = :n, usuario = :u, funcao = :f WHERE id = :id");
+            $stmt = $db->prepare("UPDATE usuario SET nome = :n, usuario = :u, funcao = :f WHERE id = :id");
             $stmt->execute([
                 ':n' => $data->nome,
                 ':u' => $data->login,
@@ -103,7 +103,7 @@ try {
             if (!$isAdmin && !$isSelf) throw new Exception("Sem permissão.", 403);
 
             $hash = password_hash($data->novaSenha, PASSWORD_DEFAULT);
-            $stmt = $db->prepare("UPDATE Usuario SET senha = :s WHERE id = :id");
+            $stmt = $db->prepare("UPDATE usuario SET senha = :s WHERE id = :id");
             $stmt->execute([':s' => $hash, ':id' => $data->id]);
 
             registrarLog($db, $_SESSION['user_nome'], "Reset Senha", "ID: $data->id");
@@ -115,7 +115,7 @@ try {
             if (!$isAdmin) throw new Exception("Apenas Admins podem excluir.", 403);
             if ($data->id == $currentId) throw new Exception("Não pode excluir a própria conta.", 403);
 
-            $stmt = $db->prepare("DELETE FROM Usuario WHERE id = :id");
+            $stmt = $db->prepare("DELETE FROM usuario WHERE id = :id");
             $stmt->execute([':id' => $data->id]);
 
             registrarLog($db, $_SESSION['user_nome'], "Excluir Usuário", "ID: $data->id");
@@ -129,7 +129,7 @@ try {
         $id = $_GET['id'] ?? null;
         if (!$id || $id == $currentId) throw new Exception("Operação inválida.", 400);
 
-        $stmt = $db->prepare("DELETE FROM Usuario WHERE id = :id");
+        $stmt = $db->prepare("DELETE FROM usuario WHERE id = :id");
         $stmt->execute([':id' => $id]);
         $response = ['success' => true];
     }

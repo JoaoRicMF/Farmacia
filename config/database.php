@@ -10,7 +10,7 @@ function registrarLog(?PDO $db, string $usuario, string $acao, string $detalhes 
     if (!$db) return;
 
     try {
-        $stmt = $db->prepare("INSERT INTO Log (usuario, acao, detalhes) VALUES (:u, :a, :d)");
+        $stmt = $db->prepare("INSERT INTO log (usuario, acao, detalhes) VALUES (:u, :a, :d)");
         $stmt->execute([':u' => $usuario, ':a' => $acao, ':d' => $detalhes]);
     } catch (Exception $e) {
         // Loga no arquivo do servidor, sem parar a aplicação
@@ -19,19 +19,20 @@ function registrarLog(?PDO $db, string $usuario, string $acao, string $detalhes 
 }
 
 class Database {
-    private string $host;
-    private string $db_name = "farmacia_db";
-    private string $username;
-    private string $password;
-    private string $port;
+    private string $host     = "127.0.0.1";
+    private string $db_name  = "joaori31_farmacia_db";
+    private string $username = "joaori31_joaor";
+    private string $password = "150406jrMF#";
+    private string $port     = "3306";
 
     public ?PDO $conn = null;
 
     public function __construct() {
-        $this->host     = getenv('DB_HOST') ?: "127.0.0.1";
-        $this->username = getenv('DB_USER') ?: "root";
-        $this->password = getenv('DB_PASS') ?: "1504";
-        $this->port     = getenv('DB_PORT') ?: "3306";
+        $this->host     = getenv('DB_HOST') ?: $this->host;
+        $this->username = getenv('DB_USER') ?: $this->username;
+        $this->password = getenv('DB_PASS') ?: $this->password;
+        $this->port     = getenv('DB_PORT') ?: $this->port;
+        $this->db_name  = getenv('DB_NAME') ?: $this->db_name;
     }
 
     /**
@@ -100,7 +101,7 @@ class Database {
 
         try {
             // 1. Tabela Usuario
-            $this->conn->exec("CREATE TABLE IF NOT EXISTS Usuario (
+            $this->conn->exec("CREATE TABLE IF NOT EXISTS usuario (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 nome VARCHAR(100) NOT NULL,
                 usuario VARCHAR(50) NOT NULL UNIQUE,
@@ -109,15 +110,15 @@ class Database {
             ) ENGINE=InnoDB;");
 
             // Admin Padrão
-            $check = $this->conn->query("SELECT id FROM Usuario LIMIT 1");
+            $check = $this->conn->query("SELECT id FROM usuario LIMIT 1");
             if ($check->rowCount() == 0) {
                 $senhaHash = password_hash('admin', PASSWORD_DEFAULT);
-                $stmt = $this->conn->prepare("INSERT INTO Usuario (nome, usuario, senha, funcao) VALUES ('Administrador', 'admin', :senha, 'Admin')");
+                $stmt = $this->conn->prepare("INSERT INTO usuario (nome, usuario, senha, funcao) VALUES ('Administrador', 'admin', :senha, 'Admin')");
                 $stmt->execute([':senha' => $senhaHash]);
             }
 
             // 2. Financeiro
-            $this->conn->exec("CREATE TABLE IF NOT EXISTS Financeiro (
+            $this->conn->exec("CREATE TABLE IF NOT EXISTS financeiro (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 descricao VARCHAR(255) NOT NULL,
                 valor DECIMAL(10, 2) NOT NULL,
@@ -129,14 +130,14 @@ class Database {
             ) ENGINE=InnoDB;");
 
             // 3. Categorias
-            $this->conn->exec("CREATE TABLE IF NOT EXISTS Categorias (
+            $this->conn->exec("CREATE TABLE IF NOT EXISTS categorias (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 nome VARCHAR(100) NOT NULL UNIQUE,
                 cor VARCHAR(7) DEFAULT '#3b82f6'
             ) ENGINE=InnoDB;");
 
             // Categorias Padrão
-            $checkCat = $this->conn->query("SELECT id FROM Categorias LIMIT 1");
+            $checkCat = $this->conn->query("SELECT id FROM categorias LIMIT 1");
             if ($checkCat->rowCount() == 0) {
                 $padroes = ['Medicamentos (Estoque)', 'Água/Luz/Internet', 'Aluguel & Condomínio', 'Impostos & Taxas', 'Folha de Pagamento', 'Marketing', 'Manutenção', 'Outros'];
                 $stmtCat = $this->conn->prepare("INSERT IGNORE INTO Categorias (nome) VALUES (:nome)");
@@ -146,7 +147,7 @@ class Database {
             }
 
             // 4. Fornecedor
-            $this->conn->exec("CREATE TABLE IF NOT EXISTS Fornecedor (
+            $this->conn->exec("CREATE TABLE IF NOT EXISTS fornecedor (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 nome VARCHAR(150) NOT NULL,
                 cnpj VARCHAR(20), 
@@ -155,27 +156,27 @@ class Database {
             ) ENGINE=InnoDB;");
 
             // 5. Fluxo
-            $this->conn->exec("CREATE TABLE IF NOT EXISTS EntradaCaixa (
+            $this->conn->exec("CREATE TABLE IF NOT EXISTS entradacaixa (
                 id_entrada INT AUTO_INCREMENT PRIMARY KEY,
                 dataRegistro DATETIME DEFAULT CURRENT_TIMESTAMP,
                 formaPagamento VARCHAR(50),
                 descricao VARCHAR(255),
                 valor DECIMAL(10, 2) NOT NULL,
                 id INT,
-                FOREIGN KEY (id) REFERENCES Usuario(id) ON DELETE SET NULL
+                FOREIGN KEY (id) REFERENCES usuario(id) ON DELETE SET NULL
             ) ENGINE=InnoDB;");
 
-            $this->conn->exec("CREATE TABLE IF NOT EXISTS SaidaCaixa (
+            $this->conn->exec("CREATE TABLE IF NOT EXISTS saidacaixa (
                 id_saida INT AUTO_INCREMENT PRIMARY KEY,
                 dataRegistro DATETIME DEFAULT CURRENT_TIMESTAMP,
                 descricao VARCHAR(255),
                 valor DECIMAL(10, 2) NOT NULL,
                 id INT,
-                FOREIGN KEY (id) REFERENCES Usuario(id) ON DELETE SET NULL
+                FOREIGN KEY (id) REFERENCES usuario(id) ON DELETE SET NULL
             ) ENGINE=InnoDB;");
 
             // 6. Log
-            $this->conn->exec("CREATE TABLE IF NOT EXISTS Log (
+            $this->conn->exec("CREATE TABLE IF NOT EXISTS log (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 dataHora DATETIME DEFAULT CURRENT_TIMESTAMP,
                 usuario VARCHAR(100),

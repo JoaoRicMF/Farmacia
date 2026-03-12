@@ -22,7 +22,7 @@ try {
 
     // --- ROTINA DE AUTO-UPDATE (VENCIDOS) ---
     // Executa antes de qualquer ação para garantir dados atualizados
-    $sqlAutoUpdate = "UPDATE Financeiro 
+    $sqlAutoUpdate = "UPDATE financeiro 
                       SET status = 'Vencido' 
                       WHERE status = 'Pendente' 
                       AND vencimento < CURRENT_DATE()";
@@ -38,7 +38,7 @@ try {
         
         // [CORREÇÃO] Se vier um ID, retorna apenas o registro específico (Para Edição)
         if ($id) {
-            $stmt = $db->prepare("SELECT * FROM Financeiro WHERE id = :id");
+            $stmt = $db->prepare("SELECT * FROM financeiro WHERE id = :id");
             $stmt->execute([':id' => $id]);
             $registro = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -61,7 +61,7 @@ try {
         $offset = ($pagina - 1) * $limite;
 
         // Construção da Query Dinâmica
-        $sql = "SELECT * FROM Financeiro WHERE (descricao LIKE :b OR codigo_barras LIKE :b)";
+        $sql = "SELECT * FROM financeiro WHERE (descricao LIKE :b OR codigo_barras LIKE :b)";
         $params = [':b' => "%$busca%"];
 
         if ($status !== 'Todos') {
@@ -127,7 +127,7 @@ try {
             $db->beginTransaction();
 
             // 1. Busca dados do título
-            $stmtGet = $db->prepare("SELECT descricao, valor FROM Financeiro WHERE id = :id AND status != 'Pago'");
+            $stmtGet = $db->prepare("SELECT descricao, valor FROM financeiro WHERE id = :id AND status != 'Pago'");
             $stmtGet->execute([':id' => $idBaixa]);
             $titulo = $stmtGet->fetch(PDO::FETCH_ASSOC);
 
@@ -137,7 +137,7 @@ try {
             // Concatenamos a forma de pagamento na descrição
             $descCaixa = "Pgto ($formaPgto): " . $titulo['descricao'];
 
-            $stmtCaixa = $db->prepare("INSERT INTO SaidaCaixa (dataRegistro, descricao, valor, id) VALUES (:data, :desc, :val, :user)");
+            $stmtCaixa = $db->prepare("INSERT INTO saidacaixa (dataRegistro, descricao, valor, id) VALUES (:data, :desc, :val, :user)");
             $stmtCaixa->execute([
                 ':data'  => $dataCompleta,
                 ':desc'  => $descCaixa,
@@ -146,7 +146,7 @@ try {
             ]);
 
             // 3. Atualiza o Financeiro com a DATA DO PAGAMENTO REAL
-            $stmtUp = $db->prepare("UPDATE Financeiro SET status = 'Pago', data_processamento = :data WHERE id = :id");
+            $stmtUp = $db->prepare("UPDATE financeiro SET status = 'Pago', data_processamento = :data WHERE id = :id");
             $stmtUp->execute([
                 ':data' => $dataCompleta,
                 ':id'   => $idBaixa
@@ -173,7 +173,7 @@ try {
         }
 
         if (!empty($input->id)) {
-            $sql = "UPDATE Financeiro SET 
+            $sql = "UPDATE financeiro SET 
                     descricao=:d, 
                     valor=:v, 
                     vencimento=:ve, 
@@ -195,7 +195,7 @@ try {
             $codigoBarras = $input->codigo_barras ?? '';
 
             if (!empty($codigoBarras)) {
-                $checkDup = $db->prepare("SELECT id FROM Financeiro WHERE codigo_barras = :cb LIMIT 1");
+                $checkDup = $db->prepare("SELECT id FROM financeiro WHERE codigo_barras = :cb LIMIT 1");
                 $checkDup->execute([':cb' => $codigoBarras]);
 
                 if ($checkDup->rowCount() > 0) {
@@ -203,7 +203,7 @@ try {
                 }
             }
 
-            $sql = "INSERT INTO Financeiro (descricao, valor, vencimento, categoria, status, codigo_barras) VALUES (:d, :v, :ve, :c, :s, :cb)";
+            $sql = "INSERT INTO financeiro (descricao, valor, vencimento, categoria, status, codigo_barras) VALUES (:d, :v, :ve, :c, :s, :cb)";
             $stmt = $db->prepare($sql);
             $logAction = "Novo Financeiro";
         }
@@ -226,7 +226,7 @@ try {
         $idDel = $id ?? json_decode(file_get_contents("php://input"))->id ?? null;
         if (!$idDel) throw new Exception("ID não fornecido");
 
-        $stmt = $db->prepare("DELETE FROM Financeiro WHERE id = :id");
+        $stmt = $db->prepare("DELETE FROM financeiro WHERE id = :id");
         $stmt->execute([':id' => $idDel]);
         registrarLog($db, $userNome, "Excluir Financeiro", "ID: $idDel");
 

@@ -1,39 +1,57 @@
-RewriteEngine On
-RewriteBase /
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
 
-# 1. Ignora regras se o arquivo ou diretório real existir
-# Isso permite que chamadas diretas como /api/dashboard.php ou /public/style.css continuem funcionando
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
+    # 1. Forçar HTTPS (Mantive o seu, está ótimo)
+    RewriteCond %{HTTPS} off
+    RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-# 2. Rotas da API (Apontando para a pasta api/)
-# Autenticação
+    # 2. Ignora a regra se o arquivo requisitado JÁ ESTIVER na pasta public
+    # (Isso evita um loop infinito de redirecionamento)
+    RewriteRule ^public/ - [L]
+    RewriteRule ^api/ - [L]
+
+    # 3. A Mágica Real: Redireciona TUDO para a pasta public
+    # Se alguém acessar "site.com/dashboard", o servidor busca em "public/dashboard"
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteCond %{REQUEST_URI} !^/api/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# --- API ---
 RewriteRule ^login$ api/auth.php?action=login [L,QSA]
 RewriteRule ^logout$ api/auth.php?action=logout [L,QSA]
 RewriteRule ^dados_usuario$ api/auth.php?action=check [L,QSA]
 
-# Financeiro
 RewriteRule ^registros/([0-9]+)/baixar$ api/financeiro.php?id=$1&action=baixar [L,QSA]
 RewriteRule ^registros/([0-9]+)$ api/financeiro.php?id=$1 [L,QSA]
 RewriteRule ^registros$ api/financeiro.php [L,QSA]
 RewriteRule ^novo_boleto$ api/financeiro.php [L,QSA]
 
-# Dashboard & Fluxo
 RewriteRule ^dashboard$ api/dashboard.php [L,QSA]
 RewriteRule ^fluxo/movimento$ api/fluxo.php?action=salvar [L,QSA]
 RewriteRule ^fluxo$ api/fluxo.php [L,QSA]
 
-# Utilitários
 RewriteRule ^ler_codigo$ api/boleto.php [L,QSA]
 RewriteRule ^fornecedores/([0-9]+)$ api/fornecedores.php?id=$1 [L,QSA]
 RewriteRule ^fornecedores$ api/fornecedores.php [L,QSA]
 RewriteRule ^exportar$ api/exportar.php [L,QSA]
 
-# Admin
 RewriteRule ^logs$ api/admin.php?resource=logs [L,QSA]
 RewriteRule ^usuarios$ api/admin.php?resource=usuarios [L,QSA]
 
-# 3. Fallback para SPA (Frontend)
-# Qualquer rota não encontrada acima será enviada para o index.html na pasta public
+# 4. Fallback (Qualquer outra rota vai para o Frontend SPA)
+# Se o usuário digitar /dashboard (rota do React/Vue/Angular), carrega o index
 RewriteRule ^ public/index.html [L]
+
+# PHP Config (Não mexer)
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php82___lsphp .php .php8 .phtml
+</IfModule>
+
+# php -- BEGIN cPanel-generated handler, do not edit
+# Set the “ea-php82” package as the default “PHP” programming language.
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php82___lsphp .php .php8 .phtml
+</IfModule>
+# php -- END cPanel-generated handler, do not edit

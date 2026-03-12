@@ -5,7 +5,7 @@
 
 /* 1. CONFIGURAÇÕES E CONSTANTES */
 const CONFIG = {
-    API_URL: '/api',
+    API_URL: '../api',
     ANIMATION_SPEED: 300,
     THEME_KEY: 'theme'
 };
