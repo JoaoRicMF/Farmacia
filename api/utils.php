@@ -24,8 +24,9 @@ function enviarResponse(mixed $data, int $httpCode = 200): void {
 
 function verificarAuth(): void {
     inicializarApi();
-    if (!isset($_SESSION['user_id'])) {
-        enviarResponse(["success" => false, "message" => "Sessão expirada."], 401);
+    // Requer tanto o user_id quanto o id_unidade_ativa na sessão
+    if (!isset($_SESSION['user_id']) || !isset($_SESSION['id_unidade_ativa'])) {
+        enviarResponse(["success" => false, "message" => "Sessão expirada ou incompleta."], 401);
     }
 }
 

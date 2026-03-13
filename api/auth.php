@@ -49,16 +49,32 @@ try {
     } 
     // --- CHECK SESSÃO ---
     elseif ($action === 'check') {
-        if (isset($_SESSION['user_id'])) {
+        if (isset($_SESSION['user_id']) && isset($_SESSION['id_unidade_ativa'])) {
+            
+            // Procura os dados da unidade ativa na lista de unidades
+            $unidadeAtivaData = null;
+            if (isset($_SESSION['unidades'])) {
+                foreach ($_SESSION['unidades'] as $u) {
+                    if ($u['id'] === $_SESSION['id_unidade_ativa']) {
+                        $unidadeAtivaData = $u;
+                        break;
+                    }
+                }
+            }
+
             $response = [
                 "success" => true,
                 "id" => $_SESSION['user_id'],
                 "nome" => $_SESSION['user_nome'],
                 "usuario" => $_SESSION['user_login'] ?? '',
-                "funcao" => $_SESSION['user_funcao']
+                "funcao" => $_SESSION['user_funcao'],
+                "unidades" => $_SESSION['unidades'] ?? [],
+                "unidade_ativa" => $unidadeAtivaData
             ];
         } else {
-            $response = ["success" => false, "message" => "Nenhuma sessão ativa"];
+            // Se a sessão for antiga/incompleta, nós a destruímos
+            session_destroy();
+            $response = ["success" => false, "message" => "Nenhuma sessão ativa válida"];
         }
     }
     // --- LOGIN ---

@@ -325,8 +325,10 @@ const Dashboard = {
         const btn = document.querySelector(`.filter-btn[onclick*="'${periodo}'"]`);
         if (btn) btn.classList.add('active');
 
-        const dados = await API.request(`dashboard.php?periodo=${periodo}`);
-        if (!dados) return;
+       const dados = await API.request(`dashboard.php?periodo=${periodo}`);
+        
+        // Proteção: Se a requisição falhar ou não retornar sucesso, interrompe a execução
+        if (!dados || dados.success === false) return;
 
         // Atualiza Cards
         if (dados.cards) {

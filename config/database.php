@@ -49,6 +49,7 @@ class Database {
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
             $this->conn->exec("SET time_zone = '-03:00';");
+            $this->createTablesIfNotExist();
 
         } catch (PDOException $exception) {
             // Se o erro for "Unknown Database" (Código 1049), tenta criar o banco
@@ -189,7 +190,7 @@ class Database {
                 nome_fornecedor VARCHAR(255) NOT NULL,
                 criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )ENGINE=InnoDB;");
-            
+
             // 1. Tabela de Unidades
             $this->conn->exec("CREATE TABLE IF NOT EXISTS unidades (
                 id INT AUTO_INCREMENT PRIMARY KEY,

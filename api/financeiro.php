@@ -61,7 +61,11 @@ try {
         $offset = ($pagina - 1) * $limite;
 
         // Construção da Query Dinâmica
-        $unidadeAtiva = $_SESSION['id_unidade_ativa'];
+        $unidadeAtiva = $_SESSION['id_unidade_ativa'] ?? null;
+        if (!$unidadeAtiva) {
+            throw new Exception("Nenhuma unidade ativa na sessão.", 403);
+        }
+        
         $sql = "SELECT * FROM financeiro WHERE id_unidade = :unidade AND (descricao LIKE :b OR codigo_barras LIKE :b)";
         $params = [':unidade' => $unidadeAtiva, ':b' => "%$busca%"];
 
