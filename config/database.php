@@ -21,8 +21,8 @@ function registrarLog(?PDO $db, string $usuario, string $acao, string $detalhes 
 class Database {
     private string $host     = "127.0.0.1";
     private string $db_name  = "joaori31_farmacia_db";
-    private string $username = "joaori31_joaor";
-    private string $password = "150406jrMF#";
+    private string $username = "root";
+    private string $password = "";
     private string $port     = "3306";
 
     public ?PDO $conn = null;

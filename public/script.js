@@ -253,6 +253,10 @@ const Auth = {
         if (userDisplay) userDisplay.innerText = dadosUsuario.nome;
         if (userRole) userRole.innerText = dadosUsuario.funcao === 'Admin' ? 'Administrador' : 'Operador';
 
+        // Sync avatar initial letter
+        const avatarEl = document.getElementById('avatar-icon');
+        if (avatarEl && dadosUsuario.nome) avatarEl.innerText = dadosUsuario.nome.charAt(0).toUpperCase();
+
         document.querySelectorAll('.admin-only').forEach(el => {
             el.style.display = dadosUsuario.funcao === 'Admin' ? 'block' : 'none';
         });
@@ -1040,8 +1044,8 @@ const Config = {
         const tbody = document.getElementById('tbody-fornecedores');
         if (!tbody) return;
         tbody.innerHTML = '';
-        if (!State.fornecedoresCache.length) {
-            Config.carregarFornecedores().then(() => Config.renderizarFornecedores()); // Tenta carregar se estiver vazio
+        if (State.fornecedoresCache.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum fornecedor cadastrado.</td></tr>';
             return;
         }
 
@@ -1422,3 +1426,309 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 });
+/* ==========================================================================
+   MÓDULO: MOBILE (Responsividade JavaScript)
+   ========================================================================== */
+const Mobile = {
+    isMobile() {
+        return window.innerWidth <= 640;
+    },
+
+    // Sincroniza tabs da bottom bar com a navegação
+    syncTabBar(telaId) {
+        const tabMap = {
+            'dashboard': 0,
+            'novo': 1,
+            'lista': 2,
+            'fluxo': 3
+        };
+        const tabs = document.querySelectorAll('.tab-item');
+        tabs.forEach(t => t.classList.remove('active'));
+
+        const idx = tabMap[telaId];
+        if (idx !== undefined && tabs[idx]) {
+            tabs[idx].classList.add('active');
+        }
+        // Secondary screens (logs, config) — no tab active, but keep "Menu" tab
+    },
+
+    // Inicializar FullCalendar em modo listWeek no mobile
+    patchCalendarForMobile() {
+        if (!this.isMobile()) return;
+        // Sobrescreve o método renderizarCalendario para usar listWeek
+        const origRender = Dashboard.renderizarCalendario.bind(Dashboard);
+        Dashboard.renderizarCalendario = function(eventos) {
+            const calendarEl = document.getElementById('calendar');
+            if (!calendarEl || typeof FullCalendar === 'undefined') return;
+
+            if (calendarEl._fullCalendar) {
+                calendarEl._fullCalendar.destroy();
+            }
+
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'listWeek',
+                locale: 'pt-br',
+                height: 'auto',
+                events: (eventos || []).map(ev => ({
+                    id: ev.id,
+                    title: ev.descricao,
+                    start: ev.vencimento,
+                    backgroundColor: ev.status === 'Pago' ? '#10b981' : (ev.status === 'Vencido' ? '#ef4444' : '#f59e0b')
+                }))
+            });
+            calendar.render();
+            calendarEl._fullCalendar = calendar;
+        };
+    },
+
+    // Configurar Fluxo de Caixa com tabs de formulário
+    setupFluxoTabs() {
+        if (!this.isMobile()) return;
+
+        const fluxoSection = document.getElementById('view-fluxo');
+        if (!fluxoSection) return;
+
+        // Inject tab UI around the two forms if not already done
+        if (fluxoSection.querySelector('.fluxo-tab-btns')) return;
+
+        const wrapper = fluxoSection.querySelector('div[style*="display: flex"][style*="gap: 20px"]');
+        if (!wrapper) return;
+
+        const leftCol = wrapper.querySelector('div[style*="min-width: 300px"]');
+        if (!leftCol) return;
+
+        const entradaCard = leftCol.querySelectorAll('.card')[0];
+        const saidaCard = leftCol.querySelectorAll('.card')[1];
+        if (!entradaCard || !saidaCard) return;
+
+        // Add tab classes
+        entradaCard.classList.add('fluxo-form-panel', 'active');
+        saidaCard.classList.add('fluxo-form-panel');
+
+        // Create tab buttons
+        const tabBar = document.createElement('div');
+        tabBar.className = 'fluxo-tab-btns';
+        tabBar.innerHTML = `
+            <button class="fluxo-tab-btn active" onclick="Mobile.switchFluxoTab(0, this)">➕ Entrada</button>
+            <button class="fluxo-tab-btn" onclick="Mobile.switchFluxoTab(1, this)">➖ Saída</button>
+        `;
+
+        leftCol.classList.add('fluxo-forms-wrapper');
+        leftCol.insertBefore(tabBar, entradaCard);
+    },
+
+    switchFluxoTab(idx, btn) {
+        const panels = document.querySelectorAll('.fluxo-form-panel');
+        const btns = document.querySelectorAll('.fluxo-tab-btn');
+        panels.forEach((p, i) => p.classList.toggle('active', i === idx));
+        btns.forEach((b, i) => b.classList.toggle('active', i === idx));
+    },
+
+    // Setup config accordions
+    setupConfigAccordions() {
+        if (!this.isMobile()) return;
+        const viewConfig = document.getElementById('view-config');
+        if (!viewConfig || viewConfig.dataset.mobileReady) return;
+        viewConfig.dataset.mobileReady = '1';
+
+        const cards = viewConfig.querySelectorAll('.card');
+        const sections = [
+            { icon: '🚚', title: 'Fornecedores', open: false },
+            { icon: '🎨', title: 'Aparência', open: false },
+            { icon: '📂', title: 'Categorias Financeiras', open: false },
+            { icon: '👥', title: 'Gestão de Equipe', open: false },
+            { icon: '👤', title: 'Perfil de Acesso', open: false },
+        ];
+
+        cards.forEach((card, i) => {
+            const info = sections[i] || { icon: '⚙️', title: 'Configuração', open: false };
+            // Get existing h3 text
+            const h3 = card.querySelector('h3');
+            if (!h3) return;
+            const titleText = h3.innerText || info.title;
+
+            // Wrap content after h3 (+ first-level siblings within card)
+            const cardChildren = Array.from(card.children);
+
+            const header = document.createElement('div');
+            header.className = 'config-accordion-header';
+            header.innerHTML = `<span>${titleText}</span><span class="config-acc-arrow">${info.open ? '▲' : '▼'}</span>`;
+
+            const body = document.createElement('div');
+            body.className = 'config-accordion-body' + (info.open ? '' : ' collapsed');
+
+            // Move all children to body
+            cardChildren.forEach(child => body.appendChild(child));
+
+            card.appendChild(header);
+            card.appendChild(body);
+
+            header.onclick = () => {
+                const isOpen = !body.classList.contains('collapsed');
+                body.classList.toggle('collapsed', isOpen);
+                header.querySelector('.config-acc-arrow').textContent = isOpen ? '▼' : '▲';
+            };
+        });
+    },
+
+    // Sync mobile avatar with desktop
+    syncUserDisplay() {
+        const userDisplay = document.getElementById('user-display');
+        const userRole = document.getElementById('user-role');
+        const mobileDisplay = document.getElementById('mobile-user-display');
+        const mobileRole = document.getElementById('mobile-user-role');
+        const avatarIcon = document.getElementById('avatar-icon');
+        const mobileAvatar = document.getElementById('mobile-avatar-icon');
+
+        if (userDisplay && mobileDisplay) mobileDisplay.innerText = userDisplay.innerText;
+        if (userRole && mobileRole) mobileRole.innerText = userRole.innerText;
+        if (avatarIcon && mobileAvatar) mobileAvatar.innerText = avatarIcon.innerText;
+
+        // Show/hide admin-only items in drawer
+        if (State.usuario) {
+            document.querySelectorAll('#mobile-menu-drawer .admin-only').forEach(el => {
+                el.style.display = State.usuario.funcao === 'Admin' ? 'flex' : 'none';
+            });
+        }
+    },
+
+    init() {
+        if (!this.isMobile()) return;
+        this.patchCalendarForMobile();
+
+        // Hide tab bar on login screen, show on app
+        const tabBar = document.getElementById('mobile-tab-bar');
+        if (tabBar) {
+            const appScreen = document.getElementById('app-screen');
+            tabBar.style.display = appScreen && !appScreen.classList.contains('hidden') ? 'flex' : 'none';
+        }
+    }
+};
+
+// Toggle date filter accordion
+window.toggleDateFilters = function(btn) {
+    const body = btn.parentElement.querySelector('.date-filter-body');
+    if (!body) return;
+    body.classList.toggle('hidden');
+    const arrow = btn.querySelector('.date-arrow');
+    if (arrow) arrow.textContent = body.classList.contains('hidden') ? '▼' : '▲';
+};
+
+// Mobile navigation wrapper
+window.mobileNav = function(telaId, tabEl) {
+    window.nav(telaId, null);
+    Mobile.syncTabBar(telaId);
+    // Close drawer if open
+    closeMobileMenu();
+};
+
+// Mobile drawer controls
+window.toggleMobileMenu = function() {
+    const overlay = document.getElementById('mobile-menu-overlay');
+    const drawer = document.getElementById('mobile-menu-drawer');
+    if (!overlay || !drawer) return;
+    const isOpen = !drawer.classList.contains('hidden');
+    if (isOpen) {
+        closeMobileMenu();
+    } else {
+        overlay.classList.remove('hidden');
+        drawer.classList.remove('hidden');
+        Mobile.syncUserDisplay();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+};
+
+window.closeMobileMenu = function() {
+    const overlay = document.getElementById('mobile-menu-overlay');
+    const drawer = document.getElementById('mobile-menu-drawer');
+    if (overlay) overlay.classList.add('hidden');
+    if (drawer) drawer.classList.add('hidden');
+};
+
+// Patch UI.navegar to also sync tab bar and run mobile inits
+const _origNavegar = UI.navegar.bind(UI);
+UI.navegar = function(telaId, elementoBtn) {
+    _origNavegar(telaId, elementoBtn);
+    if (Mobile.isMobile()) {
+        Mobile.syncTabBar(telaId);
+
+        // Show/hide tab bar based on login vs app
+        const tabBar = document.getElementById('mobile-tab-bar');
+        const appScreen = document.getElementById('app-screen');
+        if (tabBar) {
+            tabBar.style.display = appScreen && !appScreen.classList.contains('hidden') ? 'flex' : 'none';
+        }
+
+        // Run screen-specific mobile inits
+        if (telaId === 'fluxo') {
+            setTimeout(() => Mobile.setupFluxoTabs(), 50);
+        }
+        if (telaId === 'config') {
+            setTimeout(() => Mobile.setupConfigAccordions(), 50);
+        }
+    }
+};
+window.nav = UI.navegar;
+
+// Patch Auth.iniciarApp to sync mobile UI after login
+const _origIniciarApp = Auth.iniciarApp.bind(Auth);
+Auth.iniciarApp = function(dadosUsuario) {
+    _origIniciarApp(dadosUsuario);
+    if (Mobile.isMobile()) {
+        const tabBar = document.getElementById('mobile-tab-bar');
+        if (tabBar) tabBar.style.display = 'flex';
+        setTimeout(() => Mobile.syncUserDisplay(), 100);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+};
+
+// Patch Auth.logout to hide tab bar
+const _origLogout = Auth.logout.bind(Auth);
+Auth.logout = async function() {
+    await _origLogout();
+    const tabBar = document.getElementById('mobile-tab-bar');
+    if (tabBar) tabBar.style.display = 'none';
+};
+window.fazerLogoutReal = Auth.logout;
+
+// Initialize mobile on DOMContentLoaded (append after existing listener)
+document.addEventListener("DOMContentLoaded", () => {
+    Mobile.init();
+
+    // Hide tab bar initially (shown after login)
+    const tabBar = document.getElementById('mobile-tab-bar');
+    if (tabBar && Mobile.isMobile()) {
+        const appScreen = document.getElementById('app-screen');
+        tabBar.style.display = (appScreen && !appScreen.classList.contains('hidden')) ? 'flex' : 'none';
+    }
+
+    // Reinit lucide after mobile drawer renders
+    if (Mobile.isMobile() && typeof lucide !== 'undefined') {
+        setTimeout(() => lucide.createIcons(), 200);
+    }
+});
+
+// Handle resize (tablet rotation etc.)
+window.addEventListener('resize', () => {
+    const tabBar = document.getElementById('mobile-tab-bar');
+    if (!tabBar) return;
+    if (!Mobile.isMobile()) {
+        tabBar.style.display = 'none';
+        closeMobileMenu();
+    } else {
+        const appScreen = document.getElementById('app-screen');
+        if (appScreen && !appScreen.classList.contains('hidden')) {
+            tabBar.style.display = 'flex';
+        }
+    }
+});
+
+/* Mobile module exposed globally */
+window.Mobile = Mobile;
+
+/* Ensure Financeiro.fecharModalBaixa and confirmarBaixa are properly exposed
+   (already done in original, just ensuring mobile patches don't break them) */
+if (!window.Financeiro) {
+    // Safety alias if module reference was overridden
+    window.Financeiro = window.Financeiro || {};
+}

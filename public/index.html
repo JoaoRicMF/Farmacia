@@ -29,7 +29,7 @@
         <form onsubmit="fazerLogin(event);">
             <div class="input-wrapper">
                 <label for="login-user" class="sr-only">Usuário</label>
-                <input type="text" id="login-user" name="usuario" placeholder="Usuário" autocomplete="username" required>
+                <input type="text" id="login-user" name="usuario" placeholder="Usuário" autocomplete="username" inputmode="text" required>
             </div>
 
             <div class="input-wrapper">
@@ -96,6 +96,63 @@
         </div>
     </aside>
 
+    <!-- BOTTOM TAB BAR (mobile only) -->
+    <nav class="mobile-tab-bar" id="mobile-tab-bar" aria-label="Navegação principal">
+        <button class="tab-item active" onclick="mobileNav('dashboard', this)" aria-label="Dashboard">
+            <i data-lucide="layout-dashboard"></i>
+            <span>Dashboard</span>
+        </button>
+        <button class="tab-item" onclick="mobileNav('novo', this)" aria-label="Novo Lançamento">
+            <i data-lucide="file-plus-2"></i>
+            <span>Lançar</span>
+        </button>
+        <button class="tab-item" onclick="mobileNav('lista', this)" aria-label="Registros">
+            <i data-lucide="clipboard-list"></i>
+            <span>Registros</span>
+        </button>
+        <button class="tab-item" onclick="mobileNav('fluxo', this)" aria-label="Fluxo de Caixa">
+            <i data-lucide="banknote"></i>
+            <span>Fluxo</span>
+        </button>
+        <button class="tab-item" onclick="toggleMobileMenu()" aria-label="Menu" id="tab-menu-btn">
+            <i data-lucide="menu"></i>
+            <span>Menu</span>
+        </button>
+    </nav>
+
+    <!-- MOBILE MENU DRAWER (bottom sheet) -->
+    <div class="mobile-menu-overlay hidden" id="mobile-menu-overlay" onclick="closeMobileMenu()"></div>
+    <div class="mobile-menu-drawer hidden" id="mobile-menu-drawer">
+        <div class="mobile-menu-handle"></div>
+        <div class="mobile-menu-user">
+            <div class="avatar-circle" style="width:44px;height:44px;font-size:1.2rem;">
+                <span id="mobile-avatar-icon">U</span>
+            </div>
+            <div>
+                <div id="mobile-user-display" class="user-name" style="font-size:0.95rem;">Usuário</div>
+                <small id="mobile-user-role" style="color:var(--text-light);">Operador</small>
+            </div>
+        </div>
+        <div class="mobile-menu-items">
+            <button class="mobile-menu-item admin-only hidden" onclick="mobileNav('logs'); closeMobileMenu();">
+                <i data-lucide="shield-alert"></i>
+                <span>Auditoria</span>
+            </button>
+            <button class="mobile-menu-item" onclick="mobileNav('config'); closeMobileMenu();">
+                <i data-lucide="settings"></i>
+                <span>Configurações</span>
+            </button>
+            <button class="mobile-menu-item" onclick="toggleDarkMode(); closeMobileMenu();">
+                <i data-lucide="moon"></i>
+                <span>Alternar Tema</span>
+            </button>
+            <button class="mobile-menu-item mobile-menu-logout" onclick="confirmarLogout(); closeMobileMenu();">
+                <i data-lucide="log-out"></i>
+                <span>Sair</span>
+            </button>
+        </div>
+    </div>
+
     <main class="content" id="main-content">
 
         <section id="view-dashboard" class="view-section">
@@ -106,7 +163,7 @@
                 </div>
             </div>
 
-            <div style="display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
+            <div class="period-filter-row" style="display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
                 <button class="btn btn-secondary filter-btn active" onclick="filtrarDashboard('7d', this)">7 Dias</button>
                 <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('30d', this)">1 Mês</button>
                 <button class="btn btn-secondary filter-btn" onclick="filtrarDashboard('3m', this)">3 Meses</button>
@@ -203,7 +260,7 @@
                     <h1>Fluxo de Caixa</h1>
                 </div>
 
-                <div style="display: flex; gap: 10px; align-items: center;">
+                <div class="fluxo-header-actions" style="display: flex; gap: 10px; align-items: center;">
                     <input type="month" id="filtro-mes-fluxo" class="periodo-select" onchange="carregarFluxo()" aria-label="Filtrar Mês">
                     <button class="btn btn-secondary" onclick="window.print()" title="Salvar como PDF (Imprimir)">🖨️ PDF</button>
                     <button class="btn btn-success" onclick="baixarExcelFluxo()">📊 Baixar Excel</button>
@@ -264,7 +321,7 @@
                         </div>
                         <div class="form-group" style="margin-top:10px;">
                             <label for="ent-valor">Valor</label>
-                            <input type="text" id="ent-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
+                            <input type="text" id="ent-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00" inputmode="decimal">
                         </div>
                         <button class="btn btn-success" style="width: 100%; margin-top: 15px;" onclick="salvarEntradaCaixa()">Registrar Entrada</button>
                     </div>
@@ -293,7 +350,7 @@
                         </div>
                         <div class="form-group" style="margin-top:10px;">
                             <label for="sai-valor">Valor</label>
-                            <input type="text" id="sai-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
+                            <input type="text" id="sai-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00" inputmode="decimal">
                         </div>
                         <button class="btn btn-danger" style="width: 100%; margin-top: 15px;" onclick="salvarSaidaCaixa()">Registrar Saída</button>
                     </div>
@@ -326,7 +383,7 @@
                     <button class="btn-toggle" onclick="toggleSidebar()" aria-label="Abrir Menu">☰</button>
                     <h1 id="form-titulo">Novo Lançamento</h1>
                 </div>
-                <small class="no-print" style="color: var(--text-light);">
+                <small class="no-print no-mobile" style="color: var(--text-light);">
                     Atalhos: <b>Enter</b> Salvar | <b>Esc</b> Limpar
                 </small>
             </div>
@@ -335,7 +392,12 @@
                 <div class="form-row">
                     <div class="full-width">
                         <label for="boleto-cod">Código de Barras (Autofocus)</label>
-                        <input type="text" id="boleto-cod" onblur="lerCodigoBarras()" oninput="this.classList.remove('input-error')" placeholder="Cole ou leia o código aqui...">
+                        <div class="barcode-field-wrapper">
+                            <input type="text" id="boleto-cod" onblur="lerCodigoBarras()" oninput="this.classList.remove('input-error')" placeholder="Cole ou leia o código aqui..." autocomplete="off" inputmode="numeric">
+                            <button type="button" class="btn-camera-scan" title="Em breve: scanner" aria-label="Escanear código de barras">
+                                <i data-lucide="scan-barcode"></i>
+                            </button>
+                        </div>
                         <small class="hint">💡 Preenche Valor e Vencimento automaticamente.</small>
                     </div>
                 </div>
@@ -352,7 +414,7 @@
                 <div class="form-row three-col">
                     <div class="form-group">
                         <label for="boleto-valor">Valor <span class="required">*</span></label>
-                        <input type="text" id="boleto-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00">
+                        <input type="text" id="boleto-valor" oninput="mascaraMoeda(this)" placeholder="R$ 0,00" inputmode="decimal">
                         <span class="error-msg" id="err-valor">Informe o valor</span>
                     </div>
                     <div class="form-group">
@@ -416,33 +478,40 @@
                         <input type="text" id="filtro-busca" placeholder="🔍 Buscar..." oninput="debounceCarregarLista()">
                     </div>
                     <div class="filters">
-                        <label for="filtro-data-inicio" class="sr-only">Data Início</label>
-                        <input type="date" id="filtro-data-inicio" onchange="carregarLista(1)" title="De">
+                        <div class="mobile-filter-row">
+                            <label for="filtro-status" class="sr-only">Status</label>
+                            <select id="filtro-status" onchange="carregarLista(1)">
+                                <option value="Todos">Status: Todos</option>
+                                <option value="Pendente">Pendente</option>
+                                <option value="Vencido">Vencido</option>
+                                <option value="Pago">Pago</option>
+                            </select>
 
-                        <label for="filtro-data-fim" class="sr-only">Data Fim</label>
-                        <input type="date" id="filtro-data-fim" onchange="carregarLista(1)" title="Até">
-
-                        <label for="filtro-status" class="sr-only">Status</label>
-                        <select id="filtro-status" onchange="carregarLista(1)">
-                            <option value="Todos">Status: Todos</option>
-                            <option value="Pendente">Pendente</option>
-                            <option value="Vencido">Vencido</option>
-                            <option value="Pago">Pago</option>
-                        </select>
-
-                        <label for="filtro-cat" class="sr-only">Categoria</label>
-                        <select id="filtro-cat" onchange="carregarLista(1)">
-                            <option value="Todas">Categoria: Todas</option>
-                            <option>Medicamentos (Estoque)</option>
-                            <option>Materiais de Consumo</option>
-                            <option>Impostos & Taxas</option>
-                            <option>Folha de Pagamento</option>
-                            <option>Aluguel & Condomínio</option>
-                            <option>Água/Luz/Internet</option>
-                            <option>Marketing</option>
-                            <option>Manutenção</option>
-                            <option>Outros</option>
-                        </select>
+                            <label for="filtro-cat" class="sr-only">Categoria</label>
+                            <select id="filtro-cat" onchange="carregarLista(1)">
+                                <option value="Todas">Categoria: Todas</option>
+                                <option>Medicamentos (Estoque)</option>
+                                <option>Materiais de Consumo</option>
+                                <option>Impostos & Taxas</option>
+                                <option>Folha de Pagamento</option>
+                                <option>Aluguel & Condomínio</option>
+                                <option>Água/Luz/Internet</option>
+                                <option>Marketing</option>
+                                <option>Manutenção</option>
+                                <option>Outros</option>
+                            </select>
+                        </div>
+                        <div class="date-filter-accordion">
+                            <button type="button" class="date-filter-toggle" onclick="toggleDateFilters(this)">
+                                📅 Filtrar por data <span class="date-arrow">▼</span>
+                            </button>
+                            <div class="date-filter-body hidden">
+                                <label for="filtro-data-inicio" class="sr-only">Data Início</label>
+                                <input type="date" id="filtro-data-inicio" onchange="carregarLista(1)" title="De">
+                                <label for="filtro-data-fim" class="sr-only">Data Fim</label>
+                                <input type="date" id="filtro-data-fim" onchange="carregarLista(1)" title="Até">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -498,7 +567,10 @@
         </section>
 
         <section id="view-config" class="view-section hidden">
-            <div class="card" style="margin-top: 20px;">
+            <div class="header-flex mobile-config-header">
+                <h1>⚙️ Configurações</h1>
+            </div>
+            <div class="card" style="margin-top: 0;">
                 <h3>🚚 Cadastro de Fornecedores</h3>
                 <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 15px;">
                     Padronize os nomes para evitar duplicidades no financeiro.

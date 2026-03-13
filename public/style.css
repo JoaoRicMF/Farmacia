@@ -302,6 +302,7 @@ input:focus, select:focus {
 
 /* 1. Summary Card (Dashboard) */
 .summary-card {
+    min-height: 44px;
     padding: 24px;
     display: flex;
     align-items: center;
@@ -789,4 +790,865 @@ table td:last-child .btn-trash svg {
     width: 24px; /* A lixeira fica levemente maior */
     height: 24px;
     color: var(--danger); /* Garante que fique vermelha */
+}
+/* ==========================================================================
+   13. MOBILE — BOTTOM TAB BAR & DRAWER
+   ========================================================================== */
+
+/* Bottom Tab Bar */
+.mobile-tab-bar {
+    display: none;
+}
+
+/* Camera scan button for barcode field */
+.barcode-field-wrapper {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+.barcode-field-wrapper input {
+    flex: 1;
+}
+.btn-camera-scan {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    background: var(--bg-body);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-light);
+    flex-shrink: 0;
+}
+.btn-camera-scan svg { width: 22px; height: 22px; }
+
+/* Date filter accordion */
+.date-filter-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.date-filter-toggle {
+    display: none;
+}
+.date-filter-body {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   14. MOBILE — @media (max-width: 640px)
+   ========================================================================== */
+@media (max-width: 640px) {
+    /* --- GLOBAL FIXES --- */
+    .no-mobile { display: none !important; }
+
+    /* Prevent iOS zoom on inputs */
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    input[type="password"],
+    input[type="month"],
+    .input-wrapper input,
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+
+    /* Body adjustments */
+    body {
+        padding-bottom: 70px;
+    }
+
+    /* --- LOGIN SCREEN --- */
+    #login-screen {
+        min-height: 100svh;
+        height: auto;
+        align-items: center;
+        padding: 20px;
+    }
+    .login-box {
+        padding: 2rem 1.5rem;
+        width: 100%;
+    }
+    .login-box h2 {
+        font-size: 2rem;
+        margin-bottom: 0.35rem;
+    }
+    .login-box p {
+        font-size: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .input-wrapper input {
+        height: 52px;
+        font-size: 16px !important;
+    }
+    .btn-login {
+        height: 52px;
+        border-radius: 12px;
+    }
+
+    /* --- SIDEBAR — hidden on mobile, replaced by bottom bar --- */
+    .sidebar {
+        display: none !important;
+    }
+    #mobile-overlay {
+        display: none !important;
+    }
+    .btn-toggle {
+        display: none !important;
+    }
+
+    /* --- CONTENT --- */
+    .content {
+        margin-left: 0 !important;
+        padding: 16px 14px;
+        padding-bottom: 80px;
+    }
+
+    /* --- HEADER --- */
+    .header-flex {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 18px;
+        padding-bottom: 14px;
+    }
+    .header-flex > div:first-child {
+        gap: 8px;
+    }
+    h1 {
+        font-size: 1.35rem;
+    }
+    .header-flex h1 {
+        font-size: 1.35rem;
+    }
+
+    /* --- BOTTOM TAB BAR --- */
+    .mobile-tab-bar {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 62px;
+        background: var(--bg-card);
+        border-top: 1px solid var(--border);
+        z-index: var(--z-sidebar);
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+        align-items: stretch;
+    }
+    .tab-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        color: var(--text-light);
+        font-size: 0.65rem;
+        font-weight: 600;
+        padding: 6px 4px 8px;
+        min-height: 44px;
+        transition: color 0.2s;
+        font-family: 'Inter', sans-serif;
+    }
+    .tab-item svg {
+        width: 22px;
+        height: 22px;
+        stroke-width: 2px;
+    }
+    .tab-item.active {
+        color: var(--primary);
+    }
+    .tab-item.active svg {
+        stroke-width: 2.5px;
+    }
+
+    /* --- MOBILE MENU DRAWER --- */
+    .mobile-menu-overlay {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.45);
+        z-index: calc(var(--z-sidebar) + 5);
+        backdrop-filter: blur(2px);
+    }
+    .mobile-menu-drawer {
+        position: fixed;
+        bottom: 62px;
+        left: 0;
+        width: 100%;
+        background: var(--bg-card);
+        border-radius: 20px 20px 0 0;
+        z-index: calc(var(--z-sidebar) + 10);
+        padding: 0 0 12px;
+        box-shadow: 0 -8px 32px rgba(0,0,0,0.15);
+        animation: slideUpDrawer 0.28s ease;
+    }
+    @keyframes slideUpDrawer {
+        from { transform: translateY(100%); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .mobile-menu-handle {
+        width: 40px; height: 4px;
+        background: var(--border);
+        border-radius: 2px;
+        margin: 12px auto 8px;
+    }
+    .mobile-menu-user {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 20px 14px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 8px;
+    }
+    .mobile-menu-items {
+        display: flex;
+        flex-direction: column;
+    }
+    .mobile-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 22px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        color: var(--text-main);
+        font-size: 0.98rem;
+        font-weight: 500;
+        font-family: 'Inter', sans-serif;
+        text-align: left;
+        min-height: 52px;
+        transition: background 0.15s;
+    }
+    .mobile-menu-item:hover,
+    .mobile-menu-item:active {
+        background: var(--bg-body);
+    }
+    .mobile-menu-item svg { width: 20px; height: 20px; color: var(--text-light); }
+    .mobile-menu-logout { color: var(--danger) !important; }
+    .mobile-menu-logout svg { color: var(--danger) !important; }
+
+    /* --- DASHBOARD --- */
+    .dashboard-cards {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .summary-card {
+        padding: 14px 12px;
+        gap: 10px;
+    }
+    .summary-card:hover {
+        transform: none;
+    }
+    .card-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        font-size: 1.4rem;
+        flex-shrink: 0;
+    }
+    .card-icon svg { width: 22px; height: 22px; }
+    .card-info h3 {
+        font-size: 0.65rem;
+        margin-bottom: 4px;
+    }
+    .card-info p {
+        font-size: 1.1rem;
+        line-height: 1.2;
+    }
+    .card-info small {
+        font-size: 0.7rem;
+        margin-top: 3px;
+    }
+    .card-value-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+    .bullet-separator { font-size: 0.6rem; color: var(--text-light); }
+    .qty-indicator { font-size: 0.8rem; font-weight: 700; }
+
+    /* Filter chips (period buttons) horizontal scroll */
+    #view-dashboard > div:nth-child(2),
+    .filter-chips-row {
+        display: flex !important;
+        gap: 8px !important;
+        overflow-x: auto !important;
+        padding-bottom: 6px !important;
+        margin-bottom: 16px !important;
+        flex-wrap: nowrap !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    #view-dashboard > div:nth-child(2)::-webkit-scrollbar { display: none; }
+    .filter-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding: 7px 14px;
+        font-size: 0.8rem;
+        border-radius: 20px;
+    }
+    .filter-btn.active {
+        background: var(--primary) !important;
+        color: white !important;
+        border-color: var(--primary) !important;
+    }
+
+    /* Charts stacked vertically */
+    .charts-row {
+        flex-direction: column;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    .chart-box {
+        flex: none !important;
+        min-width: unset !important;
+        width: 100%;
+        padding: 16px;
+    }
+    .chart-container {
+        height: 200px !important;
+    }
+
+    /* Calendar accordion — listWeek on mobile (JS handles view, CSS collapses by default) */
+    #calendar-wrapper {
+        overflow: hidden;
+    }
+
+    /* --- NOVO LANÇAMENTO FORM --- */
+    #form-boleto {
+        max-width: 100% !important;
+        padding: 16px;
+    }
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    .half-width,
+    .full-width,
+    .three-col .form-group {
+        flex: none !important;
+        width: 100% !important;
+        min-width: unset !important;
+    }
+    .form-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .form-actions .btn {
+        width: 100%;
+        height: 50px;
+    }
+    .barcode-field-wrapper {
+        align-items: center;
+    }
+
+    /* --- REGISTROS — TABLE TO CARDS --- */
+    /* Hide the table header on mobile */
+    #tabela-registros thead {
+        display: none !important;
+    }
+    /* Each row becomes a card */
+    #tabela-registros tbody tr {
+        display: block;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        margin-bottom: 12px;
+        padding: 14px;
+        box-shadow: var(--shadow-sm);
+    }
+    #tabela-registros tbody tr:hover td {
+        background: transparent;
+    }
+    /* Hide individual TDs default layout */
+    #tabela-registros tbody td {
+        display: block;
+        padding: 2px 0;
+        border: none;
+        font-size: 0.9rem;
+    }
+    /* Vencimento column - small top label */
+    #tabela-registros tbody td:nth-child(1) {
+        font-size: 0.75rem;
+        color: var(--text-light);
+        order: 3;
+        display: inline;
+    }
+    /* Descrição - main title */
+    #tabela-registros tbody td:nth-child(2) {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-main);
+        order: 1;
+        display: block;
+        margin-bottom: 6px;
+    }
+    /* Categoria badge */
+    #tabela-registros tbody td:nth-child(3) {
+        font-size: 0.75rem;
+        color: var(--text-light);
+        order: 2;
+        display: inline;
+        margin-right: 8px;
+    }
+    /* Valor - highlighted right */
+    #tabela-registros tbody td:nth-child(4) {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: var(--text-main);
+        order: 1;
+        display: block;
+        text-align: right;
+        margin-top: -26px;
+        margin-bottom: 4px;
+    }
+    /* Status badge */
+    #tabela-registros tbody td:nth-child(5) {
+        display: inline-block !important;
+        order: 2;
+    }
+    /* Actions row */
+    #tabela-registros tbody td:last-child {
+        display: flex !important;
+        justify-content: flex-end !important;
+        gap: 6px !important;
+        padding: 8px 0 0 !important;
+        margin-top: 8px;
+        border-top: 1px solid var(--border) !important;
+    }
+    #tabela-registros tbody td:last-child .btn-icon {
+        width: 44px !important;
+        height: 44px !important;
+    }
+
+    /* Toolbar — 2 rows on mobile */
+    .toolbar {
+        flex-direction: column;
+        padding: 12px;
+        gap: 10px;
+    }
+    .search-box {
+        min-width: unset;
+        width: 100%;
+        flex: none;
+    }
+    .search-box input {
+        width: 100%;
+    }
+    .filters {
+        width: 100%;
+        flex-direction: column;
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        gap: 8px;
+    }
+    .filters > * {
+        min-width: unset;
+        flex: none;
+        width: 100%;
+    }
+    .mobile-filter-row {
+        display: flex;
+        gap: 8px;
+    }
+    .mobile-filter-row select {
+        flex: 1;
+        font-size: 14px !important;
+    }
+
+    /* Date filter accordion on mobile */
+    .date-filter-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        padding: 10px 14px;
+        background: var(--bg-body);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--text-main);
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: 'Inter', sans-serif;
+    }
+    .date-filter-body {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .date-filter-body.hidden {
+        display: none !important;
+    }
+
+    /* Pagination simplified */
+    .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 12px 0 4px;
+    }
+    #info-paginas {
+        font-size: 0.9rem;
+    }
+
+    /* --- FLUXO DE CAIXA --- */
+    /* Summary cards: compact vertical stack */
+    #view-fluxo .dashboard-cards {
+        grid-template-columns: 1fr !important;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    #view-fluxo .summary-card {
+        padding: 12px 16px;
+    }
+
+    /* Forms as tabs */
+    .fluxo-forms-wrapper {
+        flex-direction: column !important;
+        gap: 0 !important;
+    }
+    .fluxo-tab-btns {
+        display: flex;
+        gap: 0;
+        border-bottom: 2px solid var(--border);
+        margin-bottom: 0;
+    }
+    .fluxo-tab-btn {
+        flex: 1;
+        padding: 12px;
+        background: var(--bg-body);
+        border: none;
+        border-bottom: 2px solid transparent;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--text-light);
+        margin-bottom: -2px;
+        font-family: 'Inter', sans-serif;
+        transition: color 0.2s, border-color 0.2s;
+    }
+    .fluxo-tab-btn.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+        background: var(--bg-card);
+    }
+    .fluxo-form-panel {
+        display: none;
+    }
+    .fluxo-form-panel.active {
+        display: block;
+    }
+
+    /* Header actions on fluxo - icon only */
+    .fluxo-header-actions .btn span {
+        display: none;
+    }
+
+    /* Fluxo table also cards */
+    #tabela-fluxo thead { display: none !important; }
+    #tabela-fluxo tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        margin-bottom: 10px;
+        padding: 12px 14px;
+        gap: 4px;
+        align-items: center;
+    }
+    #tabela-fluxo tbody td {
+        display: inline-block;
+        padding: 2px 4px;
+        border: none;
+    }
+    #tabela-fluxo tbody td:nth-child(1) { /* Data */
+        font-size: 0.75rem;
+        color: var(--text-light);
+        width: 100%;
+    }
+    #tabela-fluxo tbody td:nth-child(2) { /* Descrição */
+        font-weight: 600;
+        font-size: 0.9rem;
+        flex: 1;
+    }
+    #tabela-fluxo tbody td:nth-child(4) { /* Valor */
+        font-weight: 800;
+        font-size: 1rem;
+        margin-left: auto;
+    }
+
+    /* Extrato full width on mobile */
+    #view-fluxo [style*="flex: 2"] {
+        min-width: unset !important;
+        width: 100% !important;
+    }
+    #view-fluxo > div[style*="display: flex"] {
+        flex-direction: column !important;
+    }
+    #view-fluxo [style*="min-width: 300px"],
+    #view-fluxo [style*="min-width: 400px"] {
+        min-width: unset !important;
+    }
+
+    /* --- MODAIS — Bottom Sheet --- */
+    .modal-overlay {
+        align-items: flex-end;
+    }
+    .modal-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-radius: 20px 20px 0 0;
+        max-height: 90vh;
+        overflow-y: auto;
+        animation: slideUpModal 0.3s ease;
+    }
+    @keyframes slideUpModal {
+        from { transform: translateY(100%); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    .modal-header {
+        padding: 16px 20px;
+    }
+    .modal-body {
+        padding: 16px 20px 24px;
+        max-height: none;
+    }
+    .close-btn {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.6rem;
+    }
+    /* Modal form rows also stack */
+    .modal-body .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    .modal-body .half-width {
+        flex: none !important;
+        width: 100% !important;
+    }
+
+    /* --- CONFIGURAÇÕES — Accordions --- */
+    #view-config .card {
+        padding: 0;
+        overflow: hidden;
+        margin-bottom: 12px;
+    }
+    .config-accordion-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 18px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.95rem;
+        user-select: none;
+    }
+    .config-accordion-body {
+        padding: 0 18px 16px;
+    }
+    .config-accordion-body.collapsed {
+        display: none;
+    }
+    #view-config .card .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    #view-config .card .half-width {
+        flex: none !important;
+        width: 100% !important;
+    }
+    /* Config header */
+    #view-config > .header-flex {
+        display: none;
+    }
+
+    /* User table in config → cards */
+    #tabela-usuarios-config tr {
+        display: block;
+        border-bottom: 1px solid var(--border);
+        padding: 10px 0;
+    }
+    #tabela-usuarios-config td {
+        display: inline-block;
+        padding: 2px 4px;
+    }
+    #tabela-usuarios-config th {
+        display: none;
+    }
+    #tabela-usuarios-config td:last-child {
+        display: flex !important;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+    }
+
+    /* Toast position adjustment */
+    #toast-container {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        align-items: stretch;
+    }
+    .toast {
+        min-width: unset;
+        width: 100%;
+    }
+
+    /* Logs table adjustments */
+    #tabela-logs thead th:nth-child(4),
+    #tabela-logs tbody td:nth-child(4) {
+        display: none;
+    }
+    #tabela-logs td, #tabela-logs th {
+        padding: 10px 8px;
+        font-size: 0.8rem;
+    }
+
+    /* Fluxo header buttons icon-only */
+    #view-fluxo .header-flex > div:last-child .btn {
+        padding: 8px 10px;
+    }
+    #view-fluxo .header-flex .btn-success span,
+    #view-fluxo .header-flex [onclick*="print"] span {
+        display: none;
+    }
+
+    /* Period select month input */
+    .periodo-select {
+        font-size: 14px !important;
+        padding: 8px 10px;
+    }
+}
+
+    /* --- PERIOD FILTER ROW (chips) --- */
+    .period-filter-row {
+        flex-wrap: nowrap !important;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 4px !important;
+    }
+    .period-filter-row::-webkit-scrollbar { display: none; }
+
+    /* --- CONFIG MOBILE HEADER --- */
+    .mobile-config-header {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+    }
+    .mobile-config-header h1 { margin: 0; }
+
+    /* --- BARCODE field fix (desktop: side by side) --- */
+    .barcode-field-wrapper {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    /* --- FLUXO header action buttons: show text on desktop --- */
+    .fluxo-header-actions .btn span { display: inline; }
+
+    /* --- ENSURE TABLE ROW CARD layout correctness --- */
+    #tabela-registros tbody tr td {
+        vertical-align: top;
+    }
+
+/* Dark mode adjustments for mobile elements */
+[data-theme="dark"] .mobile-tab-bar {
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+}
+[data-theme="dark"] .mobile-menu-drawer {
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.4);
+}
+[data-theme="dark"] .tab-item.active {
+    color: var(--primary);
+}
+[data-theme="dark"] .mobile-menu-item:active {
+    background: rgba(255,255,255,0.05);
+}
+
+/* Config mobile header — hidden on desktop, visible mobile */
+.mobile-config-header {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .mobile-config-header {
+        display: flex !important;
+        margin-bottom: 12px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    /* Fluxo forms wrapper min-width reset */
+    .fluxo-forms-wrapper > .card {
+        min-width: unset !important;
+        margin-bottom: 0 !important;
+    }
+    .fluxo-forms-wrapper {
+        gap: 0 !important;
+    }
+
+    /* Remove gap between cards in forms wrapper */
+    .fluxo-forms-wrapper .card + .card {
+        border-top: none;
+    }
+
+    /* Card value row for dashboard cards — allow value + qty on same row */
+    .card-value-row {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+        flex-wrap: nowrap;
+    }
+    .card-value-row p {
+        font-size: 1.05rem !important;
+    }
+
+    /* Ensure period filter row has proper scrolling */
+    .period-filter-row {
+        margin-left: -14px;
+        margin-right: -14px;
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+    }
+
+    /* Audit page — simplified for mobile */
+    #view-logs .card {
+        padding: 16px 12px;
+        overflow-x: auto;
+    }
+
+    /* Fluxo extrato card full-width */
+    #view-fluxo .card[style*="flex: 2"] {
+        flex: none !important;
+        width: 100% !important;
+        min-width: unset !important;
+    }
+
+    /* Search input placeholder size */
+    #filtro-busca::placeholder {
+        font-size: 14px;
+    }
 }
