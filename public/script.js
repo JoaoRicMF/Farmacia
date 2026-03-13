@@ -1012,6 +1012,7 @@ const Config = {
             if (iLogin) iLogin.value = State.usuario.usuario || State.usuario.login || '';
             if (iNome) iNome.value = State.usuario.nome || '';
         }
+        await Config.carregarFornecedores();
 
         Config.renderizarFornecedores();
         Config.carregarCategorias();

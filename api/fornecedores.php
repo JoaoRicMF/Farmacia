@@ -66,7 +66,7 @@ if ($method === 'POST') {
 
     try {
         // CORREÇÃO: Inclusão de cnpj e telefone na query de INSERT
-        $stmt = $db->prepare("INSERT INTO fornecedor (nome, cnpj, telefone, categoriaPadrao, assinatura, id_unidade) VALUES (:n, :cnpj, :tel, :c, :ass, :u)");
+        $stmt = $db->prepare("INSERT INTO fornecedor (nome, cnpj, telefone, categoriaPadrao, id_unidade) VALUES (:n, :cnpj, :tel, :c, :ass, :u)");
 
         $params = [
             ":n"    => $data->nome,
