@@ -184,6 +184,12 @@ class Database {
                 detalhes TEXT
             ) ENGINE=InnoDB;");
 
+            $this->conn->exec("CREATE TABLE IF NOT EXISTS boleto_assinaturas (
+                assinatura VARCHAR(50) PRIMARY KEY,
+                nome_fornecedor VARCHAR(255) NOT NULL,
+                criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )ENGINE=InnoDB;");
+
         } catch (PDOException $e) {
             error_log("Erro na criação de tabelas: " . $e->getMessage());
             // [ALTERAÇÃO AQUI] Lança o erro para a API capturar e mostrar no frontend

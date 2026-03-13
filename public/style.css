@@ -1652,3 +1652,7 @@ table td:last-child .btn-trash svg {
         font-size: 14px;
     }
 }
+/* Animação para o Loading do Código de Barras */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

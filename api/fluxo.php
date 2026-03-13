@@ -108,6 +108,33 @@ if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)) {
                 }
 
                 $db->commit();
+
+                // --------------------------------------------------------
+                // MOTOR DE APRENDIZADO: grava assinatura → fornecedor
+                // para que boleto.php consiga "adivinhar" futuramente.
+                // Só aprende com boletos bancários (44 dígitos).
+                // --------------------------------------------------------
+                if ($data->tipo === 'SAIDA' && !empty($data->codigo_barras) && !empty($data->descricao)) {
+                    try {
+                        require_once 'boleto.php';
+                        $codigoLimpo = preg_replace('/[^0-9]/', '', $data->codigo_barras);
+                        if (strlen($codigoLimpo) === 44) {
+                            $assinatura = gerarAssinaturaBoleto($codigoLimpo);
+                            if ($assinatura) {
+                                $stmtAprender = $db->prepare("
+                                    INSERT INTO boleto_assinaturas (assinatura, nome_fornecedor)
+                                    VALUES (?, ?)
+                                    ON DUPLICATE KEY UPDATE nome_fornecedor = VALUES(nome_fornecedor)
+                                ");
+                                $stmtAprender->execute([$assinatura, $data->descricao]);
+                            }
+                        }
+                    } catch (Exception $eLearning) {
+                        // Falha silenciosa: não cancela o salvamento se a tabela ainda não existir
+                        error_log("[fluxo.php] Erro ao gravar assinatura: " . $eLearning->getMessage());
+                    }
+                }
+
                 enviarResponse(["success" => true, "message" => "Movimentação registrada com sucesso!"]);
 
             } catch (Exception $e) {
@@ -143,6 +170,7 @@ if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)) {
                 }
             }
             unset($mov);
+
 
             // Totais Específicos (Dinheiro/Pix) mantêm query separada pois é agrupamento
             $stmtTotais = $db->prepare("SELECT formaPagamento, SUM(valor) as total FROM entradacaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a GROUP BY formaPagamento");

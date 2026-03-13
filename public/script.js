@@ -651,28 +651,49 @@ const Financeiro = {
     async lerCodigoBarras() {
         const inputCod = document.getElementById('boleto-cod');
         const codigo = inputCod.value.trim();
+        
+        // Só avança se tiver o tamanho mínimo de um código de barras
         if (codigo.length < 10) return;
 
-        const res = await API.request('boleto.php', 'POST', { codigo: codigo });
-        if (res && res.valido) {
-            UI.showToast("Identificado!");
+        try {
+            // Faz a validação matemática instantânea no PHP
+            const res = await API.request('boleto.php', 'POST', { codigo: codigo });
+            
+            if (res && res.valido) {
+                UI.showToast("Boleto processado!", "success");
 
-            // PIX
-            if (res.tipo.includes('PIX')) {
-                const modalQR = document.getElementById('modal-qrcode');
-                const imgQR = document.getElementById('img-qrcode');
-                if (modalQR && imgQR) {
-                    imgQR.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(codigo)}`;
-                    modalQR.classList.remove('hidden');
-                    UI.showToast("QR Code PIX Gerado.", "success");
+                // 1. Preenchimento Automático: Valor
+                if (res.valor > 0) {
+                    document.getElementById('boleto-valor').value = Utils.formatarMoedaBRL(res.valor);
                 }
+                
+                // 2. Preenchimento Automático: Vencimento
+                if (res.vencimento) {
+                    document.getElementById('boleto-venc').value = res.vencimento;
+                    Financeiro.verificarVencimento();
+                }
+
+                // 3. Foco Automático na Descrição:
+                // Limpa qualquer texto genérico e coloca o cursor pronto a escrever
+                const descInput = document.getElementById('boleto-desc');
+                descInput.value = ""; 
+                descInput.focus();
+
+                // Tratamento para PIX Copia e Cola (mantido)
+                if (res.tipo && res.tipo.includes('PIX')) {
+                    const modalQR = document.getElementById('modal-qrcode');
+                    const imgQR = document.getElementById('img-qrcode');
+                    if (modalQR && imgQR) {
+                        imgQR.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(codigo)}`;
+                        modalQR.classList.remove('hidden');
+                        UI.showToast("QR Code PIX Gerado.", "success");
+                    }
+                }
+            } else {
+                UI.showToast(res?.mensagem || "Código inválido ou não reconhecido.", "error");
             }
-            // Auto-fill
-            if (res.valor > 0) document.getElementById('boleto-valor').value = Utils.formatarMoedaBRL(res.valor);
-            if (res.vencimento) {
-                document.getElementById('boleto-venc').value = res.vencimento;
-                Financeiro.verificarVencimento();
-            }
+        } catch (e) {
+            UI.showToast("Erro ao processar o boleto.", "error");
         }
     },
 

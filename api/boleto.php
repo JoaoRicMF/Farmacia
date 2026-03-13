@@ -5,6 +5,7 @@
  */
 require_once 'utils.php';
 require_once 'MoneyUtils.php';
+require_once '../config/database.php';
 
 inicializarApi();
 
@@ -50,20 +51,39 @@ try {
         throw new Exception("Tamanho de código ($tam) ou formato incompatível.");
     }
 
-    // 2. CONSULTA NA API EXTERNA (Se o boleto for válido localmente)
+    // 2. MOTOR DE APRENDIZADO — tenta prever o fornecedor pela assinatura do código de barras
+    if ($response['valido'] && $response['tipo'] !== "PIX Copia e Cola" && strlen($linha) === 44) {
+        try {
+            $pdo = (new Database())->getConnection();
+            $assinatura = gerarAssinaturaBoleto($linha);
+            $fornecedorPrevisto = preverFornecedor($assinatura, $pdo);
+
+            if ($fornecedorPrevisto) {
+                $response['empresa_cobradora']       = $fornecedorPrevisto;
+                $response['aprendido_pelo_sistema']  = true;
+            } else {
+                $response['aprendido_pelo_sistema']  = false;
+            }
+        } catch (Exception $eLearning) {
+            // Falha silenciosa: banco indisponível não deve derrubar a leitura do boleto
+            error_log("[boleto.php] Erro no motor de aprendizado: " . $eLearning->getMessage());
+        }
+    }
+
+    // 3. CONSULTA NA API EXTERNA (Se o boleto for válido localmente)
     if ($response['valido'] && $response['tipo'] !== "PIX Copia e Cola") {
         $dadosExternos = consultarBoletoNaApiExterna($linha);
         
         if ($dadosExternos) {
-            // Se a API externa retornar os dados, atualiza a nossa resposta
-            $response['empresa_cobradora'] = $dadosExternos['empresa'] ?? $response['empresa_cobradora'];
-            $response['data_emissao'] = $dadosExternos['emissao'] ?? $response['data_emissao'];
-            
-            // Opcional: Você pode sobrescrever o valor e vencimento com os da API externa
-            // caso confie mais nela do que no cálculo local
-            // $response['valor'] = $dadosExternos['valor'] ?? $response['valor'];
+            // Se a API externa retornar os dados, sobrescreve a previsão local
+            $response['empresa_cobradora']      = $dadosExternos['empresa'] ?? $response['empresa_cobradora'];
+            $response['data_emissao']           = $dadosExternos['emissao'] ?? $response['data_emissao'];
+            $response['aprendido_pelo_sistema'] = false; // Dado veio da API, não do aprendizado
         } else {
-            $response['mensagem'] = "Boleto válido, mas não foi possível consultar os dados da empresa na API externa.";
+            // Só emite aviso se o fornecedor também não foi previsto pelo aprendizado
+            if (empty($response['aprendido_pelo_sistema'])) {
+                $response['mensagem'] = "Boleto válido, mas não foi possível consultar os dados da empresa na API externa.";
+            }
         }
     }
 
@@ -73,62 +93,6 @@ try {
 }
 
 enviarResponse($response);
-
-
-// ============================================================================
-// FUNÇÃO DE INTEGRAÇÃO COM A API EXTERNA (cURL)
-// ============================================================================
-function consultarBoletoNaApiExterna($codigoBoleto) {
-    /**
-     * TODO: CONFIGURAÇÕES DA SUA API AQUI
-     * Exemplo usando um endpoint genérico. 
-     * Substitua pela URL e Token do seu provedor (Asaas, API Brasil, etc.)
-     */
-    $apiUrl = "https://api.seugateway.com.br/v1/boletos/consulta";
-    $token  = "SEU_TOKEN_DE_ACESSO_AQUI";
-
-    // Prepara os dados a serem enviados (Geralmente via POST ou GET)
-    $payload = json_encode([
-        "codigo" => $codigoBoleto
-    ]);
-
-    // Inicializa o cURL
-    $ch = curl_init($apiUrl);
-    
-    // Configurações da requisição HTTP
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST"); // Ou "GET" dependendo da API
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer {$token}",
-        "Content-Type: application/json",
-        "Accept: application/json"
-    ]);
-
-    // Ignorar verificação SSL localmente (Remova em Produção)
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); 
-
-    // Executa e pega a resposta
-    $respostaApi = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    // Se a requisição for bem sucedida (Código 200)
-    if ($httpCode >= 200 && $httpCode < 300 && $respostaApi) {
-        $dadosJson = json_decode($respostaApi, true);
-        
-        // Mapeie aqui os campos de acordo com a documentação da API que você contratou
-        // Exemplo de mapeamento:
-        return [
-            'empresa' => $dadosJson['razao_social'] ?? $dadosJson['beneficiario'] ?? null,
-            'emissao' => $dadosJson['data_documento'] ?? $dadosJson['data_emissao'] ?? null,
-            'valor'   => $dadosJson['valor_documento'] ?? null
-        ];
-    }
-
-    // Retorna null se a API falhar ou o boleto não for encontrado nela
-    return null;
-}
 
 
 // ============================================================================
@@ -244,4 +208,45 @@ function modulo10($num) {
     }
     $resto = $soma % 10;
     return ($resto == 0) ? 0 : (10 - $resto);
+}
+
+// ============================================================================
+// MOTOR DE APRENDIZADO DE BOLETOS (HEURÍSTICA)
+// ============================================================================
+
+/**
+ * Gera uma assinatura única baseada no padrão do fornecedor no código de barras (44 posições)
+ */
+function gerarAssinaturaBoleto($codigoBarras) {
+    if (strlen($codigoBarras) !== 44) return null;
+
+    if (str_starts_with($codigoBarras, '8')) {
+        // É conta de consumo/arrecadação. Posições 5 a 8 são o ID da empresa.
+        $idEmpresa = substr($codigoBarras, 4, 4);
+        return "ARREC_" . $idEmpresa;
+    } else {
+        // É boleto bancário. Extraímos Banco (1-3) + Início do Campo Livre (20-25)
+        $banco = substr($codigoBarras, 0, 3);
+        $prefixoCedente = substr($codigoBarras, 19, 6);
+        return "BANCO_" . $banco . "_" . $prefixoCedente;
+    }
+}
+
+/**
+ * Busca no banco de dados se já conhecemos essa assinatura
+ */
+function preverFornecedor($assinatura, $pdo) {
+    if (!$assinatura) return null;
+    
+    $stmt = $pdo->prepare("SELECT nome_fornecedor FROM boleto_assinaturas WHERE assinatura = ?");
+    $stmt->execute([$assinatura]);
+    $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    return $resultado ? $resultado['nome_fornecedor'] : null;
+}
+
+function consultarBoletoNaApiExterna($codigoBoleto) {
+    // Retorna null para ignorar a pesquisa externa.
+    // O sistema usará apenas a decodificação matemática local (Banco, Valor e Vencimento).
+    return null;
 }
