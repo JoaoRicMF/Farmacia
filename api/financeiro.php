@@ -192,13 +192,15 @@ try {
             $logAction = "Editar Financeiro";
         } else {
             // INSERT
-            $codigoBarras = $input->codigo_barras ?? '';
+            $codigoBarras = trim($input->codigo_barras ?? '');
 
-            if (!empty($codigoBarras)) {
+            // 2. Só verifica duplicidade se for realmente um código de barras (mais de 40 números)
+            if (!empty($codigoBarras) && strlen($codigoBarras) >= 40) {
                 $checkDup = $db->prepare("SELECT id FROM financeiro WHERE codigo_barras = :cb LIMIT 1");
                 $checkDup->execute([':cb' => $codigoBarras]);
 
-                if ($checkDup->rowCount() > 0) {
+                // 3. Usar fetch() é 100% seguro em qualquer versão de banco de dados
+                if ($checkDup->fetch(PDO::FETCH_ASSOC)) {
                     throw new Exception("Este boleto já foi cadastrado anteriormente", 409);
                 }
             }

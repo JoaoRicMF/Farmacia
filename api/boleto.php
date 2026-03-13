@@ -1,11 +1,10 @@
 <?php
 /**
- * api/boleto.php - Versão com Integração de API Externa
- * Extração local + Consulta em API de Terceiros (cURL)
+ * api/boleto.php - Versão DEFINITIVA com Motor de Aprendizado (Sem API Externa)
  */
 require_once 'utils.php';
 require_once 'MoneyUtils.php';
-require_once '../config/database.php';
+require_once '../config/database.php'; // Necessário para consultar a tabela de assinaturas
 
 inicializarApi();
 
@@ -18,10 +17,11 @@ if (!$linha) {
     enviarResponse(["error" => "Código vazio ou inválido"], 400);
 }
 
-// Estrutura de resposta base
+// 1. A frase da API externa foi removida e adicionamos o campo 'assinatura'
 $response = [
     "banco_emissor" => null,
-    "empresa_cobradora" => "Consulta requer API externa configurada", 
+    "empresa_cobradora" => null, 
+    "assinatura" => null,
     "data_emissao" => "Não disponível",
     "valor" => null,
     "vencimento" => null,
@@ -33,7 +33,7 @@ $response = [
 $tam = strlen($linha);
 
 try {
-    // 1. PROCESSAMENTO LOCAL (Extrai Banco, Valor e Vencimento rapidamente)
+    // 2. PROCESSAMENTO LOCAL (Extrai Banco, Valor e Vencimento)
     if ($tam == 44) {
         if (str_starts_with($linha, '8')) {
             processarArrecadacao($linha, $response, true);
@@ -51,39 +51,34 @@ try {
         throw new Exception("Tamanho de código ($tam) ou formato incompatível.");
     }
 
-    // 2. MOTOR DE APRENDIZADO — tenta prever o fornecedor pela assinatura do código de barras
-    if ($response['valido'] && $response['tipo'] !== "PIX Copia e Cola" && strlen($linha) === 44) {
-        try {
-            $pdo = (new Database())->getConnection();
-            $assinatura = gerarAssinaturaBoleto($linha);
-            $fornecedorPrevisto = preverFornecedor($assinatura, $pdo);
-
-            if ($fornecedorPrevisto) {
-                $response['empresa_cobradora']       = $fornecedorPrevisto;
-                $response['aprendido_pelo_sistema']  = true;
-            } else {
-                $response['aprendido_pelo_sistema']  = false;
-            }
-        } catch (Exception $eLearning) {
-            // Falha silenciosa: banco indisponível não deve derrubar a leitura do boleto
-            error_log("[boleto.php] Erro no motor de aprendizado: " . $eLearning->getMessage());
-        }
-    }
-
-    // 3. CONSULTA NA API EXTERNA (Se o boleto for válido localmente)
+    // 3. MOTOR DE APRENDIZADO (Adivinha a empresa e gera assinatura)
     if ($response['valido'] && $response['tipo'] !== "PIX Copia e Cola") {
-        $dadosExternos = consultarBoletoNaApiExterna($linha);
         
-        if ($dadosExternos) {
-            // Se a API externa retornar os dados, sobrescreve a previsão local
-            $response['empresa_cobradora']      = $dadosExternos['empresa'] ?? $response['empresa_cobradora'];
-            $response['data_emissao']           = $dadosExternos['emissao'] ?? $response['data_emissao'];
-            $response['aprendido_pelo_sistema'] = false; // Dado veio da API, não do aprendizado
-        } else {
-            // Só emite aviso se o fornecedor também não foi previsto pelo aprendizado
-            if (empty($response['aprendido_pelo_sistema'])) {
-                $response['mensagem'] = "Boleto válido, mas não foi possível consultar os dados da empresa na API externa.";
+        // Converte a linha digitada para 44 posições para criar um padrão
+        $codigoBarras = $linha;
+        if ($tam == 47) {
+            $codigoBarras = substr($linha, 0, 3) . substr($linha, 3, 1) . substr($linha, 32, 1) . 
+                       substr($linha, 33, 4) . substr($linha, 37, 10) . substr($linha, 4, 5) . 
+                       substr($linha, 10, 10) . substr($linha, 21, 10);
+        } elseif ($tam == 48) {
+            $codigoBarras = substr($linha, 0, 11) . substr($linha, 12, 11) . substr($linha, 24, 11) . substr($linha, 36, 11);
+        }
+
+        // Gera a assinatura matemática (Ex: BANCO_341_123456)
+        $assinatura = gerarAssinaturaBoleto($codigoBarras);
+        $response['assinatura'] = $assinatura;
+
+        if ($assinatura) {
+            // Tenta descobrir quem é consultando a sua nova tabela boleto_assinaturas
+            $database = new Database();
+            $pdo = $database->getConnection();
+            
+            $fornecedorPrevisto = preverFornecedor($assinatura, $pdo);
+            if ($fornecedorPrevisto) {
+                // Se achou, preenche direto!
+                $response['empresa_cobradora'] = $fornecedorPrevisto;
             }
+            // Se não achou, o frontend vai ver a 'assinatura' e abrir o Pop-up!
         }
     }
 
@@ -96,7 +91,38 @@ enviarResponse($response);
 
 
 // ============================================================================
-// FUNÇÕES DE PROCESSAMENTO LOCAL (Mantidas)
+// MOTOR DE APRENDIZADO (Substitui a API Externa)
+// ============================================================================
+
+function gerarAssinaturaBoleto($codigoBarras) {
+    if (strlen($codigoBarras) !== 44) return null;
+
+    if (str_starts_with($codigoBarras, '8')) {
+        // Arrecadação: Posições 5 a 8 são o ID fixo da empresa
+        $idEmpresa = substr($codigoBarras, 4, 4);
+        return "ARREC_" . $idEmpresa;
+    } else {
+        // Bancário: Banco (1-3) + Início do Campo Livre (20-25)
+        $banco = substr($codigoBarras, 0, 3);
+        $prefixoCedente = substr($codigoBarras, 19, 6);
+        return "BANCO_" . $banco . "_" . $prefixoCedente;
+    }
+}
+
+function preverFornecedor($assinatura, $pdo) {
+    if (!$assinatura || !$pdo) return null;
+    try {
+        $stmt = $pdo->prepare("SELECT nome_fornecedor FROM boleto_assinaturas WHERE assinatura = ? LIMIT 1");
+        $stmt->execute([$assinatura]);
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $resultado ? $resultado['nome_fornecedor'] : null;
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+// ============================================================================
+// FUNÇÕES DE PROCESSAMENTO LOCAL (Mantidas do seu código original)
 // ============================================================================
 
 function processarBancario($linha, &$res, $isBarcode) {
@@ -208,45 +234,4 @@ function modulo10($num) {
     }
     $resto = $soma % 10;
     return ($resto == 0) ? 0 : (10 - $resto);
-}
-
-// ============================================================================
-// MOTOR DE APRENDIZADO DE BOLETOS (HEURÍSTICA)
-// ============================================================================
-
-/**
- * Gera uma assinatura única baseada no padrão do fornecedor no código de barras (44 posições)
- */
-function gerarAssinaturaBoleto($codigoBarras) {
-    if (strlen($codigoBarras) !== 44) return null;
-
-    if (str_starts_with($codigoBarras, '8')) {
-        // É conta de consumo/arrecadação. Posições 5 a 8 são o ID da empresa.
-        $idEmpresa = substr($codigoBarras, 4, 4);
-        return "ARREC_" . $idEmpresa;
-    } else {
-        // É boleto bancário. Extraímos Banco (1-3) + Início do Campo Livre (20-25)
-        $banco = substr($codigoBarras, 0, 3);
-        $prefixoCedente = substr($codigoBarras, 19, 6);
-        return "BANCO_" . $banco . "_" . $prefixoCedente;
-    }
-}
-
-/**
- * Busca no banco de dados se já conhecemos essa assinatura
- */
-function preverFornecedor($assinatura, $pdo) {
-    if (!$assinatura) return null;
-    
-    $stmt = $pdo->prepare("SELECT nome_fornecedor FROM boleto_assinaturas WHERE assinatura = ?");
-    $stmt->execute([$assinatura]);
-    $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    return $resultado ? $resultado['nome_fornecedor'] : null;
-}
-
-function consultarBoletoNaApiExterna($codigoBoleto) {
-    // Retorna null para ignorar a pesquisa externa.
-    // O sistema usará apenas a decodificação matemática local (Banco, Valor e Vencimento).
-    return null;
 }

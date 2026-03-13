@@ -1263,12 +1263,17 @@ table td:last-child .btn-trash svg {
         width: 100%;
     }
     .mobile-filter-row {
-        display: flex;
-        gap: 8px;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    gap: 10px;
+    flex: 2; /* Dá espaço duplo para caberem os dois selects */
     }
+
     .mobile-filter-row select {
-        flex: 1;
-        font-size: 14px !important;
+        flex: 1; /* Divide o espaço 50/50 entre Status e Categoria */
+        width: 100%;
+        margin: 0;
     }
 
     /* Date filter accordion on mobile */
