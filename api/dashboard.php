@@ -17,6 +17,11 @@ try {
     $db = $dbClass->getConnection();
 
     $periodo = $_GET['periodo'] ?? '7d';
+    $idUnidade = $_SESSION['id_unidade_ativa'] ?? null;
+    if (!$idUnidade) {
+        enviarResponse(["success" => false, "message" => "Nenhuma unidade ativa na sessão."], 403);
+        exit;
+    }
 
     // Definição da data de corte
     $dataInicio = date('Y-m-d');
@@ -28,20 +33,20 @@ try {
 
     // --- CORREÇÃO 1: Consultar a tabela correta (entradacaixa) ---
     // Total Entradas Mês Atual
-    $stmt = $db->prepare("SELECT SUM(valor) as total FROM entradacaixa WHERE MONTH(dataRegistro) = MONTH(CURRENT_DATE()) AND YEAR(dataRegistro) = YEAR(CURRENT_DATE())");
-    $stmt->execute();
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM entradacaixa WHERE id_unidade = :u AND MONTH(dataRegistro) = MONTH(CURRENT_DATE()) AND YEAR(dataRegistro) = YEAR(CURRENT_DATE())");
+    $stmt->execute([':u' => $idUnidade]);
     $entradasMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
     // --- CORREÇÃO 2: Tabela em minúsculo (saidacaixa) ---
     // Total Saídas Caixa Mês Atual
-    $stmt = $db->prepare("SELECT SUM(valor) as total FROM saidacaixa WHERE MONTH(dataRegistro) = MONTH(CURRENT_DATE()) AND YEAR(dataRegistro) = YEAR(CURRENT_DATE())");
-    $stmt->execute();
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM saidacaixa WHERE id_unidade = :u AND MONTH(dataRegistro) = MONTH(CURRENT_DATE()) AND YEAR(dataRegistro) = YEAR(CURRENT_DATE())");
+    $stmt->execute([':u' => $idUnidade]);
     $saidasCaixaMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
     // --- CORREÇÃO 3: Tabela em minúsculo (financeiro) ---
     // Total Financeiro Pago Mês Atual
-    $stmt = $db->prepare("SELECT SUM(valor) as total FROM financeiro WHERE status = 'Pago' AND MONTH(data_processamento) = MONTH(CURRENT_DATE()) AND YEAR(data_processamento) = YEAR(CURRENT_DATE())");
-    $stmt->execute();
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM financeiro WHERE id_unidade = :u AND status = 'Pago' AND MONTH(data_processamento) = MONTH(CURRENT_DATE()) AND YEAR(data_processamento) = YEAR(CURRENT_DATE())");
+    $stmt->execute([':u' => $idUnidade]);
     $contasPagasMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
     // Totais Consolidados
@@ -53,23 +58,23 @@ try {
     // --- CORREÇÃO: Tabela financeiro em minúsculo em todas as queries abaixo ---
 
     // A Pagar
-    $stmt = $db->prepare("SELECT SUM(valor) as total FROM financeiro WHERE status != 'Pago' AND status != 'Cancelado'");
-    $stmt->execute();
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM financeiro WHERE id_unidade = :u AND status != 'Pago' AND status != 'Cancelado'");
+    $stmt->execute([':u' => $idUnidade]);
     $cards['pagar_mes'] = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
     // Pagos Mês
     $cards['pago_mes'] = $contasPagasMes;
 
     // Vencidos
-    $stmt = $db->prepare("SELECT SUM(valor) as val, COUNT(*) as qtd FROM financeiro WHERE status != 'Pago' AND vencimento < CURRENT_DATE()");
-    $stmt->execute();
+    $stmt = $db->prepare("SELECT SUM(valor) as val, COUNT(*) as qtd FROM financeiro WHERE id_unidade = :u AND status != 'Pago' AND vencimento < CURRENT_DATE()");
+    $stmt->execute([':u' => $idUnidade]);
     $res = $stmt->fetch(PDO::FETCH_ASSOC);
     $cards['vencidos_val'] = (float)($res['val'] ?? 0);
     $cards['vencidos_qtd'] = (int)($res['qtd'] ?? 0);
 
     // Próximos 7 dias
-    $stmt = $db->prepare("SELECT SUM(valor) as val, COUNT(*) as qtd FROM financeiro WHERE status != 'Pago' AND vencimento >= CURRENT_DATE() AND vencimento <= DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)");
-    $stmt->execute();
+    $stmt = $db->prepare("SELECT SUM(valor) as val, COUNT(*) as qtd FROM financeiro WHERE id_unidade = :u AND status != 'Pago' AND vencimento >= CURRENT_DATE() AND vencimento <= DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)");
+    $stmt->execute([':u' => $idUnidade]);
     $res = $stmt->fetch(PDO::FETCH_ASSOC);
     $cards['proximos_val'] = (float)($res['val'] ?? 0);
     $cards['proximos_qtd'] = (int)($res['qtd'] ?? 0);
@@ -81,21 +86,23 @@ try {
     // Gráficos (financeiro minúsculo)
     $sqlMes = "SELECT DATE_FORMAT(vencimento, '%m/%Y') as mes, SUM(valor) as total 
                FROM financeiro 
-               WHERE vencimento >= :inicio 
+               WHERE id_unidade = :u AND vencimento >= :inicio 
                GROUP BY DATE_FORMAT(vencimento, '%m/%Y') 
                ORDER BY MIN(vencimento)";
     $stmt = $db->prepare($sqlMes);
     $stmt->bindParam(":inicio", $dataInicio);
+    $stmt->bindParam(":u", $idUnidade, PDO::PARAM_INT);
     $stmt->execute();
     $graficoMes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Categorias (financeiro minúsculo)
     $sqlCat = "SELECT categoria, SUM(valor) as total 
                FROM financeiro 
-               WHERE vencimento >= :inicio 
+               WHERE id_unidade = :u AND vencimento >= :inicio 
                GROUP BY categoria";
     $stmt = $db->prepare($sqlCat);
     $stmt->bindParam(":inicio", $dataInicio);
+    $stmt->bindParam(":u", $idUnidade, PDO::PARAM_INT);
     $stmt->execute();
     $graficoCat = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -104,11 +111,12 @@ try {
     $calFim = date('Y-m-d', strtotime('+60 days'));
     $sqlCal = "SELECT id, descricao, valor, vencimento, status 
                FROM financeiro 
-               WHERE vencimento >= :inicio AND vencimento <= :fim
+               WHERE id_unidade = :u AND vencimento >= :inicio AND vencimento <= :fim
                ORDER BY vencimento";
     $stmt = $db->prepare($sqlCal);
     $stmt->bindParam(":inicio", $calInicio);
     $stmt->bindParam(":fim", $calFim);
+    $stmt->bindParam(":u", $idUnidade, PDO::PARAM_INT);
     $stmt->execute();
     $calendario = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

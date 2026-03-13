@@ -83,6 +83,11 @@
             <div class="menu-item" onclick="nav('config', this)">
                 <i data-lucide="settings"></i> <span>Configurações</span>
             </div>
+            <div class="sidebar-unit-selector" style="padding: 10px 20px; border-bottom: 1px solid var(--border);">
+                <label for="seletor-unidade" style="font-size: 0.75rem; color: var(--text-light);">Unidade Ativa</label>
+                <select id="seletor-unidade" onchange="trocarUnidadeAtual(this.value)" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-main); font-weight: 600; margin-top: 5px;">
+                    </select>
+            </div>
         </nav>
 
         <div class="sidebar-footer" style="padding: 10px 12px; margin-top: auto;">

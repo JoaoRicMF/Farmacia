@@ -13,6 +13,7 @@ const CONFIG = {
 /* 2. ESTADO GLOBAL DA APLICAÇÃO */
 const State = {
     usuario: null,
+    unidadeAtiva: null,          // { id, nome } da unidade ativa na sessão
     paginaAtualFinanceiro: 1,
     totalPaginasFinanceiro: 1,
     chartMes: null,
@@ -248,6 +249,11 @@ const Auth = {
         State.usuario = dadosUsuario;
         sessionStorage.setItem('user_role', dadosUsuario.funcao);
 
+        // Unidade ativa
+        if (dadosUsuario.unidade_ativa) {
+            State.unidadeAtiva = dadosUsuario.unidade_ativa;
+        }
+
         const userDisplay = document.getElementById('user-display');
         const userRole = document.getElementById('user-role');
         if (userDisplay) userDisplay.innerText = dadosUsuario.nome;
@@ -260,6 +266,11 @@ const Auth = {
         document.querySelectorAll('.admin-only').forEach(el => {
             el.style.display = dadosUsuario.funcao === 'Admin' ? 'block' : 'none';
         });
+
+        // Seletor de unidades (sidebar/header — só visível se o usuário tiver >1 unidade)
+        if (dadosUsuario.unidades && dadosUsuario.unidade_ativa) {
+            Unidades.popularSeletor(dadosUsuario.unidades, dadosUsuario.unidade_ativa.id);
+        }
 
         UI.alternarTelas('app');
         Config.carregarFornecedores(); // Cache background
@@ -1003,6 +1014,11 @@ const Config = {
         Config.renderizarFornecedores();
         Config.carregarCategorias();
         Admin.carregarUsuarios();
+
+        // Carrega tabela e checkboxes de unidades (apenas para Admins)
+        if (State.usuario?.funcao === 'Admin') {
+            Unidades.carregar();
+        }
     },
 
     async carregarCategorias() {
@@ -1224,25 +1240,30 @@ const Admin = {
         if (usuarios && Array.isArray(usuarios)) {
             usuarios.forEach(u => {
                 const tr = document.createElement('tr');
-                
-                // Verifica se é o próprio usuário logado
-                const isSelf = (State.usuario && u.id == State.usuario.id);
-                const isTargetAdmin = (u.funcao === 'Admin'); // Verifica se o alvo também é Admin
-                
-                let deleteBtn;
+                const isSelf      = (State.usuario && u.id == State.usuario.id);
+                const isTargetAdmin = (u.funcao === 'Admin');
 
+                let deleteBtn;
                 if (isSelf) {
-                    deleteBtn = `<span class="btn-icon" style="opacity: 0.3; cursor: not-allowed;" title="Você não pode se excluir">🚫</span>`;
+                    deleteBtn = `<span class="btn-icon" style="opacity:0.3;cursor:not-allowed" title="Você não pode se excluir">🚫</span>`;
                 } else if (isTargetAdmin) {
-                    deleteBtn = `<span class="btn-icon" style="opacity: 0.3; cursor: not-allowed;" title="Não é permitido excluir Administradores">🚫</span>`;
+                    deleteBtn = `<span class="btn-icon" style="opacity:0.3;cursor:not-allowed" title="Não é permitido excluir Administradores">🚫</span>`;
                 } else {
                     deleteBtn = `<button class="btn-icon btn-trash" onclick="Admin.excluirUsuario(${u.id})" title="Excluir">🗑</button>`;
                 }
 
+                // Unidades vinculadas ao usuário (campo opcional vindo da API)
+                const unidadesTags = (u.unidades || [])
+                    .map(un => `<span class="status-badge" style="font-size:.75em">${un.nome}</span>`)
+                    .join(' ');
+
                 tr.innerHTML = `
                     <td>${u.nome}</td>
-                    <td>${u.usuario}</td> <td><span class="status-badge">${u.funcao}</span></td>
+                    <td>${u.usuario}</td>
+                    <td><span class="status-badge">${u.funcao}</span></td>
+                    <td>${unidadesTags || '<span style="color:var(--text-light);font-size:.8em">—</span>'}</td>
                     <td class="text-right">
+                        <button class="btn-icon" onclick="Admin.modalEditarUsuario(${u.id})" title="Editar / Unidades">✏️</button>
                         <button class="btn-icon" onclick="Admin.modalReset(${u.id}, '${u.nome}')" title="Alterar Senha">🔑</button>
                         ${deleteBtn}
                     </td>`;
@@ -1259,6 +1280,67 @@ const Admin = {
             Admin.carregarUsuarios();
         } else {
             UI.showToast("Erro ao excluir.", "error");
+        }
+    },
+
+    // ── Modal Editar Usuário + Unidades ──────────────────────────────────────
+    async modalEditarUsuario(idUsuario) {
+        // Busca todos dados do usuário
+        const usuarios = await API.request('admin.php?resource=usuarios');
+        if (!usuarios) return;
+        const u = usuarios.find(x => x.id == idUsuario);
+        if (!u) return;
+
+        // Busca todas as unidades disponíveis
+        const todasUnidades = await API.request('admin.php?resource=unidades');
+
+        const modal = document.getElementById('modal-editar-usuario');
+        if (!modal) return;
+
+        document.getElementById('edit-user-id').value    = u.id;
+        document.getElementById('edit-user-nome').value  = u.nome;
+        document.getElementById('edit-user-login').value = u.usuario;
+        document.getElementById('edit-user-funcao').value = u.funcao;
+
+        // Renderiza checkboxes de unidades
+        const container = document.getElementById('edit-user-unidades');
+        if (container && Array.isArray(todasUnidades)) {
+            const vinculadas = (u.unidades || []).map(x => x.id);
+            container.innerHTML = todasUnidades.map(un => `
+                <label style="display:flex;align-items:center;gap:6px;padding:4px 0">
+                    <input type="checkbox" name="edit-unidade" value="${un.id}"
+                        ${vinculadas.includes(un.id) ? 'checked' : ''}>
+                    ${un.nome}
+                </label>`).join('');
+        }
+
+        modal.classList.remove('hidden');
+    },
+
+    fecharModalEditarUsuario() {
+        document.getElementById('modal-editar-usuario')?.classList.add('hidden');
+    },
+
+    async salvarEdicaoUsuario() {
+        const id     = document.getElementById('edit-user-id').value;
+        const nome   = document.getElementById('edit-user-nome').value.trim();
+        const login  = document.getElementById('edit-user-login').value.trim();
+        const funcao = document.getElementById('edit-user-funcao').value;
+
+        if (!nome || !login) return UI.showToast('Nome e login são obrigatórios.', 'error');
+
+        // Coleta unidades marcadas
+        const checks   = document.querySelectorAll('input[name="edit-unidade"]:checked');
+        const unidades = Array.from(checks).map(c => parseInt(c.value));
+        if (unidades.length === 0) return UI.showToast('Selecione ao menos uma unidade.', 'error');
+
+        const res = await API.request('admin.php?action=editar', 'POST', { id, nome, login, funcao, unidades });
+        if (res?.success) {
+            UI.showToast('Usuário atualizado!');
+            Admin.fecharModalEditarUsuario();
+            Admin.carregarUsuarios();
+        } else {
+            UI.showToast(res?.message || 'Erro ao salvar.', 'error');
         }
     },
 
@@ -1313,50 +1395,49 @@ const Admin = {
 };
 
 async function criarNovoUsuario() {
-    // 1. Captura os elementos do DOM
-    const nomeInput = document.getElementById('novo-user-nome');
+    const nomeInput  = document.getElementById('novo-user-nome');
     const loginInput = document.getElementById('novo-user-login');
     const senhaInput = document.getElementById('novo-user-senha');
     const funcaoInput = document.getElementById('novo-user-funcao');
 
-    // 2. Validação Básica
     if (!nomeInput.value || !loginInput.value || !senhaInput.value) {
-        return UI.showToast("Preencha nome, login e senha.", "error"); // CORRIGIDO: UI.showToast
+        return UI.showToast('Preencha nome, login e senha.', 'error');
     }
 
+    // Coleta unidades marcadas no formulário de criação
+    const unidadeChecks = document.querySelectorAll('input[name="novo-unidade"]:checked');
+    const unidades = Array.from(unidadeChecks).map(c => parseInt(c.value));
+    // Se nenhuma marcada, a API usará a unidade ativa como padrão
+
     const payload = {
-        nome: nomeInput.value,
-        login: loginInput.value,
+        nome:     nomeInput.value.trim(),
+        login:    loginInput.value.trim(),
         password: senhaInput.value,
-        nivel: funcaoInput.value
+        nivel:    funcaoInput.value,
+        unidades: unidades
     };
 
-    // 3. Feedback visual no botão
     const btn = document.querySelector('button[onclick="criarNovoUsuario()"]');
     const textoOriginal = btn.innerText;
-    btn.innerText = "Salvando...";
+    btn.innerText = 'Salvando...';
     btn.disabled = true;
 
-    // 4. Envia para a API (CORRIGIDO: API.request)
     const res = await API.request('admin.php?action=criarUsuario', 'POST', payload);
 
     btn.innerText = textoOriginal;
     btn.disabled = false;
 
-    // 5. Tratamento da Resposta
     if (res && res.success) {
-        UI.showToast("Usuário cadastrado com sucesso!"); // CORRIGIDO: UI.showToast
-
-        // Limpa os campos
-        nomeInput.value = '';
+        UI.showToast('Usuário cadastrado com sucesso!');
+        nomeInput.value  = '';
         loginInput.value = '';
         senhaInput.value = '';
         funcaoInput.value = 'Operador';
-
-        // Recarrega a lista de usuários (CORRIGIDO: Admin.carregarUsuarios)
+        // Limpa checkboxes de unidades
+        document.querySelectorAll('input[name="novo-unidade"]').forEach(c => c.checked = false);
         Admin.carregarUsuarios();
     } else {
-        UI.showToast(res?.message || "Erro ao criar usuário.", "error"); // CORRIGIDO: UI.showToast
+        UI.showToast(res?.message || 'Erro ao criar usuário.', 'error');
     }
 }
 
@@ -1405,6 +1486,128 @@ function preFiltrarLista(status) {
     // Nota: Passamos null no segundo argumento pois não há botão de menu clicado aqui
     UI.navegar('lista', null);
 }
+
+/* ==========================================================================
+   MÓDULO: UNIDADES — Seletor de unidade ativa + CRUD de unidades
+   ========================================================================== */
+const Unidades = {
+    // ── Seletor no sidebar/header ──────────────────────────────────────────
+    popularSeletor(unidades, ativaId) {
+        const seletor = document.getElementById('seletor-unidade');
+        if (!seletor) return;
+
+        seletor.innerHTML = '';
+        unidades.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.id;
+            opt.textContent = u.nome;
+            if (u.id == ativaId) opt.selected = true;
+            seletor.appendChild(opt);
+        });
+
+        // Mostra o wrapper só se houver >1 unidade
+        const wrapper = document.getElementById('seletor-unidade-wrapper');
+        if (wrapper) wrapper.style.display = unidades.length > 1 ? 'block' : 'none';
+    },
+
+    // ── Troca a unidade ativa (chama auth.php) ────────────────────────────
+    async trocar(idUnidade) {
+        if (!idUnidade) return;
+        const res = await API.request('auth.php?action=trocar_unidade', 'POST', { id_unidade: parseInt(idUnidade) });
+        if (res && res.success) {
+            State.unidadeAtiva      = res.unidade_ativa;
+            State.fornecedoresCache = [];
+            State.fluxoCache        = null;
+
+            const label = document.getElementById('label-unidade-ativa');
+            if (label && res.unidade_ativa) label.textContent = res.unidade_ativa.nome;
+
+            UI.showToast(`Unidade: ${res.unidade_ativa?.nome ?? ''}`, 'success');
+
+            // Recarrega a view atual
+            const secao = document.querySelector('.view-section:not(.hidden)');
+            if (secao) UI.navegar(secao.id.replace('view-', ''), null);
+        } else {
+            UI.showToast(res?.message || 'Erro ao trocar de unidade.', 'error');
+            // Reverte o select
+            const seletor = document.getElementById('seletor-unidade');
+            if (seletor && State.unidadeAtiva) seletor.value = State.unidadeAtiva.id;
+        }
+    },
+
+    // ── CRUD de unidades (tela Configurações > Unidades) ──────────────────
+    async carregar() {
+        const tbody = document.getElementById('tabela-unidades');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center">Carregando...</td></tr>';
+
+        const lista = await API.request('admin.php?resource=unidades');
+        tbody.innerHTML = '';
+
+        if (!lista || lista.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center" style="color:var(--text-light)">Nenhuma unidade cadastrada.</td></tr>';
+            return;
+        }
+
+        lista.forEach(u => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${u.id}</td>
+                <td><strong>${u.nome}</strong></td>
+                <td class="text-right">
+                    <button class="btn-icon btn-trash" onclick="Unidades.excluir(${u.id}, '${u.nome.replace(/'/g,"\\'")}')">🗑</button>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+
+        // Também preenche checkboxes nos formulários de criar/editar usuário
+        Unidades.preencherCheckboxes(lista);
+    },
+
+    preencherCheckboxes(lista) {
+        ['novo-unidades-container', 'edit-unidades-container'].forEach(containerId => {
+            const container = document.getElementById(containerId);
+            if (!container || container.dataset.loaded === 'true') return;
+            container.innerHTML = lista.map(u => `
+                <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer">
+                    <input type="checkbox" name="${containerId.startsWith('novo') ? 'novo-unidade' : 'edit-unidade'}" value="${u.id}">
+                    ${u.nome}
+                </label>`).join('');
+            container.dataset.loaded = 'true';
+        });
+    },
+
+    async criar() {
+        const input = document.getElementById('nova-unidade-nome');
+        const nome  = input?.value?.trim();
+        if (!nome) return UI.showToast('Informe o nome da unidade.', 'error');
+
+        const res = await API.request('admin.php?action=criarUnidade', 'POST', { nome });
+        if (res?.success) {
+            UI.showToast('Unidade criada!');
+            input.value = '';
+            // Força reload dos checkboxes na próxima abertura
+            ['novo-unidades-container','edit-unidades-container'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.dataset.loaded = 'false';
+            });
+            Unidades.carregar();
+        } else {
+            UI.showToast(res?.message || 'Erro ao criar unidade.', 'error');
+        }
+    },
+
+    async excluir(id, nome) {
+        if (!confirm(`Excluir a unidade "${nome}"? Os registros vinculados perderão a associação.`)) return;
+        const res = await API.request('admin.php?action=excluirUnidade', 'POST', { id });
+        if (res?.success) {
+            UI.showToast('Unidade removida.');
+            Unidades.carregar();
+        } else {
+            UI.showToast(res?.message || 'Não foi possível remover.', 'error');
+        }
+    }
+};
 
 /* ==========================================================================
    CONECTORES GLOBAIS (Compatibility Layer)
@@ -1462,6 +1665,15 @@ window.mascaraCNPJ = UI.Masks.cnpj;
 window.mascaraTelefone = UI.Masks.telefone;
 window.copiarCodigo = Financeiro.copiarCodigo; // Adicionado
 window.abrirBanco = Financeiro.abrirBanco; // Adicionado
+// Unidades
+window.trocarUnidadeAtual          = (id) => Unidades.trocar(id);
+window.criarUnidade                = () => Unidades.criar();
+window.excluirUnidade              = (id, nome) => Unidades.excluir(id, nome);
+window.carregarUnidades            = () => Unidades.carregar();
+// Modal editar usuário
+window.modalEditarUsuario          = Admin.modalEditarUsuario.bind(Admin);
+window.fecharModalEditarUsuario    = Admin.fecharModalEditarUsuario.bind(Admin);
+window.salvarEdicaoUsuario         = Admin.salvarEdicaoUsuario.bind(Admin);
 
 /* ==========================================================================
    INICIALIZAÇÃO (Entry Point)

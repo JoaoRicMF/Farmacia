@@ -5,20 +5,20 @@ require_once '../config/database.php';
 date_default_timezone_set('America/Sao_Paulo');
 
 // --- FUNÇÃO REUTILIZÁVEL (SHARED LOGIC) ---
-function obterMovimentacoesFluxo(PDO $db, string $ano, string $mesNum): array {
+function obterMovimentacoesFluxo(PDO $db, string $ano, string $mesNum, int $idUnidade): array {
     // 1. Entradas (Vendas/Ingressos)
     $stmt = $db->prepare("SELECT id, dataRegistro as data, descricao, valor, 'ENTRADA' as tipo, 'Vendas' as categoria, formaPagamento 
                           FROM entradacaixa 
-                          WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
-    $stmt->execute([':m' => $mesNum, ':a' => $ano]);
+                          WHERE id_unidade = :u AND MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
+    $stmt->execute([':u' => $idUnidade, ':m' => $mesNum, ':a' => $ano]);
     $entradas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 2. Saídas (Todas: Manuais + Baixas de Boletos)
     // Nota: Como a baixa agora insere aqui, não precisamos mais ler a tabela Financeiro!
     $stmt = $db->prepare("SELECT id, dataRegistro as data, descricao, valor, 'SAIDA' as tipo, 'Despesa' as categoria, NULL as formaPagamento 
                           FROM saidacaixa 
-                          WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
-    $stmt->execute([':m' => $mesNum, ':a' => $ano]);
+                          WHERE id_unidade = :u AND MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
+    $stmt->execute([':u' => $idUnidade, ':m' => $mesNum, ':a' => $ano]);
     $saidas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 3. Consolidação
@@ -51,7 +51,12 @@ if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)) {
         if (!isset($_SESSION['user_id'])) {
             throw new Exception("Usuário não autenticado.");
         }
-        $userId = $_SESSION['user_id'];
+        $userId    = $_SESSION['user_id'];
+        $idUnidade = $_SESSION['id_unidade_ativa'] ?? null;
+        if (!$idUnidade) {
+            enviarResponse(["success" => false, "message" => "Nenhuma unidade ativa na sessão."], 403);
+            exit;
+        }
 
         // POST: SALVAR (Mantém a lógica de salvamento aqui)
         // POST: SALVAR
@@ -77,13 +82,14 @@ if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)) {
 
                 if ($data->tipo === 'ENTRADA') {
                     // Tabela EntradaCaixa possui coluna 'formaPagamento' nativa
-                    $stmt = $db->prepare("INSERT INTO entradacaixa (dataRegistro, descricao, valor, formaPagamento, id) VALUES (:dt, :desc, :val, :forma, :uid)");
+                    $stmt = $db->prepare("INSERT INTO entradacaixa (dataRegistro, descricao, valor, formaPagamento, id, id_unidade) VALUES (:dt, :desc, :val, :forma, :uid, :u)");
                     $stmt->execute([
                         ':dt'    => $dataRegistro,
                         ':desc'  => $data->descricao,
                         ':val'   => $valor,
                         ':forma' => $formaPgto,
-                        ':uid'   => $userId
+                        ':uid'   => $userId,
+                        ':u'     => $idUnidade
                     ]);
 
                     registrarLog($db, $_SESSION['user_nome'], "Fluxo Entrada", "R$ $valor - $data->descricao");
@@ -93,12 +99,13 @@ if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)) {
                     // então concatenamos essa informação na descrição para não perdê-la.
                     $descricaoCompleta = $data->descricao . " (" . $formaPgto . ")";
 
-                    $stmt = $db->prepare("INSERT INTO saidacaixa (dataRegistro, descricao, valor, id) VALUES (:dt, :desc, :val, :uid)");
+                    $stmt = $db->prepare("INSERT INTO saidacaixa (dataRegistro, descricao, valor, id, id_unidade) VALUES (:dt, :desc, :val, :uid, :u)");
                     $stmt->execute([
                         ':dt'    => $dataRegistro,
                         ':desc'  => $descricaoCompleta,
                         ':val'   => $valor,
-                        ':uid'   => $userId
+                        ':uid'   => $userId,
+                        ':u'     => $idUnidade
                     ]);
 
                     registrarLog($db, $_SESSION['user_nome'], "Fluxo Saída", "R$ $valor - $descricaoCompleta");
@@ -152,7 +159,7 @@ if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)) {
             list($ano, $mesNum) = explode('-', $mes);
 
             // >>> CHAMADA DA FUNÇÃO COMPARTILHADA <<<
-            $movimentacoes = obterMovimentacoesFluxo($db, $ano, $mesNum);
+            $movimentacoes = obterMovimentacoesFluxo($db, $ano, $mesNum, (int)$idUnidade);
 
             // Cálculos de Totais para o JSON
             $totalEntCents = 0;
@@ -173,8 +180,8 @@ if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)) {
 
 
             // Totais Específicos (Dinheiro/Pix) mantêm query separada pois é agrupamento
-            $stmtTotais = $db->prepare("SELECT formaPagamento, SUM(valor) as total FROM entradacaixa WHERE MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a GROUP BY formaPagamento");
-            $stmtTotais->execute([':m' => $mesNum, ':a' => $ano]);
+            $stmtTotais = $db->prepare("SELECT formaPagamento, SUM(valor) as total FROM entradacaixa WHERE id_unidade = :u AND MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a GROUP BY formaPagamento");
+            $stmtTotais->execute([':u' => $idUnidade, ':m' => $mesNum, ':a' => $ano]);
             $formas = $stmtTotais->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 
             $saldoCents = $totalEntCents - $totalSaiCents;

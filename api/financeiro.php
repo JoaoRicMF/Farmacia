@@ -61,8 +61,9 @@ try {
         $offset = ($pagina - 1) * $limite;
 
         // Construção da Query Dinâmica
-        $sql = "SELECT * FROM financeiro WHERE (descricao LIKE :b OR codigo_barras LIKE :b)";
-        $params = [':b' => "%$busca%"];
+        $unidadeAtiva = $_SESSION['id_unidade_ativa'];
+        $sql = "SELECT * FROM financeiro WHERE id_unidade = :unidade AND (descricao LIKE :b OR codigo_barras LIKE :b)";
+        $params = [':unidade' => $unidadeAtiva, ':b' => "%$busca%"];
 
         if ($status !== 'Todos') {
             $sql .= " AND status = :st";
@@ -185,10 +186,10 @@ try {
                         WHEN :s != 'Pago' THEN NULL 
                         ELSE data_processamento 
                     END
-                    WHERE id=:id";
+                    WHERE id=:id AND id_unidade=:unidade";
 
             $stmt = $db->prepare($sql);
-            $stmt->bindValue(':id', $input->id);
+            $stmt->bindValue(':unidade', $_SESSION['id_unidade_ativa']);
             $logAction = "Editar Financeiro";
         } else {
             // INSERT
@@ -205,8 +206,10 @@ try {
                 }
             }
 
-            $sql = "INSERT INTO financeiro (descricao, valor, vencimento, categoria, status, codigo_barras) VALUES (:d, :v, :ve, :c, :s, :cb)";
+            $sql = "INSERT INTO financeiro (descricao, valor, vencimento, categoria, status, codigo_barras, id_unidade) 
+                    VALUES (:d, :v, :ve, :c, :s, :cb, :unidade)";
             $stmt = $db->prepare($sql);
+            $stmt->bindValue(':unidade', $_SESSION['id_unidade_ativa']);
             $logAction = "Novo Financeiro";
         }
 

@@ -18,12 +18,16 @@ try {
     $method = $_SERVER['REQUEST_METHOD'];
     $userNome = $_SESSION['user_nome'] ?? 'Sistema';
     $action = $_GET['action'] ?? '';
+    $idUnidade = $_SESSION['id_unidade_ativa'] ?? null;
+    if (!$idUnidade) {
+        enviarResponse(["success" => false, "message" => "Nenhuma unidade ativa na sessão."], 403);
+        exit;
+    }
 
     // --- LISTAR (GET) ---
     if ($method === 'GET') {
-        $query = "SELECT * FROM categorias ORDER BY nome";
-        $stmt = $db->prepare($query);
-        $stmt->execute();
+        $stmt = $db->prepare("SELECT * FROM categorias WHERE id_unidade = :u ORDER BY nome");
+        $stmt->execute([':u' => $idUnidade]);
         $response = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
@@ -32,19 +36,18 @@ try {
 
         // --- RESET DE CATEGORIAS ---
         if ($action === 'reset') {
-            // 1. Limpa tabela
-            $db->exec("DELETE FROM categorias");
-            // Reset do Auto Increment (opcional, dependendo do driver, mas DELETE já resolve o principal)
+            // 1. Limpa apenas as categorias desta unidade
+            $stmtDel = $db->prepare("DELETE FROM categorias WHERE id_unidade = :u");
+            $stmtDel->execute([':u' => $idUnidade]);
 
-            // 2. Insere Padrões
+            // 2. Insere Padrões para a unidade
             $padroes = ['Medicamentos (Estoque)', 'Água/Luz/Internet', 'Aluguel & Condomínio', 'Impostos & Taxas', 'Folha de Pagamento', 'Marketing', 'Manutenção', 'Outros'];
-
-            $stmt = $db->prepare("INSERT INTO categorias (nome, cor) VALUES (:nome, '#3b82f6')");
+            $stmt = $db->prepare("INSERT INTO categorias (nome, cor, id_unidade) VALUES (:nome, '#3b82f6', :u)");
             foreach ($padroes as $p) {
-                $stmt->execute([':nome' => $p]);
+                $stmt->execute([':nome' => $p, ':u' => $idUnidade]);
             }
 
-            registrarLog($db, $userNome, "Reset Categorias", "Restaurou categorias padrão");
+            registrarLog($db, $userNome, "Reset Categorias", "Unidade $idUnidade: restaurou padrões");
             $response = ["success" => true, "message" => "Categorias restauradas com sucesso."];
         }
         // --- CRIAR NOVA CATEGORIA ---
@@ -55,17 +58,18 @@ try {
                 throw new Exception("O nome da categoria é obrigatório.", 400);
             }
 
-            // Validação de Duplicidade
-            $check = $db->prepare("SELECT COUNT(*) FROM categorias WHERE nome = :nome");
-            $check->execute([':nome' => $data->nome]);
+            // Validação de Duplicidade (escopo da unidade)
+            $check = $db->prepare("SELECT COUNT(*) FROM categorias WHERE nome = :nome AND id_unidade = :u");
+            $check->execute([':nome' => $data->nome, ':u' => $idUnidade]);
             if ($check->fetchColumn() > 0) {
                 throw new Exception("Categoria já existente.", 409);
             }
 
-            $stmt = $db->prepare("INSERT INTO categorias (nome, cor) VALUES (:nome, :cor)");
+            $stmt = $db->prepare("INSERT INTO categorias (nome, cor, id_unidade) VALUES (:nome, :cor, :u)");
             $stmt->execute([
                 ':nome' => $data->nome,
-                ':cor' => $data->cor ?? '#3b82f6'
+                ':cor'  => $data->cor ?? '#3b82f6',
+                ':u'    => $idUnidade
             ]);
 
             registrarLog($db, $userNome, "Nova Categoria", "Criou: $data->nome");
@@ -79,10 +83,15 @@ try {
         $id = $_GET['id'] ?? null;
         if (!$id) throw new Exception("ID da categoria não informado.", 400);
 
-        $stmt = $db->prepare("DELETE FROM categorias WHERE id = :id");
-        $stmt->execute([':id' => $id]);
+        // Garante que a categoria pertence à unidade ativa (evita manipulação de IDs)
+        $stmt = $db->prepare("DELETE FROM categorias WHERE id = :id AND id_unidade = :u");
+        $stmt->execute([':id' => $id, ':u' => $idUnidade]);
 
-        registrarLog($db, $userNome, "Excluir Categoria", "ID: $id");
+        if ($stmt->rowCount() === 0) {
+            throw new Exception("Categoria não encontrada ou sem permissão.", 404);
+        }
+
+        registrarLog($db, $userNome, "Excluir Categoria", "ID: $id | Unidade: $idUnidade");
         $response = ["success" => true, "message" => "Categoria removida."];
     }
 

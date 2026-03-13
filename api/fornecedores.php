@@ -10,11 +10,19 @@ session_start();
 
 include_once '../config/database.php';
 
-// 1. Verificação de Autenticação
+// 1. Verificação de Autenticação e Unidade
 if (!isset($_SESSION['user_id'])) {
     ob_clean();
     http_response_code(401);
     echo json_encode(["error" => "Não autorizado"]);
+    exit;
+}
+
+$idUnidade = $_SESSION['id_unidade_ativa'] ?? null;
+if (!$idUnidade) {
+    ob_clean();
+    http_response_code(403);
+    echo json_encode(["error" => "Nenhuma unidade ativa na sessão."]);
     exit;
 }
 
@@ -35,7 +43,8 @@ $id = $_GET['id'] ?? null;
 // --- GET (Listar) ---
 if ($method === 'GET') {
     try {
-        $stmt = $db->query("SELECT * FROM fornecedor ORDER BY nome");
+        $stmt = $db->prepare("SELECT * FROM fornecedor WHERE id_unidade = :u ORDER BY nome");
+        $stmt->execute([':u' => $idUnidade]);
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($result);
     } catch (PDOException $e) {
@@ -57,14 +66,15 @@ if ($method === 'POST') {
 
     try {
         // CORREÇÃO: Inclusão de cnpj e telefone na query de INSERT
-        $stmt = $db->prepare("INSERT INTO fornecedor (nome, cnpj, telefone, categoriaPadrao, assinatura) VALUES (:n, :cnpj, :tel, :c, :ass)");
+        $stmt = $db->prepare("INSERT INTO fornecedor (nome, cnpj, telefone, categoriaPadrao, assinatura, id_unidade) VALUES (:n, :cnpj, :tel, :c, :ass, :u)");
 
         $params = [
             ":n"    => $data->nome,
-            ":cnpj" => $data->cnpj ?? null,      
-            ":tel"  => $data->telefone ?? null,  
+            ":cnpj" => $data->cnpj ?? null,
+            ":tel"  => $data->telefone ?? null,
             ":c"    => $data->categoriaPadrao ?? null,
-            ":ass"  => $data->assinatura ?? null
+            ":ass"  => $data->assinatura ?? null,
+            ":u"    => $idUnidade
         ];
 
         if ($stmt->execute($params)) {
@@ -89,9 +99,15 @@ if ($method === 'DELETE') {
     }
 
     try {
-        $stmt = $db->prepare("DELETE FROM fornecedor WHERE id = :id");
-        if ($stmt->execute([":id" => $id])) {
-            echo json_encode(["success" => true]);
+        // Restringe à unidade ativa (previne exclusão de IDs de outras unidades)
+        $stmt = $db->prepare("DELETE FROM fornecedor WHERE id = :id AND id_unidade = :u");
+        if ($stmt->execute([":id" => $id, ":u" => $idUnidade])) {
+            if ($stmt->rowCount() === 0) {
+                http_response_code(404);
+                echo json_encode(["success" => false, "error" => "Fornecedor não encontrado ou sem permissão."]);
+            } else {
+                echo json_encode(["success" => true]);
+            }
         } else {
             echo json_encode(["success" => false]);
         }

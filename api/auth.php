@@ -22,8 +22,28 @@ try {
     $method = $_SERVER['REQUEST_METHOD'];
     $action = $_GET['action'] ?? '';
 
+    // --- TROCAR UNIDADE ATIVA ---
+    if ($action === 'trocar_unidade' && $method === 'POST') {
+        $input = json_decode(file_get_contents("php://input"));
+        $novaUnidade = (int)($input->id_unidade ?? 0);
+
+        // Verifica se o usuário realmente tem acesso a essa unidade
+        $unidadesPermitidas = array_column($_SESSION['unidades'] ?? [], 'id');
+
+        if (!in_array($novaUnidade, $unidadesPermitidas)) {
+            http_response_code(403);
+            $response = ["success" => false, "message" => "Acesso negado a esta unidade."];
+        } else {
+            $_SESSION['id_unidade_ativa'] = $novaUnidade;
+            $nomeUnidade = '';
+            foreach ($_SESSION['unidades'] as $u) {
+                if ((int)$u['id'] === $novaUnidade) { $nomeUnidade = $u['nome']; break; }
+            }
+            $response = ["success" => true, "unidade_ativa" => ["id" => $novaUnidade, "nome" => $nomeUnidade]];
+        }
+    }
     // --- LOGOUT ---
-    if ($action === 'logout') {
+    elseif ($action === 'logout') {
         session_destroy();
         $response = ["success" => true, "message" => "Logout realizado"];
     } 
@@ -52,21 +72,33 @@ try {
         $stmt->execute([':u' => $input->usuario ?? '']);
 
         if ($stmt->rowCount() > 0) {
-            $row = $stmt->fetch();
+    $row = $stmt->fetch();
             if (password_verify($input->senha ?? '', $row['senha'])) {
+                // Busca unidades do usuário
+                $stmtUnidades = $db->prepare("SELECT u.id, u.nome FROM unidades u 
+                                            INNER JOIN usuario_unidade uu ON u.id = uu.id_unidade 
+                                            WHERE uu.id_usuario = :uid");
+                $stmtUnidades->execute([':uid' => $row['id']]);
+                $unidades = $stmtUnidades->fetchAll(PDO::FETCH_ASSOC);
+
+                if (count($unidades) === 0) {
+                    enviarResponse(["success" => false, "message" => "Usuário não possui acesso a nenhuma unidade."], 403);
+                }
+
                 $_SESSION['user_id'] = $row['id'];
                 $_SESSION['user_nome'] = $row['nome'];
-                $_SESSION['user_login'] = $row['usuario']; // CORREÇÃO: Salva o login na sessão
+                $_SESSION['user_login'] = $row['usuario'];
                 $_SESSION['user_funcao'] = $row['funcao'];
-
-                registrarLog($db, $row['nome'], "Login", "Sucesso via Web");
+                $_SESSION['unidades'] = $unidades;
+                $_SESSION['id_unidade_ativa'] = $unidades[0]['id']; // Define a primeira como padrão
 
                 $response = [
                     "success" => true,
                     "id" => $row['id'],
                     "nome" => $row['nome'],
-                    "usuario" => $row['usuario'], // CORREÇÃO: Retorna no login
-                    "funcao" => $row['funcao']
+                    "funcao" => $row['funcao'],
+                    "unidades" => $unidades,
+                    "unidade_ativa" => $unidades[0]
                 ];
             } else {
                 $response = ["success" => false, "message" => "Senha incorreta"];

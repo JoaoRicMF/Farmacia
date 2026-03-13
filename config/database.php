@@ -189,6 +189,42 @@ class Database {
                 nome_fornecedor VARCHAR(255) NOT NULL,
                 criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )ENGINE=InnoDB;");
+            
+            // 1. Tabela de Unidades
+            $this->conn->exec("CREATE TABLE IF NOT EXISTS unidades (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                nome VARCHAR(100) NOT NULL,
+                slug VARCHAR(100),
+                criada_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB;");
+
+            // Unidade Padrão Inicial
+            $this->conn->exec("INSERT IGNORE INTO unidades (id, nome, slug) VALUES (1, 'Matriz Principal', 'matriz-principal');");
+
+            // 2. Tabela de Relacionamento (Usuário <-> Unidade)
+            $this->conn->exec("CREATE TABLE IF NOT EXISTS usuario_unidade (
+                id_usuario INT,
+                id_unidade INT,
+                PRIMARY KEY (id_usuario, id_unidade),
+                FOREIGN KEY (id_usuario) REFERENCES usuario(id) ON DELETE CASCADE,
+                FOREIGN KEY (id_unidade) REFERENCES unidades(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB;");
+
+            // Vincula o Admin padrão à unidade 1, se não existir
+            $this->conn->exec("INSERT IGNORE INTO usuario_unidade (id_usuario, id_unidade) 
+                            SELECT id, 1 FROM usuario WHERE usuario = 'admin';");
+
+            // 3. Migração das tabelas transacionais
+            $tabelasTransacionais = ['financeiro', 'entradacaixa', 'saidacaixa', 'categorias', 'fornecedor', 'log'];
+
+            foreach ($tabelasTransacionais as $tabela) {
+                $checkCol = $this->conn->query("SHOW COLUMNS FROM `$tabela` LIKE 'id_unidade'");
+                if ($checkCol->rowCount() == 0) {
+                    $this->conn->exec("ALTER TABLE `$tabela` ADD COLUMN id_unidade INT DEFAULT 1;");
+                    // Opcional: Adicionar a FK
+                    // $this->conn->exec("ALTER TABLE `$tabela` ADD CONSTRAINT fk_{$tabela}_unidade FOREIGN KEY (id_unidade) REFERENCES unidades(id);");
+                }
+            }
 
         } catch (PDOException $e) {
             error_log("Erro na criação de tabelas: " . $e->getMessage());
