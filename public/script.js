@@ -675,7 +675,18 @@ const Financeiro = {
 
                 // 3. Foco Automático na Descrição:
                 // Limpa qualquer texto genérico e coloca o cursor pronto a escrever
-                const descInput = document.getElementById('boleto-desc');
+                // LÓGICA DA ASSINATURA (O MOTOR)
+                if (res.empresa_cobradora) {
+                    // Já conhece a empresa!
+                    document.getElementById('boleto-desc').value = res.empresa_cobradora;
+                    Financeiro.verificarFornecedor(); 
+                } else if (res.assinatura) {
+                    // Tem assinatura nova, mas não conhece a empresa
+                    Financeiro.abrirModalAssinatura(res.assinatura);
+                } else {
+                    // Não tem assinatura (ex: PIX Copia e Cola), foca na descrição
+                    document.getElementById('boleto-desc').focus();
+                }
                 descInput.value = ""; 
                 descInput.focus();
 
@@ -765,7 +776,58 @@ const Financeiro = {
 
     fecharModalQR() {
         document.getElementById('modal-qrcode').classList.add('hidden');
-    }
+    },
+
+    abrirModalAssinatura(assinatura) {
+        document.getElementById('assinatura-detectada').value = assinatura;
+        document.getElementById('assinatura-nome').value = '';
+        
+        // Copia as opções do select original para o select do modal
+        const catSelect = document.getElementById('assinatura-cat');
+        catSelect.innerHTML = document.getElementById('boleto-cat').innerHTML;
+        
+        document.getElementById('modal-nova-assinatura').classList.remove('hidden');
+        setTimeout(() => document.getElementById('assinatura-nome').focus(), 100);
+    },
+
+    fecharModalAssinatura() {
+        document.getElementById('modal-nova-assinatura').classList.add('hidden');
+        document.getElementById('boleto-desc').focus(); // Volta o foco para o input principal
+    },
+
+    async salvarAssinatura() {
+        const assinatura = document.getElementById('assinatura-detectada').value;
+        const nome = document.getElementById('assinatura-nome').value;
+        const categoria = document.getElementById('assinatura-cat').value;
+
+        if (!nome) return UI.showToast("Informe o nome do fornecedor.", "error");
+
+        const btn = document.querySelector('#modal-nova-assinatura .btn-success');
+        const txtOriginal = btn.innerText;
+        btn.innerText = "Salvando..."; 
+        btn.disabled = true;
+
+        // Salva diretamente via endpoint de fornecedores
+        const res = await API.request('assinaturas.php', 'POST', {
+            assinatura: assinatura,
+            nome: nome
+        });
+
+        btn.innerText = txtOriginal; 
+        btn.disabled = false;
+
+        if (res?.success) {
+            UI.showToast("Assinatura aprendida com sucesso!", "success");
+            
+            // Preenche magicamente a tela principal de Novo Lançamento
+            document.getElementById('boleto-desc').value = nome;
+            if (categoria) document.getElementById('boleto-cat').value = categoria;
+            
+            Financeiro.fecharModalAssinatura();
+        } else {
+            UI.showToast("Erro ao aprender assinatura.", "error");
+        }
+    },
 };
 
 /* ==========================================================================
@@ -1072,44 +1134,36 @@ const Config = {
 
         State.fornecedoresCache.forEach(f => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${f.nome}</td><td>${f.cnpj || '-'}</td><td>${f.telefone || '-'}</td>
+            // Mostra a assinatura com uma cor fraquinha para não poluir
+            const txtAssinatura = f.assinatura ? `<br><small style="color:var(--text-light)">${f.assinatura}</small>` : '';
+            
+            tr.innerHTML = `<td>${f.nome} ${txtAssinatura}</td><td>${f.cnpj || '-'}</td><td>${f.telefone || '-'}</td>
                             <td class="text-right"><button class="btn-icon btn-trash" onclick="Config.excluirFornecedor(${f.id})">🗑</button></td>`;
             tbody.appendChild(tr);
         });
     },
 
     async salvarFornecedor() {
-        // Referências aos elementos para capturar valores e limpar posteriormente
-        const elNome = document.getElementById('novo-forn-nome');
-        const elCnpj = document.getElementById('novo-forn-cnpj');
-        const elTel = document.getElementById('novo-forn-tel');
-        const elCat = document.getElementById('novo-forn-cat');
-
         const dados = {
-            nome: elNome.value,
-            cnpj: elCnpj.value,
-            telefone: elTel.value,
-            categoriaPadrao: elCat.value
+            nome: document.getElementById('novo-forn-nome').value,
+            cnpj: document.getElementById('novo-forn-cnpj').value,
+            telefone: document.getElementById('novo-forn-tel').value,
+            categoriaPadrao: document.getElementById('novo-forn-cat').value,
+            assinatura: document.getElementById('novo-forn-assinatura').value // Pegando a assinatura manual
         };
 
         const res = await API.request('fornecedores.php', 'POST', dados);
         
         if (res?.success) {
-            // Feedback visual elegante
             UI.showToast("Cadastrado!", "success");
+            document.getElementById('novo-forn-nome').value = '';
+            document.getElementById('novo-forn-cnpj').value = '';
+            document.getElementById('novo-forn-tel').value = '';
+            document.getElementById('novo-forn-assinatura').value = '';
             
-            // Limpa os campos para permitir novo registro imediato
-            elNome.value = '';
-            elCnpj.value = '';
-            elTel.value = '';
-            elCat.value = ''; // Reseta a seleção de categoria
-
-            // Atualiza a lista e o cache
             Config.carregarFornecedores().then(() => Config.renderizarFornecedores());
         } else {
-            // Tratamento de erro robusto (suporta 'message' ou 'error' vindo da API)
-            const mensagem = res?.message || res?.error || 'Desconhecido';
-            UI.showToast("Erro: " + mensagem, "error");
+            UI.showToast("Erro: " + (res?.message || res?.error || 'Desconhecido'), "error");
         }
     },
 

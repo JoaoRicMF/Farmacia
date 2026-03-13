@@ -57,13 +57,14 @@ if ($method === 'POST') {
 
     try {
         // CORREÇÃO: Inclusão de cnpj e telefone na query de INSERT
-        $stmt = $db->prepare("INSERT INTO fornecedor (nome, cnpj, telefone, categoriaPadrao) VALUES (:n, :cnpj, :tel, :c)");
+        $stmt = $db->prepare("INSERT INTO fornecedor (nome, cnpj, telefone, categoriaPadrao, assinatura) VALUES (:n, :cnpj, :tel, :c, :ass)");
 
         $params = [
             ":n"    => $data->nome,
-            ":cnpj" => $data->cnpj ?? null,      // Captura o CNPJ
-            ":tel"  => $data->telefone ?? null,  // Captura o Telefone
-            ":c"    => $data->categoriaPadrao ?? null // Corrigido nome da propriedade conforme JS (categoriaPadrao) ou input
+            ":cnpj" => $data->cnpj ?? null,      
+            ":tel"  => $data->telefone ?? null,  
+            ":c"    => $data->categoriaPadrao ?? null,
+            ":ass"  => $data->assinatura ?? null
         ];
 
         if ($stmt->execute($params)) {
