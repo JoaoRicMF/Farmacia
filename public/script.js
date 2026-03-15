@@ -325,9 +325,9 @@ const Dashboard = {
         const btn = document.querySelector(`.filter-btn[onclick*="'${periodo}'"]`);
         if (btn) btn.classList.add('active');
 
-       const dados = await API.request(`dashboard.php?periodo=${periodo}`);
+        const dados = await API.request(`dashboard.php?periodo=${periodo}`);
         
-        // Proteção: Se a requisição falhar ou não retornar sucesso, interrompe a execução
+        // Proteção contra erros de rede
         if (!dados || dados.success === false) return;
 
         // Atualiza Cards
@@ -345,8 +345,11 @@ const Dashboard = {
                 const el = document.getElementById(id);
                 if (el) el.innerText = Utils.formatarMoedaBRL(val);
             }
-            document.getElementById('card-vencidos-qtd').innerText = dados.cards.vencidos_qtd;
-            document.getElementById('card-proximos-qtd').innerText = dados.cards.proximos_qtd;
+            const elVencQtd = document.getElementById('card-vencidos-qtd');
+            if (elVencQtd) elVencQtd.innerText = dados.cards.vencidos_qtd;
+            
+            const elProxQtd = document.getElementById('card-proximos-qtd');
+            if (elProxQtd) elProxQtd.innerText = dados.cards.proximos_qtd;
         }
 
         Dashboard.renderizarGraficos(dados.graficos);
@@ -1697,7 +1700,11 @@ window.fazerLogin = Auth.login;
 window.confirmarLogout = () => document.getElementById('modal-logout').classList.remove('hidden');
 window.fecharModalLogout = () => document.getElementById('modal-logout').classList.add('hidden');
 window.fazerLogoutReal = Auth.logout;
-window.filtrarDashboard = Dashboard.carregar;
+window.filtrarDashboard = function(periodo, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    Dashboard.carregar(periodo);
+};
 window.toggleCalendarSection = Dashboard.toggleSection;
 window.verDetalhes = verDetalhes; // Função helper solta
 window.preFiltrarLista = preFiltrarLista; // Função helper solta

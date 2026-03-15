@@ -1758,3 +1758,18 @@ table td:last-child .btn-trash svg {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* Correção de fundo preto em dispositivos móveis e tablets */
+@media (max-width: 992px) {
+    html, body {
+        background-color: #f4f6f9 !important; /* Ajuste para a cor exata do seu fundo claro */
+        min-height: 100vh;
+        height: auto;
+    }
+    
+    /* Garante que o container principal também cubra a tela */
+    .main-content, .app-container {
+        background-color: #f4f6f9 !important; /* Ajuste se usar variáveis, ex: var(--bg-color) */
+        min-height: 100vh;
+    }
+}
