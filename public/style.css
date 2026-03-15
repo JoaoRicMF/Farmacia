@@ -1852,3 +1852,44 @@ table td:last-child .btn-trash svg {
         min-height: 100vh;
     }
 }
+
+/* ==========================================================================
+   MODERNIZAÇÃO DOS CAMPOS DE DATA (NATIVOS)
+   ========================================================================== */
+
+/* 1. Melhoria da tipografia e espaçamento interno */
+input[type="date"],
+input[type="month"] {
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--text-main);
+    text-transform: uppercase; /* Deixa a formatação dd/mm/aaaa visualmente mais limpa */
+    letter-spacing: 0.5px;
+    position: relative;
+    cursor: pointer;
+}
+
+/* 2. Substituir o ícone padrão antigo por um SVG moderno do Lucide (Azul) */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%232563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>');
+    background-position: right center;
+    background-repeat: no-repeat;
+    background-size: 18px;
+    cursor: pointer;
+    padding-left: 10px; /* Aumenta a área de clique para o utilizador */
+    opacity: 0.7;
+    transition: all 0.2s ease;
+}
+
+/* 3. Efeito de hover (animação suave) */
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="month"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* 4. Versão do ícone para o Tema Escuro (Azul mais claro para contraste) */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="month"]::-webkit-calendar-picker-indicator {
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%2360a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>');
+}
