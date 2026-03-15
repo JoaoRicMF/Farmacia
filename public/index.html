@@ -14,6 +14,11 @@
 
     <link rel="stylesheet" href="style.css">
     <script src="script.js" defer></script>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="img/icon-192.png">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 
 <body>
@@ -418,9 +423,7 @@
                         <label for="boleto-cod">Código de Barras (Autofocus)</label>
                         <div class="barcode-field-wrapper">
                             <input type="text" id="boleto-cod" onblur="lerCodigoBarras()" oninput="this.classList.remove('input-error')" placeholder="Cole ou leia o código aqui..." autocomplete="off" inputmode="numeric">
-                            <button type="button" class="btn-camera-scan" title="Em breve: scanner" aria-label="Escanear código de barras">
-                                <i data-lucide="scan-barcode"></i>
-                            </button>
+                            <button type="button" class="btn-camera-scan" title="Escanear Código" aria-label="Escanear código de barras" onclick="abrirScanner()">
                         </div>
                         <small class="hint">💡 Preenche Valor e Vencimento automaticamente.</small>
                     </div>
@@ -1039,6 +1042,19 @@
                 <button class="btn btn-secondary" onclick="fecharModalEditarUsuario()">Cancelar</button>
                 <button class="btn btn-primary" onclick="salvarEdicaoUsuario()">Salvar Alterações</button>
             </div>
+        </div>
+    </div>
+</div>
+<div id="modal-scanner" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 500px; text-align: center;">
+        <div class="modal-header">
+            <h2>📷 Escanear Código</h2>
+            <button class="close-btn" onclick="fecharScanner()" aria-label="Fechar Scanner">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="margin-bottom: 15px; color: var(--text-light);">Aponte a câmera para o código de barras do boleto.</p>
+            <div id="reader" style="width: 100%; min-height: 300px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm);"></div>
+            <button class="btn btn-secondary" style="margin-top: 20px;" onclick="fecharScanner()">Cancelar</button>
         </div>
     </div>
 </div>

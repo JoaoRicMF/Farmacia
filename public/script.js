@@ -2181,6 +2181,14 @@ document.addEventListener("DOMContentLoaded", () => {
         tabBar.style.display = (appScreen && !appScreen.classList.contains('hidden')) ? 'flex' : 'none';
     }
 
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').then((registration) => {
+            console.log('ServiceWorker registado com sucesso: ', registration.scope);
+        }).catch((err) => {
+            console.log('Falha ao registar o ServiceWorker: ', err);
+        });
+    }
+
     // Reinit lucide after mobile drawer renders
     if (Mobile.isMobile() && typeof lucide !== 'undefined') {
         setTimeout(() => lucide.createIcons(), 200);
@@ -2201,6 +2209,68 @@ window.addEventListener('resize', () => {
         }
     }
 });
+
+/* ==========================================================================
+   MÓDULO: LEITOR DE CÓDIGO DE BARRAS (CÂMERA)
+   ========================================================================== */
+let html5QrCode;
+
+window.abrirScanner = function() {
+    const modal = document.getElementById('modal-scanner');
+    modal.classList.remove('hidden');
+
+    // Inicializa a biblioteca
+    html5QrCode = new Html5Qrcode("reader");
+
+    // Configuração para priorizar a leitura de código de barras lineares (1D)
+    const config = { 
+        fps: 10, 
+        qrbox: { width: window.innerWidth > 600 ? 350 : 250, height: 100 },
+        aspectRatio: 1.0,
+        formatsToSupport: [
+            Html5QrcodeSupportedFormats.ITF,       // Padrão de boletos brasileiros (Interleaved 2 of 5)
+            Html5QrcodeSupportedFormats.CODE_128,  // Algumas faturas
+            Html5QrcodeSupportedFormats.CODE_39
+        ]
+    };
+
+    // Abre a câmera traseira do telemóvel
+    html5QrCode.start({ facingMode: "environment" }, config,
+        (decodedText, decodedResult) => {
+            // SUCESSO na leitura!
+            UI.showToast("Código lido com sucesso!", "success");
+            
+            // Preenche o input
+            document.getElementById('boleto-cod').value = decodedText;
+            
+            // Fecha a câmera
+            fecharScanner();
+            
+            // Dispara a lógica que você já tem pronta que vai à API descodificar o boleto
+            Financeiro.lerCodigoBarras();
+        },
+        (errorMessage) => {
+            // Ignora os erros de leitura constantes enquanto a câmera tenta focar
+        }
+    ).catch((err) => {
+        console.error("Erro ao abrir a câmera", err);
+        UI.showToast("Erro ao aceder à câmera. Verifique as permissões.", "error");
+    });
+};
+
+window.fecharScanner = function() {
+    const modal = document.getElementById('modal-scanner');
+    if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().then(() => {
+            modal.classList.add('hidden');
+        }).catch(err => {
+            console.error("Erro ao parar a câmera", err);
+            modal.classList.add('hidden');
+        });
+    } else {
+        modal.classList.add('hidden');
+    }
+};
 
 /* Mobile module exposed globally */
 window.Mobile = Mobile;
