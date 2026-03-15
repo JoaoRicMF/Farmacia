@@ -258,6 +258,15 @@ try {
             $db->prepare("INSERT IGNORE INTO usuario_unidade (id_usuario, id_unidade) VALUES (:u,:un)")
                ->execute([':u' => $currentId, ':un' => $novaId]);
 
+            Atualiza a sessão com a nova unidade imediatamente
+            $stmtUns = $db->prepare(
+                "SELECT u.id, u.nome FROM unidades u
+                 INNER JOIN usuario_unidade uu ON uu.id_unidade = u.id
+                 WHERE uu.id_usuario = :uid ORDER BY u.nome"
+            );
+            $stmtUns->execute([':uid' => $currentId]);
+            $_SESSION['unidades'] = $stmtUns->fetchAll(PDO::FETCH_ASSOC);
+
             registrarLog($db, $_SESSION['user_nome'], "Criar Unidade", "Nome: $nome | ID: $novaId");
             $response = ['success' => true, 'message' => 'Unidade criada.', 'id' => $novaId];
         }

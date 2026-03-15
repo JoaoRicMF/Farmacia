@@ -1657,6 +1657,102 @@ table td:last-child .btn-trash svg {
         font-size: 14px;
     }
 }
+
+/* ==========================================================================
+   CUSTOM DROPDOWN (Unidades)
+   ========================================================================== */
+.custom-dropdown-wrapper {
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.custom-dropdown {
+    position: relative;
+    width: 100%;
+}
+
+.dropdown-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 15px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 50px; /* Estilo Pill */
+    color: var(--text-main);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+}
+
+.dropdown-toggle:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.dropdown-toggle i {
+    width: 18px; 
+    height: 18px;
+}
+
+.dropdown-arrow {
+    margin-left: auto;
+    transition: transform 0.3s ease;
+}
+
+.custom-dropdown.open .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.custom-dropdown.open .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    color: var(--text-main);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.dropdown-item:hover {
+    background: rgba(37, 99, 235, 0.05);
+    color: var(--primary);
+}
+
+.dropdown-item.active {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--primary);
+    font-weight: 700;
+}
 /* Animação para o Loading do Código de Barras */
 @keyframes spin {
     to { transform: rotate(360deg); }

@@ -1509,21 +1509,39 @@ function preFiltrarLista(status) {
 const Unidades = {
     // ── Seletor no sidebar/header ──────────────────────────────────────────
     popularSeletor(unidades, ativaId) {
-        const seletor = document.getElementById('seletor-unidade');
-        if (!seletor) return;
+        const menu = document.getElementById('lista-unidades-dropdown');
+        const label = document.getElementById('label-unidade-ativa');
+        if (!menu || !label) return;
 
-        seletor.innerHTML = '';
+        menu.innerHTML = '';
         unidades.forEach(u => {
-            const opt = document.createElement('option');
-            opt.value = u.id;
-            opt.textContent = u.nome;
-            if (u.id == ativaId) opt.selected = true;
-            seletor.appendChild(opt);
+            if (u.id == ativaId) {
+                label.textContent = u.nome;
+            }
+            const item = document.createElement('div');
+            item.className = `dropdown-item ${u.id == ativaId ? 'active' : ''}`; 
+            item.onclick = () => {
+                Unidades.trocar(u.id);
+                Unidades.toggleDropdown(false);
+            };
+            menu.appendChild(item);
         });
 
         // Mostra o wrapper só se houver >1 unidade
         const wrapper = document.getElementById('seletor-unidade-wrapper');
         if (wrapper) wrapper.style.display = unidades.length > 1 ? 'block' : 'none';
+        
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    },
+
+    toggleDropdown(forceState) {
+        const dropdown = document.getElementById('unidade-dropdown');
+        if (!dropdown) return;
+        if (typeof forceState === 'boolean') {
+            dropdown.classList.toggle('open', forceState);
+        } else {
+            dropdown.classList.toggle('open');
+        }
     },
 
     // ── Troca a unidade ativa (chama auth.php) ────────────────────────────
@@ -1535,37 +1553,29 @@ const Unidades = {
             State.fornecedoresCache = [];
             State.fluxoCache        = null;
 
-            const label = document.getElementById('label-unidade-ativa');
-            if (label && res.unidade_ativa) label.textContent = res.unidade_ativa.nome;
+            if (State.usuario && State.usuario.unidades) {
+                Unidades.popularSeletor(State.usuario.unidades, idUnidade);
+            }
 
             UI.showToast(`Unidade: ${res.unidade_ativa?.nome ?? ''}`, 'success');
 
-            // Recarrega os módulos de dados sem reload de página.
-            // Determina a view actualmente visível para focar o refresh correcto.
             const secaoActiva = document.querySelector('.view-section:not(.hidden)');
             const telaId = secaoActiva ? secaoActiva.id.replace('view-', '') : 'dashboard';
 
-            // Atualiza sempre os três módulos principais (dados dependem da unidade)
             const refreshTasks = [
                 Dashboard.carregar(),
                 Financeiro.carregar(1),
                 Fluxo.carregar()
             ];
 
-            // Executa em paralelo e aguarda
             await Promise.allSettled(refreshTasks);
 
-            // Re-navega para a view activa para garantir que os dados corretos são exibidos
-            // (sem re-disparar o navegar se já estiver na view certa — apenas resincroniza menu)
             const btnAtivo = document.querySelector(`.menu-item[onclick*="'${telaId}'"]`);
             document.querySelectorAll('.menu-item').forEach(b => b.classList.remove('active'));
             if (btnAtivo) btnAtivo.classList.add('active');
 
         } else {
             UI.showToast(res?.message || 'Erro ao trocar de unidade.', 'error');
-            // Reverte o select para o valor anterior
-            const seletor = document.getElementById('seletor-unidade');
-            if (seletor && State.unidadeAtiva) seletor.value = State.unidadeAtiva.id;
         }
     },
 
@@ -1594,7 +1604,6 @@ const Unidades = {
             tbody.appendChild(tr);
         });
 
-        // Também preenche checkboxes nos formulários de criar/editar usuário
         Unidades.preencherCheckboxes(lista);
     },
 
@@ -1620,11 +1629,14 @@ const Unidades = {
         if (res?.success) {
             UI.showToast('Unidade criada!');
             input.value = '';
-            // Força reload dos checkboxes na próxima abertura
+            
             ['novo-unidades-container','edit-unidades-container'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.dataset.loaded = 'false';
             });
+            
+            // Força a validação da sessão para baixar as novas unidades e renderizar o menu instantaneamente
+            await Auth.verificarSessao();
             Unidades.carregar();
         } else {
             UI.showToast(res?.message || 'Erro ao criar unidade.', 'error');
@@ -1636,12 +1648,21 @@ const Unidades = {
         const res = await API.request('admin.php?action=excluirUnidade', 'POST', { id });
         if (res?.success) {
             UI.showToast('Unidade removida.');
+            await Auth.verificarSessao();
             Unidades.carregar();
         } else {
             UI.showToast(res?.message || 'Não foi possível remover.', 'error');
         }
     }
 };
+
+// Fechar o dropdown ao clicar fora
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('unidade-dropdown');
+    if (dropdown && dropdown.classList.contains('open') && !dropdown.contains(e.target)) {
+        Unidades.toggleDropdown(false);
+    }
+});
 
 /* ==========================================================================
    CONECTORES GLOBAIS (Compatibility Layer)

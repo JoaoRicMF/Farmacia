@@ -84,10 +84,16 @@
                 <i data-lucide="settings"></i> <span>Configurações</span>
             </div>
             
-            <div id="seletor-unidade-wrapper" class="sidebar-unit-selector" style="padding: 10px 20px; border-bottom: 1px solid var(--border); display: none;">
-                <label for="seletor-unidade" style="font-size: 0.75rem; color: var(--text-light);">Unidade Ativa</label>
-                <select id="seletor-unidade" onchange="trocarUnidadeAtual(this.value)" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-main); font-weight: 600; margin-top: 5px;">
-                </select>
+            <div id="seletor-unidade-wrapper" class="sidebar-unit-selector custom-dropdown-wrapper" style="display: none;">
+                <div class="custom-dropdown" id="unidade-dropdown">
+                    <button class="dropdown-toggle" onclick="Unidades.toggleDropdown()" aria-haspopup="true" aria-expanded="false">
+                        <i data-lucide="building"></i>
+                        <span id="label-unidade-ativa">Carregando...</span>
+                        <i data-lucide="chevron-down" class="dropdown-arrow"></i>
+                    </button>
+                    <div class="dropdown-menu" id="lista-unidades-dropdown">
+                        </div>
+                </div>
             </div>
         </nav>
 
