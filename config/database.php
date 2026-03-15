@@ -141,7 +141,7 @@ class Database {
             $checkCat = $this->conn->query("SELECT id FROM categorias LIMIT 1");
             if ($checkCat->rowCount() == 0) {
                 $padroes = ['Medicamentos (Estoque)', 'Água/Luz/Internet', 'Aluguel & Condomínio', 'Impostos & Taxas', 'Folha de Pagamento', 'Marketing', 'Manutenção', 'Outros'];
-                $stmtCat = $this->conn->prepare("INSERT IGNORE INTO Categorias (nome) VALUES (:nome)");
+                $stmtCat = $this->conn->prepare("INSERT IGNORE INTO categorias (nome) VALUES (:nome)");
                 foreach ($padroes as $p) {
                     $stmtCat->execute([':nome' => $p]);
                 }

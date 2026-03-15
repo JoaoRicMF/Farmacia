@@ -704,10 +704,9 @@ const Financeiro = {
                     Financeiro.abrirModalAssinatura(res.assinatura);
                 } else {
                     // Não tem assinatura (ex: PIX Copia e Cola), foca na descrição
+                    document.getElementById('boleto-desc').value = "";
                     document.getElementById('boleto-desc').focus();
                 }
-                descInput.value = ""; 
-                descInput.focus();
 
                 // Tratamento para PIX Copia e Cola (mantido)
                 if (res.tipo && res.tipo.includes('PIX')) {

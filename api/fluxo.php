@@ -7,7 +7,7 @@ date_default_timezone_set('America/Sao_Paulo');
 // --- FUNÇÃO REUTILIZÁVEL (SHARED LOGIC) ---
 function obterMovimentacoesFluxo(PDO $db, string $ano, string $mesNum, int $idUnidade): array {
     // 1. Entradas (Vendas/Ingressos)
-    $stmt = $db->prepare("SELECT id, dataRegistro as data, descricao, valor, 'ENTRADA' as tipo, 'Vendas' as categoria, formaPagamento 
+    $stmt = $db->prepare("SELECT id_entrada as id, dataRegistro as data, descricao, valor, 'ENTRADA' as tipo, 'Vendas' as categoria, formaPagamento 
                           FROM entradacaixa 
                           WHERE id_unidade = :u AND MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
     $stmt->execute([':u' => $idUnidade, ':m' => $mesNum, ':a' => $ano]);

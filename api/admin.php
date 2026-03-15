@@ -131,15 +131,29 @@ try {
                 if ($chkUn->fetchColumn() == 0) throw new Exception("Usuário não pertence a esta unidade.", 403);
             }
 
+            // Proteção: Admin não pode editar dados nem alterar função de outro Admin
+            if ($isAdmin && !$isSelf) {
+                $chkAlvoEd = $db->prepare("SELECT funcao FROM usuario WHERE id = :id");
+                $chkAlvoEd->execute([':id' => $data->id]);
+                $alvoEd = $chkAlvoEd->fetch(PDO::FETCH_ASSOC);
+                if ($alvoEd && $alvoEd['funcao'] === 'Admin') {
+                    throw new Exception("Não é permitido editar a conta de outro Administrador.", 403);
+                }
+            }
+
             // Validação de Login Duplicado (exceto para o próprio ID)
             $check = $db->prepare("SELECT id FROM usuario WHERE usuario = :u AND id != :id");
             $check->execute([':u' => $data->login, ':id' => $data->id]);
             if ($check->rowCount() > 0) throw new Exception("Este login já está em uso.", 409);
 
             // Regra de Função:
-            // Se for Admin, usa a função enviada pelo front.
+            // Se for Admin, usa a função enviada pelo front — mas não pode promover outros a Admin.
             // Se NÃO for Admin, força a função atual (impede elevação de privilégio).
-            $novaFuncao = $isAdmin ? ($data->funcao ?? 'Operador') : $currentRole;
+            $funcaoSolicitada = ucfirst($data->funcao ?? 'Operador');
+            if ($isAdmin && !$isSelf && $funcaoSolicitada === 'Admin') {
+                throw new Exception("Não é permitido promover outro usuário a Administrador.", 403);
+            }
+            $novaFuncao = $isAdmin ? $funcaoSolicitada : $currentRole;
 
             $stmt = $db->prepare("UPDATE usuario SET nome = :n, usuario = :u, funcao = :f WHERE id = :id");
             $stmt->execute([
@@ -203,6 +217,16 @@ try {
 
             $isSelf = ($data->id == $currentId);
             if (!$isAdmin && !$isSelf) throw new Exception("Sem permissão.", 403);
+
+            // Proteção: Admin não pode resetar senha de outro Admin (exceto a própria)
+            if ($isAdmin && !$isSelf) {
+                $chkAlvo = $db->prepare("SELECT funcao FROM usuario WHERE id = :id");
+                $chkAlvo->execute([':id' => $data->id]);
+                $alvo = $chkAlvo->fetch(PDO::FETCH_ASSOC);
+                if ($alvo && $alvo['funcao'] === 'Admin') {
+                    throw new Exception("Não é permitido resetar a senha de outro Administrador.", 403);
+                }
+            }
 
             $hash = password_hash($data->novaSenha, PASSWORD_DEFAULT);
             $stmt = $db->prepare("UPDATE usuario SET senha = :s WHERE id = :id");

@@ -185,6 +185,16 @@ try {
         }
 
         if (!empty($input->id)) {
+            // Valida duplicidade de código de barras na edição, excluindo o próprio registro
+            $codigoBarrasEdicao = trim($input->codigo_barras ?? '');
+            if (!empty($codigoBarrasEdicao) && strlen($codigoBarrasEdicao) >= 40) {
+                $checkDupEd = $db->prepare("SELECT id FROM financeiro WHERE codigo_barras = :cb AND id_unidade = :unidade AND id != :id LIMIT 1");
+                $checkDupEd->execute([':cb' => $codigoBarrasEdicao, ':unidade' => $_SESSION['id_unidade_ativa'], ':id' => $input->id]);
+                if ($checkDupEd->fetch(PDO::FETCH_ASSOC)) {
+                    throw new Exception("Este código de barras já está vinculado a outro registro.", 409);
+                }
+            }
+
             $sql = "UPDATE financeiro SET 
                     descricao=:d, 
                     valor=:v, 
@@ -208,8 +218,8 @@ try {
 
             // 2. Só verifica duplicidade se for realmente um código de barras (mais de 40 números)
             if (!empty($codigoBarras) && strlen($codigoBarras) >= 40) {
-                $checkDup = $db->prepare("SELECT id FROM financeiro WHERE codigo_barras = :cb LIMIT 1");
-                $checkDup->execute([':cb' => $codigoBarras]);
+                $checkDup = $db->prepare("SELECT id FROM financeiro WHERE codigo_barras = :cb AND id_unidade = :unidade LIMIT 1");
+                $checkDup->execute([':cb' => $codigoBarras, ':unidade' => $_SESSION['id_unidade_ativa']]);
 
                 // 3. Usar fetch() é 100% seguro em qualquer versão de banco de dados
                 if ($checkDup->fetch(PDO::FETCH_ASSOC)) {
