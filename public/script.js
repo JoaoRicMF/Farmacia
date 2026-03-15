@@ -1520,7 +1520,7 @@ const Unidades = {
             }
             const item = document.createElement('div');
             item.className = `dropdown-item ${u.id == ativaId ? 'active' : ''}`; 
-            item.onclick = () => {
+            item.textContent = u.nome; item.onclick = () => {
                 Unidades.trocar(u.id);
                 Unidades.toggleDropdown(false);
             };
@@ -1529,7 +1529,11 @@ const Unidades = {
 
         // Mostra o wrapper só se houver >1 unidade
         const wrapper = document.getElementById('seletor-unidade-wrapper');
-        if (wrapper) wrapper.style.display = unidades.length > 1 ? 'block' : 'none';
+        if (wrapper) {
+            wrapper.style.display = 'block'; // sempre visível
+            const btn = wrapper.querySelector('.dropdown-toggle'); // botão/seta
+            if (btn) btn.style.display = unidades.length > 1 ? 'inline-flex' : 'none';
+        }
         
         if (typeof lucide !== 'undefined') lucide.createIcons();
     },
@@ -1553,8 +1557,10 @@ const Unidades = {
             State.fornecedoresCache = [];
             State.fluxoCache        = null;
 
-            if (State.usuario && State.usuario.unidades) {
-                Unidades.popularSeletor(State.usuario.unidades, idUnidade);
+            const check = await API.request('auth.php?action=check');
+            if (check?.success) {
+                State.usuario = check;
+                Unidades.popularSeletor(check.unidades, idUnidade);
             }
 
             UI.showToast(`Unidade: ${res.unidade_ativa?.nome ?? ''}`, 'success');
@@ -1565,7 +1571,8 @@ const Unidades = {
             const refreshTasks = [
                 Dashboard.carregar(),
                 Financeiro.carregar(1),
-                Fluxo.carregar()
+                Fluxo.carregar(),
+                Config.carregarFornecedores()
             ];
 
             await Promise.allSettled(refreshTasks);
@@ -1609,11 +1616,12 @@ const Unidades = {
 
     preencherCheckboxes(lista) {
         ['novo-unidades-container', 'edit-unidades-container'].forEach(containerId => {
-            const container = document.getElementById(containerId);
+            const name = containerId === 'edit-unidades-container' ? 'edit-unidade' : 'novo-unidade';
             if (!container || container.dataset.loaded === 'true') return;
             container.innerHTML = lista.map(u => `
                 <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer">
-                    <input type="checkbox" name="${containerId.startsWith('novo') ? 'novo-unidade' : 'edit-unidade'}" value="${u.id}">
+                    <input type="checkbox" name="{name}" value="${u.id}"
+                        ${u.id === State.unidadeAtiva?.id ? 'checked' : ''}>
                     ${u.nome}
                 </label>`).join('');
             container.dataset.loaded = 'true';
@@ -1630,10 +1638,11 @@ const Unidades = {
             UI.showToast('Unidade criada!');
             input.value = '';
             
-            ['novo-unidades-container','edit-unidades-container'].forEach(id => {
+            ['novo-unidades-container', 'edit-unidades-container'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.dataset.loaded = 'false';
             });
+            Unidades.carregar();
             
             // Força a validação da sessão para baixar as novas unidades e renderizar o menu instantaneamente
             await Auth.verificarSessao();

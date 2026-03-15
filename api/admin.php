@@ -57,24 +57,21 @@ try {
             $response = $rows;
 
         } elseif ($resource === 'unidades') {
-            // Lista todas as unidades (para checkboxes + tabela CRUD)
-            if (!$isAdmin) throw new Exception("Acesso restrito.", 403);
-            $stmt = $db->query("SELECT id, nome FROM unidades ORDER BY nome");
-            $response = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        } elseif ($resource === 'logs') {
-            $stmt = $db->prepare(
-                "SELECT DATE_FORMAT(dataHora, '%d/%m/%Y %H:%i') as dataHora, usuario, acao, detalhes
-                 FROM log WHERE id_unidade = :uid
-                 ORDER BY id DESC LIMIT 100"
-            );
-            $stmt->execute([':uid' => $idUnidade]);
+             if ($isAdmin) {
+                $stmt = $db->query("SELECT id, nome FROM unidades ORDER BY nome");
+            } else {
+                $stmt = $db->prepare(
+                    "SELECT u.id, u.nome FROM unidades u
+                    INNER JOIN usuario_unidade uu ON uu.id_unidade = u.id
+                    WHERE uu.id_usuario = :uid ORDER BY u.nome"
+                );
+                $stmt->execute([':uid' => $currentId]);
+            }
             $response = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
-    }
 
     // --- POST (Escrita) ---
-    elseif ($method === 'POST') {
+    } elseif ($method === 'POST') {
         $data = json_decode(file_get_contents('php://input'));
 
         // 1. CRIAR USUÁRIO (Apenas Admin)
@@ -258,7 +255,6 @@ try {
             $db->prepare("INSERT IGNORE INTO usuario_unidade (id_usuario, id_unidade) VALUES (:u,:un)")
                ->execute([':u' => $currentId, ':un' => $novaId]);
 
-            Atualiza a sessão com a nova unidade imediatamente
             $stmtUns = $db->prepare(
                 "SELECT u.id, u.nome FROM unidades u
                  INNER JOIN usuario_unidade uu ON uu.id_unidade = u.id
@@ -278,9 +274,19 @@ try {
             if (!$idUn) throw new Exception("ID inválido.", 400);
             if ($idUn === $idUnidade) throw new Exception("Não é possível excluir a unidade ativa.", 400);
 
-            // Remove vínculos e a unidade
-            $db->prepare("DELETE FROM usuario_unidade WHERE id_unidade=:un")->execute([':un' => $idUn]);
-            $db->prepare("DELETE FROM unidades WHERE id=:un")->execute([':un' => $idUn]);
+            $db->beginTransaction();
+            try {
+                // Remove dados vinculados ANTES de remover a unidade
+                foreach (['financeiro', 'saidacaixa', 'entradacaixa', 'categorias'] as $tabela) {
+                    $db->prepare("DELETE FROM $tabela WHERE id_unidade = :un")
+                    ->execute([':un' => $idUn]);
+                }
+                $db->prepare("DELETE FROM usuario_unidade WHERE id_unidade=:un")->execute([':un' => $idUn]);
+                $db->prepare("DELETE FROM unidades WHERE id=:un")->execute([':un' => $idUn]);
+                $db->commit();
+            } catch (Exception $e) {
+                $db->rollBack(); throw $e;
+            }
 
             registrarLog($db, $_SESSION['user_nome'], "Excluir Unidade", "ID: $idUn");
             $response = ['success' => true, 'message' => 'Unidade removida.'];

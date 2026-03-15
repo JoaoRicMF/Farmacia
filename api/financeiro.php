@@ -154,6 +154,7 @@ try {
                 ':desc'  => $descCaixa,
                 ':val'   => $titulo['valor'],
                 ':user'  => $_SESSION['user_id'] ?? null
+                ':unidade' => $_SESSION['id_unidade_ativa']
             ]);
 
             // 3. Atualiza o Financeiro com a DATA DO PAGAMENTO REAL
