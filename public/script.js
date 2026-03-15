@@ -1617,10 +1617,15 @@ const Unidades = {
     preencherCheckboxes(lista) {
         ['novo-unidades-container', 'edit-unidades-container'].forEach(containerId => {
             const name = containerId === 'edit-unidades-container' ? 'edit-unidade' : 'novo-unidade';
+            
+            // Adicione esta linha que estava faltando para buscar o elemento no DOM
+            const container = document.getElementById(containerId);
+            
             if (!container || container.dataset.loaded === 'true') return;
+            
             container.innerHTML = lista.map(u => `
                 <label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer">
-                    <input type="checkbox" name="{name}" value="${u.id}"
+                    <input type="checkbox" name="${name}" value="${u.id}"
                         ${u.id === State.unidadeAtiva?.id ? 'checked' : ''}>
                     ${u.nome}
                 </label>`).join('');

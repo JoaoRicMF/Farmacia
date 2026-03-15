@@ -148,12 +148,12 @@ try {
             // Concatenamos a forma de pagamento na descrição
             $descCaixa = "Pgto ($formaPgto): " . $titulo['descricao'];
 
-            $stmtCaixa = $db->prepare("INSERT INTO saidacaixa (dataRegistro, descricao, valor, id) VALUES (:data, :desc, :val, :user)");
+            $stmtCaixa = $db->prepare("INSERT INTO saidacaixa (dataRegistro, descricao, valor, id, id_unidade) VALUES (:data, :desc, :val, :user, :unidade)");
             $stmtCaixa->execute([
-                ':data'  => $dataCompleta,
-                ':desc'  => $descCaixa,
-                ':val'   => $titulo['valor'],
-                ':user'  => $_SESSION['user_id'] ?? null
+                ':data'    => $dataCompleta,
+                ':desc'    => $descCaixa,
+                ':val'     => $titulo['valor'],
+                ':user'    => $_SESSION['user_id'] ?? null, 
                 ':unidade' => $_SESSION['id_unidade_ativa']
             ]);
 
