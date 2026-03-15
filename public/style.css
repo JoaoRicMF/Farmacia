@@ -465,37 +465,74 @@ input:focus, select:focus {
 }
 
 .menu-item {
-    margin: 4px 12px;
-    padding: 10px 14px;
+    margin: 8px 12px; /* Aumentado para dar mais espaçamento e respiro */
+    padding: 12px 14px;
     border-radius: 8px;
     color: var(--text-light);
-    font-weight: 500; font-size: 0.95rem;
-    display: flex; align-items: center; gap: 12px;
-    cursor: pointer; transition: all 0.2s;
-    border-left: none;
+    font-weight: 500; 
+    font-size: 0.95rem;
+    display: flex; 
+    align-items: center; 
+    gap: 14px; /* Ícone mais afastado do texto */
+    cursor: pointer; 
+    transition: all 0.2s ease;
+    position: relative; /* Necessário para o indicador ativo */
+    background-color: transparent; 
 }
 
-.menu-item svg { width: 20px; height: 20px; color: var(--text-light); transition: color 0.2s; }
+.menu-item svg { 
+    width: 20px; 
+    height: 20px; 
+    color: var(--text-light); 
+    transition: color 0.2s; 
+}
 
-.menu-item:hover { background-color: rgba(37, 99, 235, 0.05); color: var(--text-main); }
-.menu-item:hover svg { color: var(--primary); }
+/* Hover suave, sem cores muito contrastantes */
+.menu-item:hover { 
+    background-color: rgba(128, 128, 128, 0.1); /* Neutro, funciona no Light e Dark Mode */
+    color: var(--text-main); 
+}
+.menu-item:hover svg { 
+    color: var(--text-main); 
+}
 
+/* Estado Ativo: Elegante, sem fundo destacado, focando na barra e na cor da fonte */
 .menu-item.active {
-    background-color: rgba(37, 99, 235, 0.08);
+    background-color: transparent;
     color: var(--primary);
     font-weight: 600;
-    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.05);
-}
-.menu-item.active {
-    background-color: rgba(37, 99, 235, 0.08); /* Fundo azul muito claro */
-    color: var(--primary);
-    font-weight: 600;
-    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.05); /* Sutil destaque */
+    box-shadow: none; 
 }
 
-.menu-item.logout { margin-top: 5px; color: var(--text-main); }
-.menu-item.logout:hover { background-color: rgba(239, 68, 68, 0.1); color: var(--danger); }
-.menu-item.logout:hover svg { color: var(--danger); }
+.menu-item.active svg {
+    color: var(--primary);
+}
+
+/* O indicador de aba ativa ( ▌ ) encostado na extrema esquerda */
+.menu-item.active::before {
+    content: '';
+    position: absolute;
+    left: -12px; /* Compensa a margem para colar na borda esquerda da sidebar */
+    top: 50%;
+    transform: translateY(-50%);
+    height: 50%; /* Ocupa apenas metade da altura do item para ficar mais sofisticado */
+    width: 4px;
+    background-color: var(--primary);
+    border-radius: 0 4px 4px 0; /* Arredondado apenas do lado direito */
+}
+
+/* Ajustes no botão de Logout para manter o padrão moderno */
+.menu-item.logout { 
+    margin-top: 5px; 
+    color: var(--text-main); 
+}
+.menu-item.logout:hover { 
+    background-color: rgba(239, 68, 68, 0.05); 
+    color: var(--danger); 
+}
+.menu-item.logout:hover svg { 
+    color: var(--danger); 
+}
 
 /* ==========================================================================
    8. LAYOUT: CONTEÚDO PRINCIPAL
@@ -1117,13 +1154,47 @@ table td:last-child .btn-trash svg {
         margin-bottom: 20px;
     }
     .chart-box {
-        flex: none !important;
-        min-width: unset !important;
-        width: 100%;
-        padding: 16px;
+    flex: 1; 
+    min-width: 350px;
+    padding: 30px; /* Mais respiro interno */
+    display: flex; 
+    flex-direction: column;
+    background: var(--bg-card);
+    border-radius: var(--border-radius);
+    border: 1px solid rgba(226, 232, 240, 0.6); /* Borda translúcida e suave */
+    box-shadow: 0 4px 6px -2px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02); /* Sombra super sutil base */
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .chart-container {
-        height: 200px !important;
+
+    .chart-box:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg); /* Elevação elegante no hover */
+        border-color: transparent;
+    }
+
+    /* Títulos maiores e mais modernos */
+    .chart-box h3 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-main); 
+        margin-bottom: 25px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        letter-spacing: -0.01em;
+    }
+
+    .chart-container { 
+        position: relative; 
+        height: 320px; /* Gráficos levemente mais altos */
+        width: 100%; 
+        flex-grow: 1;
+    }
+
+    /* Correção para o Dark Mode nas linhas de grid */
+    [data-theme="dark"] .chart-box {
+        border: 1px solid var(--border);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
     }
 
     /* Calendar accordion — listWeek on mobile (JS handles view, CSS collapses by default) */

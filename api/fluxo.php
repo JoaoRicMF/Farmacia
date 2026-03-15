@@ -7,18 +7,20 @@ date_default_timezone_set('America/Sao_Paulo');
 // --- FUNÇÃO REUTILIZÁVEL (SHARED LOGIC) ---
 function obterMovimentacoesFluxo(PDO $db, string $ano, string $mesNum, int $idUnidade): array {
     // 1. Entradas (Vendas/Ingressos)
+    $dataInicio = "$ano-$mesNum-01";
+    $dataFim    = date('Y-m-t', strtotime($dataInicio)); // último dia do mês
     $stmt = $db->prepare("SELECT id_entrada as id, dataRegistro as data, descricao, valor, 'ENTRADA' as tipo, 'Vendas' as categoria, formaPagamento 
                           FROM entradacaixa 
-                          WHERE id_unidade = :u AND MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
-    $stmt->execute([':u' => $idUnidade, ':m' => $mesNum, ':a' => $ano]);
+                          WHERE id_unidade = :u AND dataRegistro BETWEEN :di AND :df");
+    $stmt->execute([':u' => $idUnidade, ':di' => "$dataInicio 00:00:00", ':df' => "$dataFim 23:59:59"]);
     $entradas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 2. Saídas (Todas: Manuais + Baixas de Boletos)
     // Nota: Como a baixa agora insere aqui, não precisamos mais ler a tabela Financeiro!
-    $stmt = $db->prepare("SELECT id, dataRegistro as data, descricao, valor, 'SAIDA' as tipo, 'Despesa' as categoria, NULL as formaPagamento 
+    $stmt = $db->prepare("SELECT id_saida as id, dataRegistro as data, descricao, valor, 'SAIDA' as tipo, 'Despesa' as categoria, NULL as formaPagamento 
                           FROM saidacaixa 
-                          WHERE id_unidade = :u AND MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a");
-    $stmt->execute([':u' => $idUnidade, ':m' => $mesNum, ':a' => $ano]);
+                          WHERE id_unidade = :u AND dataRegistro BETWEEN :di AND :df");
+    $stmt->execute([':u' => $idUnidade, ':di' => "$dataInicio 00:00:00", ':df' => "$dataFim 23:59:59"]);
     $saidas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // 3. Consolidação
@@ -159,6 +161,8 @@ if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)) {
             list($ano, $mesNum) = explode('-', $mes);
 
             // >>> CHAMADA DA FUNÇÃO COMPARTILHADA <<<
+            $dataInicio = "$ano-$mesNum-01";
+            $dataFim    = date('Y-m-t', strtotime($dataInicio));
             $movimentacoes = obterMovimentacoesFluxo($db, $ano, $mesNum, (int)$idUnidade);
 
             // Cálculos de Totais para o JSON
@@ -180,8 +184,8 @@ if (basename($_SERVER['PHP_SELF']) == basename(__FILE__)) {
 
 
             // Totais Específicos (Dinheiro/Pix) mantêm query separada pois é agrupamento
-            $stmtTotais = $db->prepare("SELECT formaPagamento, SUM(valor) as total FROM entradacaixa WHERE id_unidade = :u AND MONTH(dataRegistro) = :m AND YEAR(dataRegistro) = :a GROUP BY formaPagamento");
-            $stmtTotais->execute([':u' => $idUnidade, ':m' => $mesNum, ':a' => $ano]);
+            $stmtTotais = $db->prepare("SELECT formaPagamento, SUM(valor) as total FROM entradacaixa WHERE id_unidade = :u AND dataRegistro BETWEEN :di AND :df GROUP BY formaPagamento");
+            $stmtTotais->execute([':u' => $idUnidade, ':di' => "$dataInicio 00:00:00", ':df' => "$dataFim 23:59:59"]);
             $formas = $stmtTotais->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
 
             $saldoCents = $totalEntCents - $totalSaiCents;

@@ -359,41 +359,143 @@ const Dashboard = {
     renderizarGraficos(dados) {
         if (!dados || typeof Chart === 'undefined') return;
 
-        // Gráfico Evolução (Linha)
+        // Fonte padrão para os gráficos
+        Chart.defaults.font.family = "'Inter', system-ui, -apple-system, sans-serif";
+        Chart.defaults.color = '#64748b'; // var(--text-light)
+
+        // ==========================================
+        // 1. Gráfico de Evolução (Linha com Gradiente)
+        // ==========================================
         const ctxMes = document.getElementById('chartMes');
         if (ctxMes) {
             if (State.chartMes) State.chartMes.destroy();
+            
+            // Criar Gradiente suave para o preenchimento
+            const ctx2d = ctxMes.getContext('2d');
+            const gradient = ctx2d.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(37, 99, 235, 0.25)'); // Azul primário mais visível no topo
+            gradient.addColorStop(1, 'rgba(37, 99, 235, 0.0)');  // Transparente na base
+
             State.chartMes = new Chart(ctxMes, {
                 type: 'line',
                 data: {
                     labels: dados.por_mes.map(d => d.mes),
                     datasets: [{
-                        label: 'Total (R$)',
+                        label: 'Total Movimentado',
                         data: dados.por_mes.map(d => d.total),
-                        borderColor: '#2563eb',
-                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        borderColor: '#2563eb', // var(--primary)
+                        backgroundColor: gradient,
+                        borderWidth: 3,
                         fill: true,
-                        tension: 0.4
+                        tension: 0.4, // Curva suave
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#2563eb',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: '#2563eb',
+                        pointHoverBorderColor: '#ffffff',
+                        pointHoverBorderWidth: 2
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: { display: false }, // Ocultamos a legenda para um visual mais limpo
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)', // Tooltip dark moderna
+                            titleFont: { size: 13 },
+                            bodyFont: { size: 14, weight: 'bold' },
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let val = context.parsed.y;
+                                    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false, drawBorder: false }, // Remove grid vertical
+                        },
+                        y: {
+                            grid: { color: 'rgba(0, 0, 0, 0.04)', drawBorder: false }, // Grid horizontal extra leve
+                            border: { dash: [4, 4] }, // Grid tracejado
+                            ticks: {
+                                padding: 10,
+                                callback: function(value) {
+                                    return 'R$ ' + (value >= 1000 ? (value/1000).toFixed(1) + 'k' : value);
+                                }
+                            },
+                            beginAtZero: true
+                        }
+                    },
+                    animation: { duration: 1000, easing: 'easeOutQuart' } // Transição suave SaaS
+                }
             });
         }
 
-        // Gráfico Categoria (Donut)
+        // ==========================================
+        // 2. Gráfico de Categorias (Donut)
+        // ==========================================
         const ctxCat = document.getElementById('chartCat');
         if (ctxCat) {
             if (State.chartCat) State.chartCat.destroy();
+            
+            // Paleta de cores moderna (Vercel / Stripe vibe)
+            const modernPalette = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899'];
+            
             State.chartCat = new Chart(ctxCat, {
                 type: 'doughnut',
                 data: {
                     labels: dados.por_categoria.map(d => d.categoria),
                     datasets: [{
                         data: dados.por_categoria.map(d => d.total),
-                        backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']
+                        backgroundColor: modernPalette,
+                        borderWidth: 0, // Sem borda interna para visual contínuo
+                        hoverOffset: 6
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '65%', // Raio interno (Anel elegante)
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                padding: 20,
+                                font: { size: 12, weight: '500' }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            bodyFont: { size: 14, weight: 'bold' },
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    const valor = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.raw);
+                                    // Calcula a porcentagem para exibir na tooltip
+                                    const total = context.chart._metasets[context.datasetIndex].total;
+                                    const perc = ((context.raw / total) * 100).toFixed(1) + '%';
+                                    return ` ${valor} (${perc})`;
+                                }
+                            }
+                        }
+                    },
+                    animation: { animateScale: true, animateRotate: true, duration: 1000, easing: 'easeOutQuart' }
+                }
             });
         }
     },
@@ -621,7 +723,7 @@ const Financeiro = {
         document.getElementById('baixa-id').value = id;
         
         // Define a data padrão como HOJE
-        const hoje = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+        const hoje = new Date().toISOString().split('T')[0]; // Formato YYYY-MM-DD garantido
         document.getElementById('baixa-data').value = hoje;
         
         // Reseta o select para o padrão
@@ -1275,7 +1377,7 @@ const Admin = {
                     <td>${unidadesTags || '<span style="color:var(--text-light);font-size:.8em">—</span>'}</td>
                     <td class="text-right">
                         <button class="btn-icon" onclick="Admin.modalEditarUsuario(${u.id})" title="Editar / Unidades">✏️</button>
-                        <button class="btn-icon" onclick="Admin.modalReset(${u.id}, '${u.nome}')" title="Alterar Senha">🔑</button>
+                        <button class="btn-icon" onclick="Admin.modalReset(${u.id}, '${u.nome.replace(/'/g, "\\'")}')" title="Alterar Senha">🔑</button>
                         ${deleteBtn}
                     </td>`;
                 tbody.appendChild(tr);
@@ -1787,7 +1889,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     if (idx > -1 && idx < ordem.length - 1) {
                         document.getElementById(ordem[idx + 1]).focus();
                     } else if (idx === ordem.length - 1) {
-                        Financeiro.salvar(event.ctrlKey); // Simula comportamento do botão Salvar+Novo
+                        Financeiro.salvar({ type: 'submit', preventDefault: () => {} }); // Enter no último campo → salva e limpa
                     }
                 }
             }
@@ -1823,14 +1925,15 @@ const Mobile = {
     // Inicializar FullCalendar em modo listWeek no mobile
     patchCalendarForMobile() {
         if (!this.isMobile()) return;
-        // Sobrescreve o método renderizarCalendario para usar listWeek
-        const origRender = Dashboard.renderizarCalendario.bind(Dashboard);
+        // Guarda a instância numa variável de closure — sem poluir o elemento DOM
+        let mobileCalendarInstance = null;
         Dashboard.renderizarCalendario = function(eventos) {
             const calendarEl = document.getElementById('calendar');
             if (!calendarEl || typeof FullCalendar === 'undefined') return;
 
-            if (calendarEl._fullCalendar) {
-                calendarEl._fullCalendar.destroy();
+            if (mobileCalendarInstance) {
+                mobileCalendarInstance.destroy();
+                mobileCalendarInstance = null;
             }
 
             const calendar = new FullCalendar.Calendar(calendarEl, {
@@ -1845,7 +1948,7 @@ const Mobile = {
                 }))
             });
             calendar.render();
-            calendarEl._fullCalendar = calendar;
+            mobileCalendarInstance = calendar;
         };
     },
 
