@@ -999,12 +999,6 @@ const Fluxo = {
                         <td><span class="category-badge">${mov.categoria || '-'}</span></td>
                         <td class="text-right font-weight-bold ${cor}">${sinal} ${Utils.formatarMoedaBRL(mov.valor)}</td>
                         <td class="no-print"></td>`;
-                    // SEGURANÇA: nome via dataset evita quebra com aspas (ex: João D'Avila) e XSS
-                const btnReset = tr.querySelector('.btn-reset-senha');
-                btnReset.dataset.nome = u.nome;
-                btnReset.addEventListener('click', function () {
-                    Admin.modalReset(parseInt(this.dataset.id), this.dataset.nome);
-                });
 
                 tbody.appendChild(tr);
                 });

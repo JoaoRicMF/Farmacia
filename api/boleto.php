@@ -6,7 +6,14 @@ require_once 'utils.php';
 require_once 'MoneyUtils.php';
 require_once '../config/database.php'; // Necessário para consultar a tabela de assinaturas
 
-inicializarApi();
+// Evita "session already started" quando boleto.php é incluído por outros arquivos
+// (ex: fluxo.php usa require_once e já pode ter iniciado a sessão antes)
+if (session_status() === PHP_SESSION_NONE) {
+    inicializarApi();
+} else {
+    // Sessão já ativa: apenas configura os headers JSON sem chamar session_start()
+    header("Content-Type: application/json; charset=UTF-8");
+}
 
 $input = getJsonInput();
 $rawCode = $input->codigo ?? '';

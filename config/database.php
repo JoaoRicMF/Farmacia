@@ -153,8 +153,15 @@ class Database {
                 nome VARCHAR(150) NOT NULL,
                 cnpj VARCHAR(20), 
                 telefone VARCHAR(20),
-                categoriaPadrao VARCHAR(100)
+                categoriaPadrao VARCHAR(100),
+                assinatura VARCHAR(50)
             ) ENGINE=InnoDB;");
+
+            // Migração: Adiciona coluna assinatura em instâncias já existentes
+            $checkAssinatura = $this->conn->query("SHOW COLUMNS FROM `fornecedor` LIKE 'assinatura'");
+            if ($checkAssinatura->rowCount() == 0) {
+                $this->conn->exec("ALTER TABLE `fornecedor` ADD COLUMN assinatura VARCHAR(50) DEFAULT NULL;");
+            }
 
             // 5. Fluxo
             $this->conn->exec("CREATE TABLE IF NOT EXISTS entradacaixa (

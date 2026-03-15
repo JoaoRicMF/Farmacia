@@ -23,6 +23,7 @@ try {
 
     $tipo = $_GET['tipo'] ?? 'financeiro';
     $mesFiltro = $_GET['mes'] ?? date('Y-m');
+    $idUnidade = $_SESSION['id_unidade_ativa'] ?? null;
 
     // Cabeçalhos para Download CSV
     header('Content-Encoding: UTF-8');
@@ -45,7 +46,7 @@ try {
 
         // >>> USANDO A LÓGICA CENTRALIZADA <<<
         // Agora, se mudarmos a regra no fluxo.php, o Excel atualiza automaticamente.
-        $dados = obterMovimentacoesFluxo($db, $ano, $mesNum);
+        $dados = obterMovimentacoesFluxo($db, $ano, $mesNum, $idUnidade);
 
         // Como a função retorna decrescente (para UI), invertemos para o Excel (crescente) se desejar
         // usort($dados, function($a, $b) { return strtotime($a['data']) - strtotime($b['data']); });
