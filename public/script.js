@@ -1288,29 +1288,32 @@ const Admin = {
 
     // ── Modal Editar Usuário + Unidades ──────────────────────────────────────
     async modalEditarUsuario(idUsuario) {
-        // Busca todos dados do usuário
+        // Busca todos os dados dos usuários
         const usuarios = await API.request('admin.php?resource=usuarios');
         if (!usuarios) return;
         const u = usuarios.find(x => x.id == idUsuario);
         if (!u) return;
 
-        // Busca todas as unidades disponíveis
+        // Busca TODAS as unidades da farmácia para criar os checkboxes
         const todasUnidades = await API.request('admin.php?resource=unidades');
 
         const modal = document.getElementById('modal-editar-usuario');
         if (!modal) return;
 
+        // Preenche os dados básicos no formulário
         document.getElementById('edit-user-id').value    = u.id;
         document.getElementById('edit-user-nome').value  = u.nome;
         document.getElementById('edit-user-login').value = u.usuario;
         document.getElementById('edit-user-funcao').value = u.funcao;
 
-        // Renderiza checkboxes de unidades
+        // Renderiza checkboxes de unidades e marca as que o utilizador já tem
         const container = document.getElementById('edit-user-unidades');
         if (container && Array.isArray(todasUnidades)) {
+            // Extrai apenas os IDs das unidades que este utilizador já possui
             const vinculadas = (u.unidades || []).map(x => x.id);
+            
             container.innerHTML = todasUnidades.map(un => `
-                <label style="display:flex;align-items:center;gap:6px;padding:4px 0">
+                <label style="display:flex;align-items:center;gap:6px;padding:4px 0; cursor:pointer;">
                     <input type="checkbox" name="edit-unidade" value="${un.id}"
                         ${vinculadas.includes(un.id) ? 'checked' : ''}>
                     ${un.nome}
@@ -1332,18 +1335,23 @@ const Admin = {
 
         if (!nome || !login) return UI.showToast('Nome e login são obrigatórios.', 'error');
 
-        // Coleta unidades marcadas
+        // Coleta TODAS as unidades que o Admin deixou marcadas no modal
         const checks   = document.querySelectorAll('input[name="edit-unidade"]:checked');
         const unidades = Array.from(checks).map(c => parseInt(c.value));
-        if (unidades.length === 0) return UI.showToast('Selecione ao menos uma unidade.', 'error');
+        
+        if (unidades.length === 0) {
+            return UI.showToast('O utilizador precisa de ter acesso a pelo menos uma unidade.', 'error');
+        }
 
+        // Envia para o PHP a array de "unidades" recém-escolhida
         const res = await API.request('admin.php?action=editar', 'POST', { id, nome, login, funcao, unidades });
+        
         if (res?.success) {
-            UI.showToast('Usuário atualizado!');
+            UI.showToast('Acessos do utilizador atualizados!');
             Admin.fecharModalEditarUsuario();
-            Admin.carregarUsuarios();
+            Admin.carregarUsuarios(); // Atualiza a tabela imediatamente
         } else {
-            UI.showToast(res?.message || 'Erro ao salvar.', 'error');
+            UI.showToast(res?.message || 'Erro ao guardar.', 'error');
         }
     },
 

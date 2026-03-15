@@ -83,10 +83,11 @@
             <div class="menu-item" onclick="nav('config', this)">
                 <i data-lucide="settings"></i> <span>Configurações</span>
             </div>
-            <div class="sidebar-unit-selector" style="padding: 10px 20px; border-bottom: 1px solid var(--border);">
+            
+            <div id="seletor-unidade-wrapper" class="sidebar-unit-selector" style="padding: 10px 20px; border-bottom: 1px solid var(--border); display: none;">
                 <label for="seletor-unidade" style="font-size: 0.75rem; color: var(--text-light);">Unidade Ativa</label>
                 <select id="seletor-unidade" onchange="trocarUnidadeAtual(this.value)" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-main); font-weight: 600; margin-top: 5px;">
-                    </select>
+                </select>
             </div>
         </nav>
 
@@ -658,7 +659,28 @@
 
                 <hr style="border: 0; border-top: 1px solid var(--border); margin: 20px 0;">
 
-                <h4>➕ Cadastrar Novo</h4>
+                <div class="card admin-only mt-4" style="border-left: 5px solid var(--primary);">
+                    <h3>🏢 Gestão de Unidades</h3>
+                    <p style="color: var(--text-light); font-size: 0.9rem; margin-bottom: 15px;">
+                        Crie e gerencie as unidades da farmácia.
+                    </p>
+                    <div class="form-row">
+                        <div class="half-width" style="display:flex; align-items: flex-end; gap: 10px;">
+                            <div style="flex-grow: 1;">
+                                <label for="nova-unidade-nome">Nome da Nova Unidade</label>
+                                <input type="text" id="nova-unidade-nome" placeholder="Ex: Filial Centro">
+                            </div>
+                            <button class="btn btn-primary" onclick="criarUnidade()" style="margin-bottom: 2px;">➕ Criar</button>
+                        </div>
+                    </div>
+                    <div style="max-height: 200px; overflow-y: auto; margin-top: 15px; border: 1px solid var(--border); border-radius: 8px;">
+                        <table style="width:100%; font-size: 0.9rem;">
+                            <tbody id="tabela-unidades"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <h4>➕ Cadastrar Novo Usuário</h4>
                 <div class="form-row">
                     <div class="half-width">
                         <label for="novo-user-nome">Nome Completo</label>
@@ -669,7 +691,6 @@
                         <input type="text" id="novo-user-login" placeholder="Ex: maria.silva">
                     </div>
                 </div>
-
                 <div class="form-row">
                     <div class="half-width">
                         <label for="novo-user-senha">Senha Inicial</label>
@@ -683,11 +704,17 @@
                         </select>
                     </div>
                 </div>
-
+                <div class="form-row">
+                    <div class="full-width">
+                        <label>Unidades de Acesso</label>
+                        <div id="novo-unidades-container" data-loaded="false" style="display: flex; gap: 15px; flex-wrap: wrap; background: var(--bg-body); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                            </div>
+                        <small style="color: var(--text-light);">Selecione as unidades que este usuário poderá gerenciar.</small>
+                    </div>
+                </div>
                 <div class="form-actions">
                     <button class="btn btn-primary" onclick="criarNovoUsuario()">Cadastrar Usuário</button>
                 </div>
-            </div>
 
             <div class="card" style="margin-top: 20px;">
                 <h3>👤 Perfil de Acesso</h3>
@@ -944,6 +971,48 @@
             <div class="form-actions" style="margin-top: 25px;">
                 <button class="btn btn-secondary" onclick="Financeiro.fecharModalAssinatura()">Ignorar por enquanto</button>
                 <button class="btn btn-success" onclick="Financeiro.salvarAssinatura()">Vincular Fornecedor</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-editar-usuario" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>✏️ Editar Usuário e Acessos</h2>
+            <button class="close-btn" onclick="fecharModalEditarUsuario()" aria-label="Fechar">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="edit-user-id">
+            <div class="form-row">
+                <div class="half-width">
+                    <label for="edit-user-nome">Nome</label>
+                    <input type="text" id="edit-user-nome">
+                </div>
+                <div class="half-width">
+                    <label for="edit-user-login">Login</label>
+                    <input type="text" id="edit-user-login">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="half-width">
+                    <label for="edit-user-funcao">Função</label>
+                    <select id="edit-user-funcao">
+                        <option value="Operador">Operador</option>
+                        <option value="Admin">Administrador</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="full-width">
+                    <label>Vínculo de Unidades</label>
+                    <div id="edit-user-unidades" style="display: flex; gap: 15px; flex-wrap: wrap; background: var(--bg-body); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+                        </div>
+                </div>
+            </div>
+            <div class="form-actions" style="margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="fecharModalEditarUsuario()">Cancelar</button>
+                <button class="btn btn-primary" onclick="salvarEdicaoUsuario()">Salvar Alterações</button>
             </div>
         </div>
     </div>

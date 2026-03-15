@@ -36,16 +36,15 @@ try {
     // --- LISTAGEM E LEITURA (GET) ---
     if ($method === 'GET') {
         
-        // [CORREÇÃO] Se vier um ID, retorna apenas o registro específico (Para Edição)
         if ($id) {
-            $stmt = $db->prepare("SELECT * FROM financeiro WHERE id = :id");
-            $stmt->execute([':id' => $id]);
+            $stmt = $db->prepare("SELECT * FROM financeiro WHERE id = :id AND id_unidade = :unidade");
+            $stmt->execute([':id' => $id, ':unidade' => $_SESSION['id_unidade_ativa']]);
             $registro = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($registro) {
-                enviarResponse($registro); // Encerra aqui retornando o objeto {id: 1, ...}
+                enviarResponse($registro);
             } else {
-                throw new Exception("Registro não encontrado.", 404);
+                throw new Exception("Registro não encontrado ou acesso negado.", 404);
             }
         }
 
@@ -132,11 +131,11 @@ try {
             $db->beginTransaction();
 
             // 1. Busca dados do título
-            $stmtGet = $db->prepare("SELECT descricao, valor FROM financeiro WHERE id = :id AND status != 'Pago'");
-            $stmtGet->execute([':id' => $idBaixa]);
+            $stmtGet = $db->prepare("SELECT descricao, valor FROM financeiro WHERE id = :id AND status != 'Pago' AND id_unidade = :unidade");
+            $stmtGet->execute([':id' => $idBaixa, ':unidade' => $_SESSION['id_unidade_ativa']]);
             $titulo = $stmtGet->fetch(PDO::FETCH_ASSOC);
 
-            if (!$titulo) throw new Exception("Título não encontrado ou já pago.");
+            if (!$titulo) throw new Exception("Título não encontrado, já pago ou acesso negado.");
 
             // 2. Registra a Saída no Caixa com a DATA RETROATIVA CORRETA
             // Concatenamos a forma de pagamento na descrição
@@ -235,10 +234,15 @@ try {
         $idDel = $id ?? json_decode(file_get_contents("php://input"))->id ?? null;
         if (!$idDel) throw new Exception("ID não fornecido");
 
-        $stmt = $db->prepare("DELETE FROM financeiro WHERE id = :id");
-        $stmt->execute([':id' => $idDel]);
+        // CORREÇÃO: Garante que só exclui se for da unidade atual
+        $stmt = $db->prepare("DELETE FROM financeiro WHERE id = :id AND id_unidade = :unidade");
+        $stmt->execute([':id' => $idDel, ':unidade' => $_SESSION['id_unidade_ativa']]);
+        
+        if($stmt->rowCount() === 0) {
+            throw new Exception("Registo não encontrado ou sem permissão para exclusão.", 403);
+        }
+        
         registrarLog($db, $userNome, "Excluir Financeiro", "ID: $idDel");
-
         $response = ['success' => true, 'message' => 'Registro excluído'];
     }
 
