@@ -1912,6 +1912,32 @@ const Mobile = {
         return window.innerWidth <= 640;
     },
 
+    setupKeyboardFix() {
+        if (!this.isMobile() || !window.visualViewport) return;
+
+        const tabBar = document.getElementById('mobile-tab-bar');
+        const drawer = document.getElementById('mobile-menu-drawer');
+        const initialHeight = window.visualViewport.height;
+
+        window.visualViewport.addEventListener('resize', () => {
+            const appScreen = document.getElementById('app-screen');
+            // Se não estivermos dentro do app (ex: tela de login), ignora
+            if (!appScreen || appScreen.classList.contains('hidden')) return;
+
+            // Se a altura visual diminuiu significativamente (teclado abriu)
+            if (window.visualViewport.height < initialHeight - 100) {
+                if (tabBar) tabBar.style.display = 'none';
+                // Esconde a gaveta também, caso o usuário tenha clicado em um input dentro dela
+                if (drawer && !drawer.classList.contains('hidden')) {
+                    closeMobileMenu();
+                }
+            } else {
+                // Teclado fechou, restaura a barra inferior
+                if (tabBar) tabBar.style.display = 'flex';
+            }
+        });
+    },
+
     // Sincroniza tabs da bottom bar com a navegação
     syncTabBar(telaId) {
         const tabMap = {
@@ -2074,6 +2100,9 @@ const Mobile = {
     init() {
         if (!this.isMobile()) return;
         this.patchCalendarForMobile();
+
+        // 2. CHAME A FUNÇÃO AQUI:
+        this.setupKeyboardFix();
 
         // Hide tab bar on login screen, show on app
         const tabBar = document.getElementById('mobile-tab-bar');
