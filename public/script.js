@@ -999,7 +999,14 @@ const Fluxo = {
                         <td><span class="category-badge">${mov.categoria || '-'}</span></td>
                         <td class="text-right font-weight-bold ${cor}">${sinal} ${Utils.formatarMoedaBRL(mov.valor)}</td>
                         <td class="no-print"></td>`;
-                    tbody.appendChild(tr);
+                    // SEGURANÇA: nome via dataset evita quebra com aspas (ex: João D'Avila) e XSS
+                const btnReset = tr.querySelector('.btn-reset-senha');
+                btnReset.dataset.nome = u.nome;
+                btnReset.addEventListener('click', function () {
+                    Admin.modalReset(parseInt(this.dataset.id), this.dataset.nome);
+                });
+
+                tbody.appendChild(tr);
                 });
             } else {
                 tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nenhuma movimentação.</td></tr>';
@@ -1377,9 +1384,16 @@ const Admin = {
                     <td>${unidadesTags || '<span style="color:var(--text-light);font-size:.8em">—</span>'}</td>
                     <td class="text-right">
                         <button class="btn-icon" onclick="Admin.modalEditarUsuario(${u.id})" title="Editar / Unidades">✏️</button>
-                        <button class="btn-icon" onclick="Admin.modalReset(${u.id}, '${u.nome.replace(/'/g, "\\'")}')" title="Alterar Senha">🔑</button>
+                        <button class="btn-icon btn-reset-senha" data-id="${u.id}" title="Alterar Senha">🔑</button>
                         ${deleteBtn}
                     </td>`;
+                // SEGURANÇA: nome via dataset evita quebra com aspas (ex: João D'Avila) e XSS
+                const btnReset = tr.querySelector('.btn-reset-senha');
+                btnReset.dataset.nome = u.nome;
+                btnReset.addEventListener('click', function () {
+                    Admin.modalReset(parseInt(this.dataset.id), this.dataset.nome);
+                });
+
                 tbody.appendChild(tr);
             });
         }

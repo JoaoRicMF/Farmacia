@@ -69,10 +69,21 @@ try {
 
         fputcsv($output, ['ID', 'Vencimento', 'Descrição', 'Valor', 'Categoria', 'Status', 'Código Barras'], ';');
 
-        $sql = "SELECT id, vencimento, descricao, valor, categoria, status, codigo_barras FROM financeiro";
-        $params = [];
+        // SEGURANÇA: Garante que a exportação é sempre isolada pela unidade ativa da sessão.
+        // Sem este filtro, qualquer usuário autenticado exportaria dados de TODAS as unidades.
+        $unidadeExport = $_SESSION['id_unidade_ativa'] ?? null;
+        if (!$unidadeExport) {
+            http_response_code(403);
+            exit('Nenhuma unidade ativa na sessão.');
+        }
+
+        $sql = "SELECT id, vencimento, descricao, valor, categoria, status, codigo_barras 
+                FROM financeiro 
+                WHERE id_unidade = :unidade";
+        $params = [':unidade' => $unidadeExport];
+
         if ($mesFiltro) {
-            $sql .= " WHERE DATE_FORMAT(vencimento, '%Y-%m') = :mes";
+            $sql .= " AND DATE_FORMAT(vencimento, '%Y-%m') = :mes";
             $params[':mes'] = $mesFiltro;
         }
         $sql .= " ORDER BY vencimento";

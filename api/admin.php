@@ -301,7 +301,7 @@ try {
             $db->beginTransaction();
             try {
                 // Remove dados vinculados ANTES de remover a unidade
-                foreach (['financeiro', 'saidacaixa', 'entradacaixa', 'categorias'] as $tabela) {
+                foreach (['financeiro', 'saidacaixa', 'entradacaixa', 'categorias', 'fornecedor'] as $tabela) {
                     $db->prepare("DELETE FROM $tabela WHERE id_unidade = :un")
                     ->execute([':un' => $idUn]);
                 }
