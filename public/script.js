@@ -2242,48 +2242,105 @@ window.addEventListener('resize', () => {
 /* ==========================================================================
    MÓDULO: LEITOR DE CÓDIGO DE BARRAS (CÂMERA)
    ========================================================================== */
+/* ==========================================================================
+   MÓDULO: LEITOR DE CÓDIGO DE BARRAS (CÂMERA)
+   ========================================================================== */
 let html5QrCode;
+let scannerStreamTrack = null;
+let isTorchOn = false;
 
 window.abrirScanner = function() {
     const modal = document.getElementById('modal-scanner');
     modal.classList.remove('hidden');
 
-    // Inicializa a biblioteca
+    // Reseta estado dos controles
+    const btnTorch = document.getElementById('btn-torch');
+    const zoomSlider = document.getElementById('zoom-slider');
+    isTorchOn = false;
+    
+    if (btnTorch) {
+        btnTorch.disabled = true;
+        btnTorch.classList.replace('btn-primary', 'btn-secondary');
+    }
+    if (zoomSlider) {
+        zoomSlider.disabled = true;
+        zoomSlider.value = 1;
+    }
+
+    // Previne instâncias duplicadas (trava da câmera)
+    if (html5QrCode) {
+        try { html5QrCode.clear(); } catch(e){}
+    }
+
     html5QrCode = new Html5Qrcode("reader");
 
-    // Configuração para priorizar a leitura de código de barras lineares (1D)
+    // Configuração EXATA para Boletos Bancários Brasileiros
     const config = { 
-        fps: 10, 
-        qrbox: { width: window.innerWidth > 600 ? 350 : 250, height: 100 },
-        aspectRatio: 1.0,
+        fps: 15,
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+            // Cria um retângulo de leitura muito mais largo que alto
+            // Isso previne que a câmera tente ler o centro e ignore as bordas do boleto
+            return {
+                width: Math.floor(viewfinderWidth * 0.95),
+                height: 120 
+            };
+        },
+        aspectRatio: 1.0, // Força a câmera a não achatar em algumas telas
         formatsToSupport: [
-            Html5QrcodeSupportedFormats.ITF,       // Padrão de boletos brasileiros (Interleaved 2 of 5)
-            Html5QrcodeSupportedFormats.CODE_128,  // Algumas faturas
-            Html5QrcodeSupportedFormats.CODE_39
-        ]
+            Html5QrcodeSupportedFormats.ITF,       // Padrão de Boletos Bancários
+            Html5QrcodeSupportedFormats.CODE_128,  // Algumas Faturas
+            Html5QrcodeSupportedFormats.EAN_13     // Produtos comuns
+        ],
+        experimentalFeatures: {
+            // MÁGICA: Usa a API nativa do Celular (Android) no lugar de cálculos em Javascript. 
+            // É de 5 a 10x mais rápido para focar e ler o ITF.
+            useBarCodeDetectorIfSupported: true 
+        }
     };
 
-    // Abre a câmera traseira do telemóvel
-    html5QrCode.start({ facingMode: "environment" }, config,
+    html5QrCode.start(
+        { facingMode: "environment" }, 
+        config,
         (decodedText, decodedResult) => {
-            // SUCESSO na leitura!
-            UI.showToast("Código lido com sucesso!", "success");
-            
-            // Preenche o input
+            UI.showToast("Código detectado!", "success");
             document.getElementById('boleto-cod').value = decodedText;
-            
-            // Fecha a câmera
             fecharScanner();
-            
-            // Dispara a lógica que você já tem pronta que vai à API descodificar o boleto
             Financeiro.lerCodigoBarras();
         },
         (errorMessage) => {
-            // Ignora os erros de leitura constantes enquanto a câmera tenta focar
+            // Erros contínuos de não-encontro do código rodarão em silêncio.
         }
-    ).catch((err) => {
-        console.error("Erro ao abrir a câmera", err);
-        UI.showToast("Erro ao aceder à câmera. Verifique as permissões.", "error");
+    ).then(() => {
+        // Câmera iniciada! Vamos extrair o link com o hardware para habilitar controles
+        const video = document.querySelector("#reader video");
+        if (video && video.srcObject) {
+            const tracks = video.srcObject.getVideoTracks();
+            if (tracks.length > 0) {
+                scannerStreamTrack = tracks[0];
+                const capabilities = scannerStreamTrack.getCapabilities();
+
+                // Habilita a lanterna (Se o aparelho permitir)
+                if (capabilities.torch && btnTorch) {
+                    btnTorch.disabled = false;
+                }
+
+                // Habilita e calibra o Zoom
+                if (capabilities.zoom && zoomSlider) {
+                    zoomSlider.disabled = false;
+                    zoomSlider.min = capabilities.zoom.min || 1;
+                    zoomSlider.max = capabilities.zoom.max || 3;
+                    zoomSlider.step = capabilities.zoom.step || 0.1;
+                    
+                    // Um leve zoom de 1.5x ajuda massivamente com boletos pequenos
+                    let zoomInicial = Math.min(1.5, capabilities.zoom.max);
+                    zoomSlider.value = zoomInicial;
+                    mudarZoom(zoomInicial);
+                }
+            }
+        }
+    }).catch((err) => {
+        console.error("Erro na Câmera:", err);
+        UI.showToast("Erro ao aceder à câmera ou permissão negada.", "error");
     });
 };
 
@@ -2291,15 +2348,81 @@ window.fecharScanner = function() {
     const modal = document.getElementById('modal-scanner');
     if (html5QrCode && html5QrCode.isScanning) {
         html5QrCode.stop().then(() => {
+            html5QrCode.clear();
             modal.classList.add('hidden');
+            scannerStreamTrack = null;
         }).catch(err => {
-            console.error("Erro ao parar a câmera", err);
             modal.classList.add('hidden');
         });
     } else {
         modal.classList.add('hidden');
     }
 };
+
+window.toggleLanterna = function() {
+    if (!scannerStreamTrack) return;
+    isTorchOn = !isTorchOn;
+    
+    scannerStreamTrack.applyConstraints({
+        advanced: [{ torch: isTorchOn }]
+    }).then(() => {
+        const btn = document.getElementById('btn-torch');
+        if (isTorchOn) {
+            btn.classList.replace('btn-secondary', 'btn-primary'); // Fica azul quando liga
+        } else {
+            btn.classList.replace('btn-primary', 'btn-secondary'); // Volta ao cinza
+        }
+    }).catch(err => {
+        UI.showToast("A lanterna não é suportada ou está bloqueada neste dispositivo.", "warning");
+        isTorchOn = !isTorchOn; // Reverte o estado em caso de falha
+    });
+};
+
+window.mudarZoom = function(valor) {
+    if (!scannerStreamTrack) return;
+    scannerStreamTrack.applyConstraints({
+        advanced: [{ zoom: parseFloat(valor) }]
+    }).catch(err => console.warn("Erro ao aplicar zoom:", err));
+};
+
+// Evento Global para Feedback de Foco e Autofocus manual
+document.addEventListener('click', function(e) {
+    const reader = document.getElementById('reader');
+    
+    // Verifica se tocou DE FATO dentro da tela do vídeo e se a câmera está rodando
+    if (reader && reader.contains(e.target) && scannerStreamTrack) {
+        
+        // 1. Criar Efeito visual do "Anel de Foco" (Idêntico ao app nativo de câmera)
+        const rect = reader.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const focusRing = document.createElement('div');
+        focusRing.className = 'focus-ring';
+        focusRing.style.left = `${x - 30}px`;
+        focusRing.style.top = `${y - 30}px`;
+        reader.appendChild(focusRing);
+        
+        // Inicia a animação CSS em 10ms e destrói o elemento em 800ms
+        setTimeout(() => { focusRing.classList.add('active'); }, 10);
+        setTimeout(() => { focusRing.remove(); }, 800);
+
+        // 2. Comunicar ao Hardware para forçar o foco automático naquele instante
+        const capabilities = scannerStreamTrack.getCapabilities();
+        if (capabilities.focusMode && capabilities.focusMode.includes('single-shot')) {
+            scannerStreamTrack.applyConstraints({
+                advanced: [{ focusMode: "single-shot" }]
+            }).then(() => {
+                // Após o "single-shot" tentar recuperar a área, volta o hardware para o scan contínuo
+                setTimeout(() => {
+                    if (capabilities.focusMode.includes('continuous')) {
+                        scannerStreamTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+                    }
+                }, 1000);
+            }).catch(err => console.warn("Foco forçado não suportado pela lente.", err));
+        }
+    }
+});
 
 
 window.gerarPDF = function(tipo) {

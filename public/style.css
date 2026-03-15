@@ -1906,3 +1906,48 @@ input[type="month"]::-webkit-calendar-picker-indicator:hover {
 .view-section:not(.hidden) {
     animation: fadeInSlide 0.4s ease-out;
 }
+
+/* ==========================================================================
+   MÓDULO DE CÂMERA (CONTROLES E FOCO)
+   ========================================================================== */
+.scanner-controls input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    height: 6px;
+    border-radius: 4px;
+    background-color: var(--border);
+    outline: none;
+    border: none;
+    box-shadow: none;
+}
+
+.scanner-controls input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Anel de Animação de Foco na Câmera */
+.focus-ring {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    border: 2px solid var(--success);
+    border-radius: 50%;
+    pointer-events: none;
+    transform: scale(1.5);
+    opacity: 0;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+    z-index: 100;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+.focus-ring.active {
+    transform: scale(1);
+    opacity: 1;
+}
