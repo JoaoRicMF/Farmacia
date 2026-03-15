@@ -19,6 +19,7 @@
     <meta name="theme-color" content="#2563eb">
     <link rel="apple-touch-icon" href="img/icon-192.png">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 
 <body>
@@ -291,7 +292,7 @@
 
                 <div class="fluxo-header-actions" style="display: flex; gap: 10px; align-items: center;">
                     <input type="month" id="filtro-mes-fluxo" class="periodo-select" onchange="carregarFluxo()" aria-label="Filtrar Mês">
-                    <button class="btn btn-secondary" onclick="window.print()" title="Salvar como PDF (Imprimir)">🖨️ PDF</button>
+                    <button class="btn btn-secondary" onclick="gerarPDF('fluxo')" title="Salvar como PDF (Baixar)">🖨️ Baixar PDF</button>
                     <button class="btn btn-success" onclick="baixarExcelFluxo()">📊 Baixar Excel</button>
                 </div>
             </div>
@@ -493,7 +494,7 @@
 
                 <div style="display:flex; gap:10px">
                     <button class="btn btn-secondary" onclick="window.print()">🖨️ PDF</button>
-                    <button class="btn btn-success" onclick="baixarExcelFluxo()">📊 Exportar CSV</button>
+                    <button class="btn btn-secondary" onclick="gerarPDF('lista')">🖨️ Baixar PDF</button>
                 </div>
             </div>
 

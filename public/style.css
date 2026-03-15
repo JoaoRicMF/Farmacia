@@ -675,6 +675,7 @@ tr.row-proximo td { background-color: rgba(245, 158, 11, 0.05) !important; }
     background: var(--bg-card); width: 95%; max-width: 600px;
     border-radius: 16px; box-shadow: var(--shadow-lg);
     animation: slideUp 0.3s ease; overflow: hidden;
+    overscroll-behavior: contain;
 }
 .modal-header {
     padding: 20px; border-bottom: 1px solid var(--border);
@@ -1627,6 +1628,11 @@ table td:last-child .btn-trash svg {
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
         padding-bottom: 4px !important;
+        
+        /* ADICIONE ESTAS LINHAS: Cria o efeito de esmaecimento (Fade) na direita */
+        -webkit-mask-image: linear-gradient(to right, black 80%, transparent 100%);
+        mask-image: linear-gradient(to right, black 80%, transparent 100%);
+        padding-right: 30px !important; /* Adiciona espaço extra no fim para o scroll ir até o fim visível */
     }
     .period-filter-row::-webkit-scrollbar { display: none; }
 

@@ -2301,6 +2301,68 @@ window.fecharScanner = function() {
     }
 };
 
+
+window.gerarPDF = function(tipo) {
+    UI.showToast("Gerando PDF, aguarde...", "success");
+    
+    let elementoOrigem;
+    let nomeArquivo;
+    let tituloRelatorio;
+
+    if (tipo === 'fluxo') {
+        elementoOrigem = document.getElementById('tabela-fluxo');
+        nomeArquivo = 'Fluxo_de_Caixa.pdf';
+        tituloRelatorio = 'Relatório - Fluxo de Caixa';
+    } else if (tipo === 'lista') {
+        elementoOrigem = document.getElementById('tabela-registros');
+        nomeArquivo = 'Registros_Financeiros.pdf';
+        tituloRelatorio = 'Relatório - Registros';
+    }
+
+    if (!elementoOrigem) return;
+
+    // 1. Clonar a tabela para não destruir a interface original do utilizador
+    const clone = elementoOrigem.cloneNode(true);
+    
+    // 2. Limpar o clone (Remover colunas de "Ações" e elementos no-print)
+    const noPrintElements = clone.querySelectorAll('.no-print, td:last-child, th:last-child');
+    noPrintElements.forEach(el => el.remove());
+
+    // 3. Criar um container bonito para o PDF
+    const containerPdf = document.createElement('div');
+    containerPdf.style.padding = '20px';
+    containerPdf.style.fontFamily = 'Inter, sans-serif';
+    containerPdf.innerHTML = `
+        <h2 style="text-align: center; color: #334155; margin-bottom: 20px;">Farmácia Nova Farma</h2>
+        <h3 style="text-align: center; color: #64748b; margin-bottom: 30px;">${tituloRelatorio}</h3>
+    `;
+    
+    // 4. Formatar a tabela clonada para impressão
+    clone.style.width = '100%';
+    clone.style.borderCollapse = 'collapse';
+    clone.querySelectorAll('th, td').forEach(celula => {
+        celula.style.border = '1px solid #e2e8f0';
+        celula.style.padding = '10px';
+        celula.style.textAlign = 'left';
+        celula.style.fontSize = '12px';
+    });
+
+    containerPdf.appendChild(clone);
+
+    // 5. Configurar e invocar a biblioteca
+    const opt = {
+        margin:       10,
+        filename:     nomeArquivo,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+
+    html2pdf().set(opt).from(containerPdf).save().then(() => {
+        UI.showToast("PDF descarregado com sucesso!", "success");
+    });
+};
+
 /* Mobile module exposed globally */
 window.Mobile = Mobile;
 
