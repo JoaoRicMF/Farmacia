@@ -336,7 +336,10 @@ const Dashboard = {
                 'card-pagar-mes': dados.cards.pagar_mes,
                 'card-pago-mes': dados.cards.pago_mes,
                 'card-vencidos-val': dados.cards.vencidos_val,
-                'card-proximos-val': dados.cards.proximos_val
+                'card-proximos-val': dados.cards.proximos_val,
+                'card-fluxo-saldo': dados.cards.saldo_mes,
+                'card-fluxo-ent': dados.cards.entradas_mes,
+                'card-fluxo-sai': dados.cards.saidas_totais_mes
             };
             for (const [id, val] of Object.entries(map)) {
                 const el = document.getElementById(id);

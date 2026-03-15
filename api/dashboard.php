@@ -31,22 +31,19 @@ try {
     elseif ($periodo == '1y') $dataInicio = date('Y-m-d', strtotime('-365 days'));
     elseif ($periodo == 'all') $dataInicio = '1900-01-01';
 
-    // --- CORREÇÃO 1: Consultar a tabela correta (entradacaixa) ---
-    // Total Entradas Mês Atual
-    $stmt = $db->prepare("SELECT SUM(valor) as total FROM entradacaixa WHERE id_unidade = :u AND MONTH(dataRegistro) = MONTH(CURRENT_DATE()) AND YEAR(dataRegistro) = YEAR(CURRENT_DATE())");
-    $stmt->execute([':u' => $idUnidade]);
+    // --- CORREÇÃO 1: Consultar a tabela correta (entradacaixa) filtrada pelo período ---
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM entradacaixa WHERE id_unidade = :u AND DATE(dataRegistro) >= :inicio");
+    $stmt->execute([':u' => $idUnidade, ':inicio' => $dataInicio]);
     $entradasMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
-    // --- CORREÇÃO 2: Tabela em minúsculo (saidacaixa) ---
-    // Total Saídas Caixa Mês Atual
-    $stmt = $db->prepare("SELECT SUM(valor) as total FROM saidacaixa WHERE id_unidade = :u AND MONTH(dataRegistro) = MONTH(CURRENT_DATE()) AND YEAR(dataRegistro) = YEAR(CURRENT_DATE())");
-    $stmt->execute([':u' => $idUnidade]);
+    // --- CORREÇÃO 2: Tabela em minúsculo (saidacaixa) filtrada pelo período ---
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM saidacaixa WHERE id_unidade = :u AND DATE(dataRegistro) >= :inicio");
+    $stmt->execute([':u' => $idUnidade, ':inicio' => $dataInicio]);
     $saidasCaixaMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
-    // --- CORREÇÃO 3: Tabela em minúsculo (financeiro) ---
-    // Total Financeiro Pago Mês Atual
-    $stmt = $db->prepare("SELECT SUM(valor) as total FROM financeiro WHERE id_unidade = :u AND status = 'Pago' AND MONTH(data_processamento) = MONTH(CURRENT_DATE()) AND YEAR(data_processamento) = YEAR(CURRENT_DATE())");
-    $stmt->execute([':u' => $idUnidade]);
+    // --- CORREÇÃO 3: Tabela em minúsculo (financeiro) filtrada pelo período ---
+    $stmt = $db->prepare("SELECT SUM(valor) as total FROM financeiro WHERE id_unidade = :u AND status = 'Pago' AND DATE(data_processamento) >= :inicio");
+    $stmt->execute([':u' => $idUnidade, ':inicio' => $dataInicio]);
     $contasPagasMes = (float)($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
 
     // Totais Consolidados
