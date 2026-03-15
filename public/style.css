@@ -539,6 +539,8 @@ input:focus, select:focus {
 .search-box { flex: 2; min-width: 250px; }
 .filters { flex: 3; display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .filters > * { flex: 1; min-width: 130px; }
+.mobile-filter-row { display: flex; flex-direction: row; gap: 10px; flex: 2; }
+.mobile-filter-row select { flex: 1; min-width: 0; }
 
 /* ==========================================================================
    9. MÓDULO: LOGIN
@@ -1263,16 +1265,15 @@ table td:last-child .btn-trash svg {
         width: 100%;
     }
     .mobile-filter-row {
-    display: flex !important;
-    flex-direction: row !important;
+    display: flex;
+    flex-direction: row;
     align-items: center;
     gap: 10px;
-    flex: 2; /* Dá espaço duplo para caberem os dois selects */
+    flex: 2;
     }
 
     .mobile-filter-row select {
-        flex: 1; /* Divide o espaço 50/50 entre Status e Categoria */
-        width: 100%;
+        flex: 1;
         margin: 0;
     }
 
