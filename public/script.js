@@ -823,7 +823,8 @@ const Financeiro = {
         // Salva diretamente via endpoint de fornecedores
         const res = await API.request('assinaturas.php', 'POST', {
             assinatura: assinatura,
-            nome: nome
+            nome: nome,
+            categoria: categoria
         });
 
         btn.innerText = txtOriginal; 
@@ -835,6 +836,8 @@ const Financeiro = {
             // Preenche magicamente a tela principal de Novo Lançamento
             document.getElementById('boleto-desc').value = nome;
             if (categoria) document.getElementById('boleto-cat').value = categoria;
+
+            Config.carregarFornecedores().then(() => Config.renderizarFornecedores());
             
             Financeiro.fecharModalAssinatura();
         } else {

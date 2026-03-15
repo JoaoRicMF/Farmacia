@@ -7,7 +7,7 @@ session_start();
 
 include_once '../config/database.php';
 
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['id_unidade_ativa'])) {
     http_response_code(401);
     echo json_encode(["error" => "Não autorizado"]);
     exit;
@@ -32,20 +32,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    $idUnidade = $_SESSION['id_unidade_ativa'];
+    $categoria = $data['categoria'] ?? null;
+
     try {
-        // Insere a nova assinatura. Se ela já existir, atualiza o nome vinculado.
-        $stmt = $db->prepare("
+        $db->beginTransaction();
+
+        // 1. Guarda a assinatura para o motor adivinhar o boleto no futuro
+        $stmt1 = $db->prepare("
             INSERT INTO boleto_assinaturas (assinatura, nome_fornecedor) 
             VALUES (:ass, :nome) 
             ON DUPLICATE KEY UPDATE nome_fornecedor = VALUES(nome_fornecedor)
         ");
+        $stmt1->execute([':ass' => $data['assinatura'], ':nome' => $data['nome']]);
+
+        // 2. Verifica se o fornecedor já existe na tabela de Configurações
+        $stmtCheck = $db->prepare("SELECT id FROM fornecedor WHERE nome = :nome AND id_unidade = :u");
+        $stmtCheck->execute([':nome' => $data['nome'], ':u' => $idUnidade]);
         
-        if ($stmt->execute([':ass' => $data['assinatura'], ':nome' => $data['nome']])) {
-            echo json_encode(["success" => true]);
-        } else {
-            echo json_encode(["success" => false, "message" => "Falha ao salvar a assinatura"]);
+        // 3. Se não existir, cria o fornecedor oficial para aparecer nas configurações!
+        if ($stmtCheck->rowCount() == 0) {
+            $stmt2 = $db->prepare("INSERT INTO fornecedor (nome, categoriaPadrao, id_unidade) VALUES (:nome, :cat, :u)");
+            $stmt2->execute([
+                ':nome' => $data['nome'], 
+                ':cat'  => $categoria, 
+                ':u'    => $idUnidade
+            ]);
         }
+
+        $db->commit();
+        echo json_encode(["success" => true]);
+
     } catch (Exception $e) {
+        $db->rollBack();
         echo json_encode(["success" => false, "message" => $e->getMessage()]);
     }
 }
