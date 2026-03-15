@@ -650,6 +650,7 @@
                             <th style="padding:10px; text-align: left;">Nome</th>
                             <th style="padding:10px; text-align: left;">Login</th>
                             <th style="padding:10px; text-align: left;">Função</th>
+                            <th style="padding:10px; text-align: left;" class="admin-only">Unidades</th>
                             <th style="padding:10px; text-align: right;">Ações</th>
                         </tr>
                         </thead>
@@ -675,6 +676,13 @@
                     </div>
                     <div style="max-height: 200px; overflow-y: auto; margin-top: 15px; border: 1px solid var(--border); border-radius: 8px;">
                         <table style="width:100%; font-size: 0.9rem;">
+                            <thead>
+                            <tr style="background: var(--bg-body); position: sticky; top: 0;">
+                                <th style="padding:8px 10px; text-align:left; font-weight:600; color:var(--text-light); font-size:0.8rem;">#</th>
+                                <th style="padding:8px 10px; text-align:left; font-weight:600; color:var(--text-light); font-size:0.8rem;">Nome da Unidade</th>
+                                <th style="padding:8px 10px; text-align:right; font-weight:600; color:var(--text-light); font-size:0.8rem;">Ações</th>
+                            </tr>
+                            </thead>
                             <tbody id="tabela-unidades"></tbody>
                         </table>
                     </div>

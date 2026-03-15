@@ -24,22 +24,43 @@ try {
 
     // --- TROCAR UNIDADE ATIVA ---
     if ($action === 'trocar_unidade' && $method === 'POST') {
-        $input = json_decode(file_get_contents("php://input"));
-        $novaUnidade = (int)($input->id_unidade ?? 0);
-
-        // Verifica se o usuário realmente tem acesso a essa unidade
-        $unidadesPermitidas = array_column($_SESSION['unidades'] ?? [], 'id');
-
-        if (!in_array($novaUnidade, $unidadesPermitidas)) {
-            http_response_code(403);
-            $response = ["success" => false, "message" => "Acesso negado a esta unidade."];
+        if (!isset($_SESSION['user_id'])) {
+            http_response_code(401);
+            $response = ["success" => false, "message" => "Sessão inválida."];
         } else {
-            $_SESSION['id_unidade_ativa'] = $novaUnidade;
-            $nomeUnidade = '';
-            foreach ($_SESSION['unidades'] as $u) {
-                if ((int)$u['id'] === $novaUnidade) { $nomeUnidade = $u['nome']; break; }
+            $input = json_decode(file_get_contents("php://input"));
+            $novaUnidade = (int)($input->id_unidade ?? 0);
+
+            // Valida no banco de dados (fonte de verdade), não apenas na sessão
+            $dbClass = new Database();
+            $db = $dbClass->getConnection();
+            $stmtCheck = $db->prepare(
+                "SELECT u.id, u.nome FROM unidades u
+                 INNER JOIN usuario_unidade uu ON uu.id_unidade = u.id
+                 WHERE uu.id_usuario = :uid AND u.id = :un LIMIT 1"
+            );
+            $stmtCheck->execute([':uid' => $_SESSION['user_id'], ':un' => $novaUnidade]);
+            $unidade = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+            if (!$unidade) {
+                http_response_code(403);
+                $response = ["success" => false, "message" => "Acesso negado a esta unidade."];
+            } else {
+                $_SESSION['id_unidade_ativa'] = (int)$unidade['id'];
+                // Actualiza o cache de unidades na sessão para ficar consistente
+                $stmtUns = $db->prepare(
+                    "SELECT u.id, u.nome FROM unidades u
+                     INNER JOIN usuario_unidade uu ON uu.id_unidade = u.id
+                     WHERE uu.id_usuario = :uid ORDER BY u.nome"
+                );
+                $stmtUns->execute([':uid' => $_SESSION['user_id']]);
+                $_SESSION['unidades'] = $stmtUns->fetchAll(PDO::FETCH_ASSOC);
+
+                $response = [
+                    "success" => true,
+                    "unidade_ativa" => ["id" => (int)$unidade['id'], "nome" => $unidade['nome']]
+                ];
             }
-            $response = ["success" => true, "unidade_ativa" => ["id" => $novaUnidade, "nome" => $nomeUnidade]];
         }
     }
     // --- LOGOUT ---
@@ -50,25 +71,30 @@ try {
     // --- CHECK SESSÃO ---
     elseif ($action === 'check') {
         if (isset($_SESSION['user_id']) && isset($_SESSION['id_unidade_ativa'])) {
-            
-            // Procura os dados da unidade ativa na lista de unidades
+
+            // Normaliza todas as unidades da sessão para garantir que 'id' é sempre int
+            // (PDO pode devolver strings dependendo do driver/configuração)
+            $unidadesSessao = array_map(function($u) {
+                return ['id' => (int)$u['id'], 'nome' => $u['nome']];
+            }, $_SESSION['unidades'] ?? []);
+
+            // Procura a unidade ativa com comparação segura (ambos os lados como int)
             $unidadeAtivaData = null;
-            if (isset($_SESSION['unidades'])) {
-                foreach ($_SESSION['unidades'] as $u) {
-                    if ($u['id'] === $_SESSION['id_unidade_ativa']) {
-                        $unidadeAtivaData = $u;
-                        break;
-                    }
+            $idAtivaInt = (int)$_SESSION['id_unidade_ativa'];
+            foreach ($unidadesSessao as $u) {
+                if ($u['id'] === $idAtivaInt) {
+                    $unidadeAtivaData = $u;
+                    break;
                 }
             }
 
             $response = [
-                "success" => true,
-                "id" => $_SESSION['user_id'],
-                "nome" => $_SESSION['user_nome'],
-                "usuario" => $_SESSION['user_login'] ?? '',
-                "funcao" => $_SESSION['user_funcao'],
-                "unidades" => $_SESSION['unidades'] ?? [],
+                "success"       => true,
+                "id"            => (int)$_SESSION['user_id'],
+                "nome"          => $_SESSION['user_nome'],
+                "usuario"       => $_SESSION['user_login'] ?? '',
+                "funcao"        => $_SESSION['user_funcao'],
+                "unidades"      => $unidadesSessao,
                 "unidade_ativa" => $unidadeAtivaData
             ];
         } else {
@@ -93,27 +119,30 @@ try {
                 // Busca unidades do usuário
                 $stmtUnidades = $db->prepare("SELECT u.id, u.nome FROM unidades u 
                                             INNER JOIN usuario_unidade uu ON u.id = uu.id_unidade 
-                                            WHERE uu.id_usuario = :uid");
+                                            WHERE uu.id_usuario = :uid ORDER BY u.nome");
                 $stmtUnidades->execute([':uid' => $row['id']]);
-                $unidades = $stmtUnidades->fetchAll(PDO::FETCH_ASSOC);
+                $unidadesRaw = $stmtUnidades->fetchAll(PDO::FETCH_ASSOC);
+
+                // Normaliza os IDs para int (PDO pode devolver strings)
+                $unidades = array_map(fn($u) => ['id' => (int)$u['id'], 'nome' => $u['nome']], $unidadesRaw);
 
                 if (count($unidades) === 0) {
                     enviarResponse(["success" => false, "message" => "Usuário não possui acesso a nenhuma unidade."], 403);
                 }
 
-                $_SESSION['user_id'] = $row['id'];
-                $_SESSION['user_nome'] = $row['nome'];
-                $_SESSION['user_login'] = $row['usuario'];
-                $_SESSION['user_funcao'] = $row['funcao'];
-                $_SESSION['unidades'] = $unidades;
-                $_SESSION['id_unidade_ativa'] = $unidades[0]['id']; // Define a primeira como padrão
+                $_SESSION['user_id']          = (int)$row['id'];
+                $_SESSION['user_nome']         = $row['nome'];
+                $_SESSION['user_login']        = $row['usuario'];
+                $_SESSION['user_funcao']       = $row['funcao'];
+                $_SESSION['unidades']          = $unidades;
+                $_SESSION['id_unidade_ativa']  = $unidades[0]['id']; // já é int
 
                 $response = [
-                    "success" => true,
-                    "id" => $row['id'],
-                    "nome" => $row['nome'],
-                    "funcao" => $row['funcao'],
-                    "unidades" => $unidades,
+                    "success"       => true,
+                    "id"            => (int)$row['id'],
+                    "nome"          => $row['nome'],
+                    "funcao"        => $row['funcao'],
+                    "unidades"      => $unidades,
                     "unidade_ativa" => $unidades[0]
                 ];
             } else {

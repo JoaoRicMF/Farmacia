@@ -21,12 +21,19 @@ try {
     $userNome = $_SESSION['user_nome'];
 
     // --- ROTINA DE AUTO-UPDATE (VENCIDOS) ---
-    // Executa antes de qualquer ação para garantir dados atualizados
-    $sqlAutoUpdate = "UPDATE financeiro 
-                      SET status = 'Vencido' 
-                      WHERE status = 'Pendente' 
-                      AND vencimento < CURRENT_DATE()";
-    $db->query($sqlAutoUpdate);
+    // Executa antes de qualquer ação para garantir dados atualizados.
+    // ISOLAMENTO: Filtra pela unidade ativa para não afectar outros tenants.
+    $unidadeAtivaSessao = $_SESSION['id_unidade_ativa'] ?? null;
+    if ($unidadeAtivaSessao) {
+        $stmtAutoUp = $db->prepare(
+            "UPDATE financeiro 
+             SET status = 'Vencido' 
+             WHERE status = 'Pendente' 
+             AND vencimento < CURRENT_DATE()
+             AND id_unidade = :uid"
+        );
+        $stmtAutoUp->execute([':uid' => $unidadeAtivaSessao]);
+    }
     // ----------------------------------------
 
     $method = $_SERVER['REQUEST_METHOD'];

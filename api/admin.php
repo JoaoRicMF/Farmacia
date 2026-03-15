@@ -158,15 +158,41 @@ try {
                 // $_SESSION['user_funcao'] = $novaFuncao; // Se quiser atualizar a role na sessão imediatamente
             }
 
-            // Se Admin enviou array de unidades, ressincroniza os vínculos
-            if ($isAdmin && !empty($data->unidades) && is_array($data->unidades)) {
-                // Remove todos vínculos existentes e recria com os selecionados
-                // (apenas remove vínculos desta unidade; outras permanecem intactas)
-                $db->prepare("DELETE FROM usuario_unidade WHERE id_usuario = :uid")
-                   ->execute([':uid' => $data->id]);
-                $stmtRe = $db->prepare("INSERT IGNORE INTO usuario_unidade (id_usuario, id_unidade) VALUES (:u,:un)");
-                foreach ($data->unidades as $idUn) {
-                    $stmtRe->execute([':u' => $data->id, ':un' => (int)$idUn]);
+            // Se Admin enviou array de unidades, ressincroniza os vínculos.
+            // SEGURANÇA: Apenas manipula unidades às quais o Admin logado tem acesso,
+            // nunca removendo vínculos de outras instalações/tenants.
+            if ($isAdmin && isset($data->unidades) && is_array($data->unidades)) {
+                // 1. Obtém todas as unidades às quais o Admin logado tem acesso (seu escopo)
+                $stmtAdminUns = $db->prepare(
+                    "SELECT id_unidade FROM usuario_unidade WHERE id_usuario = :uid"
+                );
+                $stmtAdminUns->execute([':uid' => $currentId]);
+                $adminScope = array_column($stmtAdminUns->fetchAll(PDO::FETCH_ASSOC), 'id_unidade');
+
+                // 2. Filtra o array recebido para aceitar apenas IDs dentro do escopo do Admin
+                $novasUnidades = array_values(array_filter(
+                    array_map('intval', $data->unidades),
+                    fn($id) => in_array($id, $adminScope)
+                ));
+
+                if (empty($novasUnidades)) {
+                    throw new Exception("Selecione ao menos uma unidade válida.", 400);
+                }
+
+                // 3. Remove APENAS os vínculos dentro do escopo do Admin (preserva outros tenants)
+                $placeholders = implode(',', array_fill(0, count($adminScope), '?'));
+                $stmtDel = $db->prepare(
+                    "DELETE FROM usuario_unidade 
+                     WHERE id_usuario = ? AND id_unidade IN ($placeholders)"
+                );
+                $stmtDel->execute(array_merge([(int)$data->id], $adminScope));
+
+                // 4. Insere os vínculos novos selecionados pelo Admin
+                $stmtIns = $db->prepare(
+                    "INSERT IGNORE INTO usuario_unidade (id_usuario, id_unidade) VALUES (?, ?)"
+                );
+                foreach ($novasUnidades as $idUn) {
+                    $stmtIns->execute([(int)$data->id, $idUn]);
                 }
             }
 

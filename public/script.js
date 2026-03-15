@@ -1288,14 +1288,15 @@ const Admin = {
 
     // ── Modal Editar Usuário + Unidades ──────────────────────────────────────
     async modalEditarUsuario(idUsuario) {
-        // Busca todos os dados dos usuários
-        const usuarios = await API.request('admin.php?resource=usuarios');
-        if (!usuarios) return;
-        const u = usuarios.find(x => x.id == idUsuario);
-        if (!u) return;
+        // Faz as duas requisições em paralelo para ser mais rápido
+        const [usuarios, todasUnidades] = await Promise.all([
+            API.request('admin.php?resource=usuarios'),
+            API.request('admin.php?resource=unidades')
+        ]);
 
-        // Busca TODAS as unidades da farmácia para criar os checkboxes
-        const todasUnidades = await API.request('admin.php?resource=unidades');
+        if (!usuarios) return UI.showToast('Erro ao carregar utilizadores.', 'error');
+        const u = usuarios.find(x => x.id == idUsuario);
+        if (!u) return UI.showToast('Utilizador não encontrado.', 'error');
 
         const modal = document.getElementById('modal-editar-usuario');
         if (!modal) return;
@@ -1308,16 +1309,20 @@ const Admin = {
 
         // Renderiza checkboxes de unidades e marca as que o utilizador já tem
         const container = document.getElementById('edit-user-unidades');
-        if (container && Array.isArray(todasUnidades)) {
-            // Extrai apenas os IDs das unidades que este utilizador já possui
-            const vinculadas = (u.unidades || []).map(x => x.id);
-            
-            container.innerHTML = todasUnidades.map(un => `
-                <label style="display:flex;align-items:center;gap:6px;padding:4px 0; cursor:pointer;">
-                    <input type="checkbox" name="edit-unidade" value="${un.id}"
-                        ${vinculadas.includes(un.id) ? 'checked' : ''}>
-                    ${un.nome}
-                </label>`).join('');
+        if (container) {
+            if (!Array.isArray(todasUnidades) || todasUnidades.length === 0) {
+                container.innerHTML = '<small style="color:var(--text-light)">Nenhuma unidade disponível.</small>';
+            } else {
+                // Extrai apenas os IDs das unidades que este utilizador já possui
+                const vinculadas = (u.unidades || []).map(x => parseInt(x.id));
+
+                container.innerHTML = todasUnidades.map(un => `
+                    <label style="display:flex;align-items:center;gap:6px;padding:4px 0; cursor:pointer;">
+                        <input type="checkbox" name="edit-unidade" value="${un.id}"
+                            ${vinculadas.includes(parseInt(un.id)) ? 'checked' : ''}>
+                        ${un.nome}
+                    </label>`).join('');
+            }
         }
 
         modal.classList.remove('hidden');
@@ -1535,12 +1540,30 @@ const Unidades = {
 
             UI.showToast(`Unidade: ${res.unidade_ativa?.nome ?? ''}`, 'success');
 
-            // Recarrega a view atual
-            const secao = document.querySelector('.view-section:not(.hidden)');
-            if (secao) UI.navegar(secao.id.replace('view-', ''), null);
+            // Recarrega os módulos de dados sem reload de página.
+            // Determina a view actualmente visível para focar o refresh correcto.
+            const secaoActiva = document.querySelector('.view-section:not(.hidden)');
+            const telaId = secaoActiva ? secaoActiva.id.replace('view-', '') : 'dashboard';
+
+            // Atualiza sempre os três módulos principais (dados dependem da unidade)
+            const refreshTasks = [
+                Dashboard.carregar(),
+                Financeiro.carregar(1),
+                Fluxo.carregar()
+            ];
+
+            // Executa em paralelo e aguarda
+            await Promise.allSettled(refreshTasks);
+
+            // Re-navega para a view activa para garantir que os dados corretos são exibidos
+            // (sem re-disparar o navegar se já estiver na view certa — apenas resincroniza menu)
+            const btnAtivo = document.querySelector(`.menu-item[onclick*="'${telaId}'"]`);
+            document.querySelectorAll('.menu-item').forEach(b => b.classList.remove('active'));
+            if (btnAtivo) btnAtivo.classList.add('active');
+
         } else {
             UI.showToast(res?.message || 'Erro ao trocar de unidade.', 'error');
-            // Reverte o select
+            // Reverte o select para o valor anterior
             const seletor = document.getElementById('seletor-unidade');
             if (seletor && State.unidadeAtiva) seletor.value = State.unidadeAtiva.id;
         }
